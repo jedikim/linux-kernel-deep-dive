@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 364" xmlns="http://www.w3.org/2000/svg">
+  <title>VT-x의 두 모드와 링: 호스트는 VMX root 모드, 게스트는 VMX non-root 모드에서 각각 링 0과 링 3을 쓴다. VM 진입과 VM exit이 두 모드를 오가고 VMCS가 양쪽 상태를 담는다.</title>
+
+  <!-- root -->
+  <rect class="panel yellow" x="20" y="16" width="290" height="196" rx="14"/>
+  <text class="t-b tc-yellow" x="36" y="41">VMX root 모드 · 호스트</text>
+  <rect class="box green" x="36" y="54" width="258" height="62" rx="10"/>
+  <text class="t-b" x="50" y="79">링 3</text>
+  <text class="t-s" x="50" y="101">VMM(QEMU 등)과 보통의 프로세스</text>
+  <rect class="box yellow" x="36" y="130" width="258" height="66" rx="10"/>
+  <text class="t-b" x="50" y="156">링 0</text>
+  <text class="t-s" x="50" y="178">호스트 커널 + KVM 모듈</text>
+
+  <!-- non-root -->
+  <rect class="panel blue" x="450" y="16" width="290" height="196" rx="14"/>
+  <text class="t-b tc-blue" x="466" y="41">VMX non-root 모드 · 게스트</text>
+  <rect class="box blue" x="466" y="54" width="258" height="62" rx="10"/>
+  <text class="t-b" x="480" y="79">링 3</text>
+  <text class="t-s" x="480" y="101">게스트의 유저 프로세스</text>
+  <rect class="box blue" x="466" y="130" width="258" height="66" rx="10"/>
+  <text class="t-b" x="480" y="156">링 0</text>
+  <text class="t-s" x="480" y="178">게스트 커널 · 진짜 링 0에서 실행</text>
+
+  <!-- 전환 -->
+  <path class="ln blue" d="M294 150 H462" marker-end="url(#ah-blue)"/>
+  <text class="t-s t-ink t-b mid" x="380" y="130">VM 진입</text>
+  <text class="t-code mid" x="380" y="144">VMRESUME</text>
+  <path class="ln red" d="M466 178 H298" marker-end="url(#ah-red)"/>
+  <text class="t-s tc-red t-b mid" x="380" y="198">VM exit</text>
+
+  <!-- VMCS -->
+  <rect class="box" x="20" y="230" width="720" height="92" rx="12"/>
+  <text class="t-l" x="36" y="255">VMCS</text>
+  <text class="t-s" x="96" y="255">vCPU마다 하나. 진입과 exit 때 CPU가 직접 읽고 쓴다</text>
+  <rect class="box blue" x="36" y="266" width="220" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="48" y="285">게스트 상태</text>
+  <text class="t-xs" x="48" y="302">RIP, RSP, CR3, 세그먼트 …</text>
+  <rect class="box yellow" x="270" y="266" width="220" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="282" y="285">호스트 상태</text>
+  <text class="t-xs" x="282" y="302">exit 뒤에 돌아올 RIP, RSP, CR3</text>
+  <rect class="box red" x="504" y="266" width="220" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="516" y="285">실행 제어</text>
+  <text class="t-xs" x="516" y="302">무엇이 exit을 일으키는가</text>
+
+  <text class="t-s mid" x="380" y="348">exit은 게스트의 어느 링에서든 일어나고, 언제나 호스트의 링 0으로 넘어온다</text>
+</svg>

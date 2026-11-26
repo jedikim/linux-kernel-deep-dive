@@ -1,0 +1,63 @@
+<svg viewBox="0 0 760 272" xmlns="http://www.w3.org/2000/svg">
+  <title>RX 디스크립터 링의 세 구역: NIC가 패킷을 채운 디스크립터, 빈 버퍼가 달린 디스크립터, 버퍼를 다시 달아야 하는 디스크립터와 그 경계를 가리키는 세 포인터</title>
+
+  <text class="t-code mid" x="160" y="36">next_to_clean</text>
+  <text class="t-xs mid" x="160" y="54">드라이버가 읽을 자리</text>
+  <path class="ln thin purple" d="M160 62 V90" marker-end="url(#ah-purple)"/>
+  <text class="t-code mid" x="360" y="36">RDH</text>
+  <text class="t-xs mid" x="360" y="54">NIC가 쓸 자리</text>
+  <path class="ln thin " d="M360 62 V90" marker-end="url(#ah)"/>
+  <text class="t-code mid" x="600" y="36">next_to_use · RDT</text>
+  <text class="t-xs mid" x="600" y="54">새 버퍼를 달 자리</text>
+  <path class="ln thin purple" d="M600 62 V90" marker-end="url(#ah-purple)"/>
+  <rect class="ghost dash" x="60" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="80" y="148">0</text>
+  <rect class="ghost dash" x="100" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="120" y="148">1</text>
+  <rect class="box green" x="140" y="96" width="40" height="36"/>
+  <text class="t-code mid" x="160" y="119">DD</text>
+  <text class="t-xs tc-muted mid" x="160" y="148">2</text>
+  <rect class="box green" x="180" y="96" width="40" height="36"/>
+  <text class="t-code mid" x="200" y="119">DD</text>
+  <text class="t-xs tc-muted mid" x="200" y="148">3</text>
+  <rect class="box green" x="220" y="96" width="40" height="36"/>
+  <text class="t-code mid" x="240" y="119">DD</text>
+  <text class="t-xs tc-muted mid" x="240" y="148">4</text>
+  <rect class="box green" x="260" y="96" width="40" height="36"/>
+  <text class="t-code mid" x="280" y="119">DD</text>
+  <text class="t-xs tc-muted mid" x="280" y="148">5</text>
+  <rect class="box green" x="300" y="96" width="40" height="36"/>
+  <text class="t-code mid" x="320" y="119">DD</text>
+  <text class="t-xs tc-muted mid" x="320" y="148">6</text>
+  <rect class="box gray" x="340" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="360" y="148">7</text>
+  <rect class="box gray" x="380" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="400" y="148">8</text>
+  <rect class="box gray" x="420" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="440" y="148">9</text>
+  <rect class="box gray" x="460" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="480" y="148">10</text>
+  <rect class="box gray" x="500" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="520" y="148">11</text>
+  <rect class="box gray" x="540" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="560" y="148">12</text>
+  <rect class="ghost dash" x="580" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="600" y="148">13</text>
+  <rect class="ghost dash" x="620" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="640" y="148">14</text>
+  <rect class="ghost dash" x="660" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="680" y="148">15</text>
+  <path class="ln thin green" d="M144 160 V166 H336 V160"/>
+  <text class="t-s t-ink t-b mid" x="240" y="186">패킷이 든 버퍼</text>
+  <text class="t-xs mid" x="240" y="204">poll이 꺼내 skb로 올린다</text>
+  <path class="ln thin muted" d="M344 160 V166 H576 V160"/>
+  <text class="t-s t-ink t-b mid" x="460" y="186">빈 버퍼, NIC가 차지</text>
+  <text class="t-xs mid" x="460" y="204">다음 패킷이 DMA로 들어온다</text>
+  <path class="ln thin muted" d="M584 160 V166 H696 V160"/>
+  <text class="t-s t-ink t-b mid" x="640" y="186">버퍼 없음</text>
+  <text class="t-xs mid" x="640" y="204">드라이버가 채운다</text>
+  <path class="ln thin muted" d="M64 160 V166 H136 V160"/>
+  <text class="t-s t-ink t-b mid" x="100" y="186">버퍼 없음</text>
+  <path class="ln thin muted dash" d="M700 114 H726 V232 H34 V114 H54" marker-end="url(#ah-muted)"/>
+  <text class="t-xs mid" x="380" y="252">링이므로 15 다음은 0이다. 세 포인터가 같은 방향으로 돌며 서로를 쫓는다.</text>
+</svg>

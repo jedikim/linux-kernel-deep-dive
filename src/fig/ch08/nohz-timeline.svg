@@ -1,0 +1,41 @@
+<svg viewBox="0 0 760 348" xmlns="http://www.w3.org/2000/svg">
+  <title>틱 모드 세 가지의 시간선: HZ_PERIODIC은 항상 틱이 오고, NO_HZ_IDLE은 쉬는 동안 틱을 멈추고, NO_HZ_FULL은 태스크 하나만 도는 동안에도 틱을 멈춘다</title>
+
+  <!-- CPU가 하는 일 -->
+  <text class="t-s t-ink t-b" x="20" y="48">CPU가 하는 일</text>
+  <rect class="box green" x="160" y="28" width="180" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="250" y="49">태스크 A, B가 번갈아 실행</text>
+  <rect class="box gray" x="340" y="28" width="210" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="445" y="49">쉬는 중 (idle)</text>
+  <rect class="box blue" x="550" y="28" width="180" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="640" y="49">태스크 C 하나만 실행</text>
+
+  <path class="ln thin muted dash" d="M340 64 V128 M340 150 V208 M340 230 V286"/>
+  <path class="ln thin muted dash" d="M550 64 V128 M550 150 V208 M550 230 V286"/>
+
+  <!-- HZ_PERIODIC -->
+  <text class="t-b" x="20" y="112">HZ_PERIODIC</text>
+  <path class="ln thin muted" d="M160 122 H730"/>
+  <path class="ln warm" d="M169 106 V122 M187 106 V122 M205 106 V122 M223 106 V122 M241 106 V122 M259 106 V122 M277 106 V122 M295 106 V122 M313 106 V122 M331 106 V122 M349 106 V122 M367 106 V122 M385 106 V122 M403 106 V122 M421 106 V122 M439 106 V122 M457 106 V122 M475 106 V122 M493 106 V122 M511 106 V122 M529 106 V122 M547 106 V122 M565 106 V122 M583 106 V122 M601 106 V122 M619 106 V122 M637 106 V122 M655 106 V122 M673 106 V122 M691 106 V122 M709 106 V122 M727 106 V122"/>
+  <text class="t-xs" x="160" y="142">할 일이 있든 없든 1/HZ초마다 틱이 온다</text>
+
+  <!-- NO_HZ_IDLE -->
+  <text class="t-b" x="20" y="192">NO_HZ_IDLE</text>
+  <path class="ln thin muted" d="M160 202 H730"/>
+  <path class="ln warm" d="M169 186 V202 M187 186 V202 M205 186 V202 M223 186 V202 M241 186 V202 M259 186 V202 M277 186 V202 M295 186 V202 M313 186 V202 M331 186 V202 M565 186 V202 M583 186 V202 M601 186 V202 M619 186 V202 M637 186 V202 M655 186 V202 M673 186 V202 M691 186 V202 M709 186 V202 M727 186 V202"/>
+  <path class="ln red" d="M475 182 V202"/>
+  <text class="t-xs tc-red mid" x="475" y="176">다음 타이머 만료</text>
+  <text class="t-xs" x="160" y="222">쉬는 동안은 가장 이른 타이머에 맞춘 인터럽트 한 번만 예약한다</text>
+
+  <!-- NO_HZ_FULL -->
+  <text class="t-b" x="20" y="268">NO_HZ_FULL</text>
+  <text class="t-xs" x="20" y="286">nohz_full= CPU</text>
+  <path class="ln thin muted" d="M160 282 H730"/>
+  <path class="ln warm" d="M169 266 V282 M187 266 V282 M205 266 V282 M223 266 V282 M241 266 V282 M259 266 V282 M277 266 V282 M295 266 V282 M313 266 V282 M331 266 V282"/>
+  <path class="ln red" d="M475 262 V282"/>
+  <text class="t-xs" x="160" y="302">런큐에 태스크가 하나뿐이면 실행 중에도 틱을 멈춘다</text>
+  <text class="t-xs" x="160" y="320">jiffies 갱신은 다른 CPU가 맡고, 스케줄러 통계는 1초에 한 번 원격으로 갱신한다</text>
+
+  <path class="ln warm" d="M20 338 V326"/>
+  <text class="t-xs" x="28" y="337">틱 인터럽트</text>
+</svg>

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>참고 자료 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="참고 자료">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="참고 자료 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="참고 자료">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="refs" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html" aria-current="page">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb"><b>참고 자료</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head"><h1>참고 자료</h1></header><section class="level2" id="primary">
+<h2>일차 자료<a aria-label="이 절의 링크" class="anchor" href="#primary">#</a></h2>
+<ul>
+<li><a href="https://github.com/torvalds/linux/tree/v7.3" rel="noopener" target="_blank">리눅스 커널 소스 v7.3</a>: 이 책의 모든 코드 인용이 나온 곳.</li>
+<li><a href="https://docs.kernel.org/" rel="noopener" target="_blank">docs.kernel.org</a>: 소스 트리의 <code>Documentation/</code>을 그대로 실은 공식 문서.</li>
+<li><a href="https://lore.kernel.org/" rel="noopener" target="_blank">lore.kernel.org</a>: 메일링 리스트 보관소. 패치와 그 토론이 모두 남아 있습니다.</li>
+<li><a href="https://man7.org/linux/man-pages/" rel="noopener" target="_blank">man7.org</a>: 시스템 콜과 커널 인터페이스의 매뉴얼 페이지.</li>
+<li><a href="https://elixir.bootlin.com/linux/v7.3/source" rel="noopener" target="_blank">elixir.bootlin.com</a>: 식별자를 따라가며 읽는 소스 브라우저.</li>
+</ul>
+</section>
+<section class="level2" id="news">
+<h2>변화를 따라가는 곳<a aria-label="이 절의 링크" class="anchor" href="#news">#</a></h2>
+<ul>
+<li><a href="https://lwn.net/Kernel/Index/" rel="noopener" target="_blank">LWN.net 커널 색인</a>: 주제별로 정리된 커널 기사. 설계 논의의 배경을 알기에 가장 좋습니다.</li>
+<li><a href="https://kernelnewbies.org/LinuxVersions" rel="noopener" target="_blank">Kernel Newbies: LinuxVersions</a>: 버전마다 무엇이 들어왔는지의 요약.</li>
+<li><a href="https://www.kernel.org/" rel="noopener" target="_blank">kernel.org</a>: 메인라인, 안정 버전, 장기 지원 버전의 현재 목록.</li>
+</ul>
+</section>
+<section class="level2" id="articles">
+<h2>강의와 글<a aria-label="이 절의 링크" class="anchor" href="#articles">#</a></h2>
+<ul>
+<li>Kernel of Linux 강의 교안. 공개SW 역량프라자 OLC의 모델 커리큘럼 과정 교재입니다. CC BY 2.0 KR, © Korea OSS Promotion Forum, NIPA.</li>
+<li><a href="http://jake.dothome.co.kr/" rel="noopener" target="_blank">문c 블로그</a>: 커널 소스를 함수 단위로 따라가며 해설한 한국어 글 모음. 이 책과 관련 깊은 글로 <a href="http://jake.dothome.co.kr/preemption/" rel="noopener" target="_blank">선점과 컨텍스트 스위치</a>, <a href="http://jake.dothome.co.kr/tick-device/" rel="noopener" target="_blank">틱 디바이스</a>, <a href="http://jake.dothome.co.kr/two-part-interrupt-handler/" rel="noopener" target="_blank">top-half와 bottom-half</a>, <a href="http://jake.dothome.co.kr/priority-inheritance/" rel="noopener" target="_blank">우선순위 역전과 상속</a>, <a href="http://jake.dothome.co.kr/rcu/" rel="noopener" target="_blank">RCU</a>가 있습니다.</li>
+<li><a href="https://github.com/0xAX/linux-insides" rel="noopener" target="_blank">linux-insides</a>: 부팅, 인터럽트, 시스템 콜, 타이머를 소스로 따라가는 책.</li>
+<li><a href="https://linux-kernel-labs.github.io/refs/heads/master/" rel="noopener" target="_blank">Linux Kernel Labs</a>: 강의 자료와 실습. <a href="https://linux-kernel-labs.github.io/refs/heads/master/lectures/smp.html" rel="noopener" target="_blank">SMP 강의</a>가 동시성의 좋은 입문입니다.</li>
+<li>Eli Bendersky, <a href="https://eli.thegreenplace.net/2018/launching-linux-threads-and-processes-with-clone/" rel="noopener" target="_blank">Launching Linux threads and processes with clone</a>: 스레드와 프로세스가 <code>clone</code> 플래그의 차이임을 예제로 보입니다.</li>
+<li>Jiannan Ouyang, <a href="http://people.cs.pitt.edu/~ouyang/20150225-kernel-concurreny.html" rel="noopener" target="_blank">Kernel Level Concurrency: Locks and Kernel Preemption</a>: 락, 선점 끄기, 인터럽트 끄기의 관계.</li>
+<li>Matt Fleming, <a href="https://www.codeblueprint.co.uk/2019/12/23/linux-preemption-latency-throughput.html" rel="noopener" target="_blank">Linux kernel preemption and the latency-throughput tradeoff</a>: 선점 모델별 측정.</li>
+<li>Alex Dzyoba, <a href="https://alex.dzyoba.com/blog/os-interrupts/" rel="noopener" target="_blank">Basic x86 interrupts</a>: 작은 커널에서 IDT와 PIC를 직접 설정해 보는 글.</li>
+<li><a href="https://makelinux.github.io/kernel/map/" rel="noopener" target="_blank">Interactive map of Linux kernel</a>: 서브시스템과 주요 함수의 지도.</li>
+<li>Brendan Gregg, <a href="https://www.brendangregg.com/linuxperf.html" rel="noopener" target="_blank">Linux Performance</a>: 관측 도구의 지도와 사용법.</li>
+</ul>
+</section>
+<section class="level2" id="books">
+<h2>책<a aria-label="이 절의 링크" class="anchor" href="#books">#</a></h2>
+<ul>
+<li>Robert Love, <em>Linux Kernel Development</em> (3판, 2010). 커널 전반의 입문서. 버전은 오래되었지만 설명의 뼈대는 여전히 좋습니다.</li>
+<li>Daniel P. Bovet, Marco Cesati, <em>Understanding the Linux Kernel</em> (3판, 2005).</li>
+<li>Wolfgang Mauerer, <em>Professional Linux Kernel Architecture</em> (2008).</li>
+<li>Michael Kerrisk, <em>The Linux Programming Interface</em> (2010). 유저 공간에서 본 커널 인터페이스.</li>
+<li>Paul E. McKenney, <a href="https://mirrors.edge.kernel.org/pub/linux/kernel/people/paulmck/perfbook/perfbook.html" rel="noopener" target="_blank"><em>Is Parallel Programming Hard, And, If So, What Can You Do About It?</em></a>: RCU를 만든 사람이 쓴 병렬 프로그래밍 책. 무료로 공개되어 있습니다.</li>
+<li>Brendan Gregg, <em>Systems Performance</em> (2판, 2020), <em>BPF Performance Tools</em> (2019).</li>
+</ul>
+</section>
+
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#primary">일차 자료</a><a href="#news">변화를 따라가는 곳</a><a href="#articles">강의와 글</a><a href="#books">책</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

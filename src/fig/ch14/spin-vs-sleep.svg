@@ -1,0 +1,59 @@
+<svg viewBox="0 0 760 384" xmlns="http://www.w3.org/2000/svg">
+  <title>임계 구역이 짧을 때는 돌며 기다리는 쪽이, 길 때는 잠들어 기다리는 쪽이 CPU 시간을 덜 쓴다</title>
+
+  <!-- 위: 임계 구역이 짧을 때 -->
+  <text class="t-b" x="20" y="26">임계 구역이 짧을 때</text>
+  <text class="t-xs" x="246" y="26">↓ A가 락을 푼다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="60">CPU 0 · A</text>
+  <rect class="box blue" x="160" y="40" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="200" y="60">락 쥠</text>
+
+  <text class="t-s t-ink t-b" x="20" y="100">CPU 1 · 스핀</text>
+  <rect class="box red" x="180" y="80" width="60" height="30" rx="6"/>
+  <rect x="180" y="80" width="60" height="30" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box green" x="240" y="80" width="120" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="300" y="100">B · 락 획득</text>
+
+  <text class="t-s t-ink t-b" x="20" y="140">CPU 1 · 슬립</text>
+  <rect class="box warm" x="180" y="120" width="70" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="215" y="140">전환</text>
+  <rect class="box gray" x="250" y="120" width="110" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="305" y="140">다른 태스크</text>
+  <rect class="box warm" x="360" y="120" width="70" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="395" y="140">전환</text>
+  <rect class="box green" x="430" y="120" width="120" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="490" y="140">B · 락 획득</text>
+
+  <path class="ln thin blue dash" d="M240 32 V156"/>
+  <text class="t-s" x="160" y="176">컨텍스트 스위치 두 번이 임계 구역보다 길다. 잠깐 도는 편이 싸다</text>
+
+  <path class="ln thin muted dash" d="M20 196 H740"/>
+
+  <!-- 아래: 임계 구역이 길 때 -->
+  <text class="t-b" x="20" y="226">임계 구역이 길 때</text>
+  <text class="t-xs" x="566" y="226">↓ A가 락을 푼다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="260">CPU 0 · A</text>
+  <rect class="box blue" x="160" y="240" width="400" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="360" y="260">락 쥠</text>
+
+  <text class="t-s t-ink t-b" x="20" y="300">CPU 1 · 스핀</text>
+  <rect class="box red" x="180" y="280" width="380" height="30" rx="6"/>
+  <rect x="180" y="280" width="380" height="30" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box green" x="560" y="280" width="120" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="300">B · 락 획득</text>
+
+  <text class="t-s t-ink t-b" x="20" y="340">CPU 1 · 슬립</text>
+  <rect class="box warm" x="180" y="320" width="50" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="205" y="340">전환</text>
+  <rect class="box gray" x="230" y="320" width="330" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="395" y="340">B는 잠들고, 다른 태스크가 CPU 1을 쓴다</text>
+  <rect class="box warm" x="560" y="320" width="50" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="585" y="340">전환</text>
+  <rect class="box green" x="610" y="320" width="120" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="670" y="340">B · 락 획득</text>
+
+  <path class="ln thin blue dash" d="M560 232 V356"/>
+  <text class="t-s" x="160" y="374">도는 동안 CPU 1은 아무 일도 못 한다. 잠드는 편이 싸다</text>
+</svg>

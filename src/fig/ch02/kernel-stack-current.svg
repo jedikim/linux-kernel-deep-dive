@@ -1,0 +1,64 @@
+<svg viewBox="0 0 760 404" xmlns="http://www.w3.org/2000/svg">
+  <title>커널 스택과 current: v7.3의 x86-64에서는 CPU별 변수 current_task가 task_struct를 가리키고, thread_info는 task_struct의 맨 앞에 들어 있으며, 커널 스택은 가드 페이지 사이에 가상 주소로 매핑된다. 예전에는 thread_info가 스택 바닥에 있어서 스택 포인터로 current를 찾았고, 스택이 넘치면 thread_info가 덮어쓰였다.</title>
+
+  <!-- 왼쪽: v7.3 -->
+  <rect class="panel" x="20" y="16" width="424" height="372" rx="14"/>
+  <text class="t-b" x="34" y="42">v7.3 · x86-64</text>
+
+  <rect class="box yellow" x="34" y="58" width="170" height="52" rx="8"/>
+  <text class="t-code t-b" x="46" y="80">current_task</text>
+  <text class="t-xs" x="46" y="99">CPU별 변수. 스위치 때 갱신</text>
+  <path class="ln" d="M119 110 V136" marker-end="url(#ah)"/>
+
+  <rect class="box blue" x="34" y="140" width="170" height="150" rx="8"/>
+  <text class="t-code t-b" x="46" y="162">task_struct</text>
+  <rect class="box" x="46" y="172" width="146" height="26" rx="5"/>
+  <text class="t-code" x="56" y="190">thread_info</text>
+  <text class="t-xs end" x="184" y="190">맨 앞</text>
+  <rect class="box" x="46" y="204" width="146" height="26" rx="5"/>
+  <text class="t-code" x="56" y="222">stack</text>
+  <text class="t-xs" x="46" y="252">상태, 스케줄링, 자원</text>
+  <text class="t-xs" x="46" y="270">포인터, … thread</text>
+
+  <!-- 스택 기둥 -->
+  <text class="t-xs" x="262" y="52">높은 주소</text>
+  <rect class="box red" x="262" y="58" width="168" height="26"/>
+  <rect x="262" y="58" width="168" height="26" fill="url(#hatch-red)"/>
+  <rect class="box blue" x="262" y="88" width="168" height="30"/>
+  <text class="t-code mid" x="346" y="108">pt_regs</text>
+  <rect class="box yellow" x="262" y="122" width="168" height="44"/>
+  <text class="t-s t-ink mid" x="346" y="149">쓰는 중 ↓</text>
+  <rect class="ghost dash" x="262" y="170" width="168" height="66"/>
+  <text class="t-s mid" x="346" y="208">빈 공간</text>
+  <rect class="box warm" x="262" y="240" width="168" height="26"/>
+  <text class="t-code mid" x="346" y="258">STACK_END_MAGIC</text>
+  <rect class="box red" x="262" y="270" width="168" height="26"/>
+  <rect x="262" y="270" width="168" height="26" fill="url(#hatch-red)"/>
+  <path class="ln thin blue" d="M192 217 H228 V253 H256" marker-end="url(#ah-blue)"/>
+
+  <text class="t-s t-ink t-b" x="34" y="322">커널 스택 16KB를 vmalloc 영역에 따로 매핑한다</text>
+  <text class="t-s tc-red" x="34" y="344">빗금은 가드 페이지. 매핑이 없어서 넘치면 곧바로 폴트가 난다</text>
+  <text class="t-s" x="34" y="366">thread_info는 스택 밖에 있어 넘쳐도 덮어쓰이지 않는다</text>
+
+  <!-- 오른쪽: 예전 -->
+  <rect class="panel" x="460" y="16" width="280" height="372" rx="14"/>
+  <text class="t-b" x="474" y="42">예전 방식</text>
+
+  <text class="t-xs" x="474" y="64">높은 주소</text>
+  <rect class="box blue" x="474" y="70" width="168" height="30"/>
+  <text class="t-code mid" x="558" y="90">pt_regs</text>
+  <rect class="box yellow" x="474" y="104" width="168" height="44"/>
+  <text class="t-s t-ink mid" x="558" y="131">쓰는 중 ↓</text>
+  <rect class="ghost dash" x="474" y="152" width="168" height="48"/>
+  <text class="t-s mid" x="558" y="181">빈 공간</text>
+  <rect class="box red" x="474" y="204" width="168" height="44"/>
+  <text class="t-code t-b mid" x="558" y="222">thread_info</text>
+  <text class="t-xs mid" x="558" y="240">task 포인터, flags</text>
+  <path class="ln" d="M558 248 V268" marker-end="url(#ah)"/>
+  <rect class="box blue" x="474" y="272" width="168" height="28" rx="6"/>
+  <text class="t-code t-b mid" x="558" y="291">task_struct</text>
+
+  <text class="t-s" x="474" y="326">current는 스택 포인터의 아래 비트를</text>
+  <text class="t-s" x="474" y="344">지워 thread_info를 찾고 거기서 읽는다</text>
+  <text class="t-s tc-red" x="474" y="366">넘치면 thread_info부터 덮어쓴다</text>
+</svg>

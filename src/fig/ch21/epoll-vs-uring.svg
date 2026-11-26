@@ -1,0 +1,60 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>소켓 세 개에 데이터가 도착했을 때 epoll은 epoll_wait 한 번과 read 세 번으로 유저·커널 경계를 네 번 넘고, io_uring은 io_uring_enter 한 번으로 완료된 결과를 받아 공유 메모리의 완료 큐에서 읽는다</title>
+
+  <!-- epoll -->
+  <rect class="panel" x="20" y="14" width="720" height="150" rx="14"/>
+  <text class="t-b" x="36" y="38">epoll · 준비 통지</text>
+  <text class="t-s end" x="724" y="38">시스템 콜 N + 1번</text>
+  <path class="ln thin muted dash" d="M36 100 H724"/>
+
+  <rect class="box blue" x="36" y="52" width="110" height="34" rx="6"/>
+  <text class="t-code mid" x="91" y="74">epoll_wait()</text>
+  <path class="ln blue" d="M152 69 V130" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="158" y="114" width="140" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="228" y="136">a, b, c 읽을 수 있음</text>
+  <path class="ln yellow" d="M304 131 V70" marker-end="url(#ah-yellow)"/>
+
+  <rect class="box blue" x="310" y="52" width="74" height="34" rx="6"/>
+  <text class="t-code mid" x="347" y="74">read(a)</text>
+  <path class="ln blue" d="M390 69 V130" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="396" y="114" width="40" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="416" y="136">복사</text>
+  <path class="ln yellow" d="M442 131 V70" marker-end="url(#ah-yellow)"/>
+
+  <rect class="box blue" x="448" y="52" width="74" height="34" rx="6"/>
+  <text class="t-code mid" x="485" y="74">read(b)</text>
+  <path class="ln blue" d="M528 69 V130" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="534" y="114" width="40" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="554" y="136">복사</text>
+  <path class="ln yellow" d="M580 131 V70" marker-end="url(#ah-yellow)"/>
+
+  <rect class="box blue" x="586" y="52" width="74" height="34" rx="6"/>
+  <text class="t-code mid" x="623" y="74">read(c)</text>
+  <path class="ln blue" d="M666 69 V130" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="672" y="114" width="40" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="692" y="136">복사</text>
+
+  <!-- io_uring -->
+  <rect class="panel green" x="20" y="180" width="720" height="150" rx="14"/>
+  <text class="t-b" x="36" y="204">io_uring · 완료 통지 (멀티샷 recv를 걸어 둔 상태)</text>
+  <text class="t-s end" x="724" y="204">1번, 또는 0번</text>
+  <path class="ln thin muted dash" d="M36 266 H724"/>
+
+  <rect class="box blue" x="36" y="218" width="140" height="34" rx="6"/>
+  <text class="t-code mid" x="106" y="240">io_uring_enter()</text>
+  <path class="ln blue" d="M182 235 V296" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="188" y="280" width="282" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="329" y="302">a, b, c에 대해 recv를 실행하고 CQE 3개를 쓴다</text>
+  <path class="ln yellow" d="M476 297 V236" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="482" y="218" width="242" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="603" y="240">CQ에서 결과 3개를 읽는다 · 공유 메모리</text>
+
+  <!-- 범례 -->
+  <rect class="box blue" x="150" y="350" width="26" height="14" rx="3"/>
+  <text class="t-xs" x="184" y="362">유저 모드</text>
+  <rect class="box yellow" x="260" y="350" width="26" height="14" rx="3"/>
+  <text class="t-xs" x="294" y="362">커널 모드</text>
+  <path class="ln thin muted dash" d="M370 357 H396"/>
+  <text class="t-xs" x="404" y="362">유저·커널 경계. 화살표 하나가 모드 전환 한 번</text>
+  <text class="t-xs mid" x="380" y="382">데이터가 이미 와 있으면 io_uring은 경계를 넘지 않고 CQ만 읽는다</text>
+</svg>

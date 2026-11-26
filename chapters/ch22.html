@@ -1,0 +1,1225 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>네임스페이스와 cgroup — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="컨테이너를 이루는 두 가지 커널 기능">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="네임스페이스와 cgroup — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="컨테이너를 이루는 두 가지 커널 기능">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch22" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html" aria-current="page"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">7부 격리와 확장 › <b>22장 네임스페이스와 cgroup</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-yellow">
+<div class="ch-kicker"><span class="ch-no">22</span><span class="part">7부 · 격리와 확장</span></div>
+<h1>네임스페이스와 cgroup</h1>
+<p class="ch-sub">컨테이너를 이루는 두 가지 커널 기능</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 50분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/nsproxy.h" target="_blank" rel="noopener">include/linux/nsproxy.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/nsproxy.c" target="_blank" rel="noopener">kernel/nsproxy.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/pid.h" target="_blank" rel="noopener">include/linux/pid.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/pid.c" target="_blank" rel="noopener">kernel/pid.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/security/commoncap.c" target="_blank" rel="noopener">security/commoncap.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/cgroup-defs.h" target="_blank" rel="noopener">include/linux/cgroup-defs.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/cgroup/cgroup.c" target="_blank" rel="noopener">kernel/cgroup/cgroup.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c" target="_blank" rel="noopener">kernel/sched/fair.c</a></div>
+</header><div class="lead">
+<p><code>docker run</code>으로 띄운 프로세스는 호스트의 <code>ps</code>에 그대로 보입니다. PID가 다르게 보이고 파일시스템이 다르게 보일 뿐, 같은 커널 위에서 도는 평범한 태스크입니다. 커널 소스 어디에도 <code>struct container</code>는 없습니다. 있는 것은 "이 태스크에게 무엇이 보이는가"를 정하는 네임스페이스와 "이 태스크들이 얼마나 쓸 수 있는가"를 정하는 cgroup입니다. 컨테이너는 유저 공간의 런타임이 이 둘을 엮어 만든 약속입니다. 이 장은 그 두 부품이 <code>task_struct</code>에 어떻게 매달려 있는지 읽습니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>컨테이너를 이루는 커널 기능은 무엇이고, 각각 무엇을 맡는가?</li>
+<li>태스크는 자기가 속한 네임스페이스를 어떤 구조체로 가리키는가? <code>fork()</code>할 때 그 구조체는 어떻게 되는가?</li>
+<li>같은 프로세스가 컨테이너 안에서는 PID 1이고 호스트에서는 PID 48213인 것은 어떻게 구현되는가?</li>
+<li>cgroup v2는 왜 트리를 하나만 두는가? "내부 프로세스 금지" 규칙은 코드 어디에 있는가?</li>
+<li><code>cpu.max</code>와 <code>memory.max</code>를 넘으면 각각 무슨 일이 일어나는가?</li>
+<li>컨테이너의 격리는 어디까지이고, 어디서 끝나는가?</li>
+</ul>
+</div>
+<section class="level2" id="no-container">
+<h2><span class="sec-n">22.1</span>커널에는 컨테이너가 없다<a aria-label="이 절의 링크" class="anchor" href="#no-container">#</a></h2>
+<p>컨테이너 런타임이 하는 일을 커널의 눈으로 보면 세 가지입니다.</p>
+<ul>
+<li><strong>네임스페이스</strong>(namespace): 전역 자원의 <strong>이름표</strong>를 태스크 묶음마다 따로 줍니다. PID, 마운트 트리, 네트워크 장치, 호스트 이름이 그런 자원입니다. 무엇이 <em>보이는가</em>를 정합니다.</li>
+<li><strong>cgroup</strong>(control group): 태스크를 묶어 CPU, 메모리, I/O를 <strong>재고 제한</strong>합니다. 얼마나 <em>쓰는가</em>를 정합니다.</li>
+<li><strong>권한 제한</strong>: capability를 줄이고, seccomp로 시스템 콜을 거르고(<a href="ch19.html">19장</a>), LSM으로 접근을 막습니다. 무엇을 <em>할 수 있는가</em>를 정합니다.</li>
+</ul>
+<figure class="fig" id="fig-container-parts"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 366" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>컨테이너는 커널 객체가 아니라 네임스페이스, cgroup, 권한 제한 세 가지를 유저 공간의 런타임이 조합한 것이며, 커널에 남는 것은 포인터 몇 개가 다른 평범한 태스크다</title>
+
+  <rect class="box gray" x="20" y="14" width="720" height="44" rx="10"/>
+  <text class="t-b" x="36" y="41">컨테이너 런타임</text>
+  <text class="t-s end" x="724" y="41">유저 공간의 프로그램. "컨테이너"라는 묶음은 여기에만 있다</text>
+  <path class="ln blue" d="M134 58 V84" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M380 58 V84" marker-end="url(#ah-green)"/>
+  <path class="ln warm" d="M626 58 V84" marker-end="url(#ah-warm)"/>
+
+  <rect class="panel blue" x="20" y="88" width="228" height="170" rx="14"/>
+  <use href="#i-eye" x="36" y="102" width="36" height="36" class="ic blue"/>
+  <text class="t-l" x="84" y="118">네임스페이스</text>
+  <text class="t-s" x="84" y="138">무엇이 보이는가</text>
+  <text class="t-code" x="36" y="172">mnt · pid · net · uts</text>
+  <text class="t-code" x="36" y="192">ipc · user · cgroup · time</text>
+  <text class="t-xs" x="36" y="222">PID, 마운트 트리, 네트워크 장치의</text>
+  <text class="t-xs" x="36" y="240">이름표를 태스크 묶음마다 따로</text>
+
+  <rect class="panel green" x="266" y="88" width="228" height="170" rx="14"/>
+  <use href="#i-scale" x="282" y="102" width="36" height="36" class="ic green"/>
+  <text class="t-l" x="330" y="118">cgroup</text>
+  <text class="t-s" x="330" y="138">얼마나 쓰는가</text>
+  <text class="t-code" x="282" y="172">cpu · memory · io</text>
+  <text class="t-code" x="282" y="192">pids · cpuset</text>
+  <text class="t-xs" x="282" y="222">태스크를 트리로 묶어</text>
+  <text class="t-xs" x="282" y="240">자원을 재고 제한한다</text>
+
+  <rect class="panel warm" x="512" y="88" width="228" height="170" rx="14"/>
+  <use href="#i-shield" x="528" y="102" width="36" height="36" class="ic warm"/>
+  <text class="t-l" x="576" y="118">권한 제한</text>
+  <text class="t-s" x="576" y="138">무엇을 할 수 있는가</text>
+  <text class="t-code" x="528" y="172">capability</text>
+  <text class="t-code" x="528" y="192">seccomp · LSM</text>
+  <text class="t-xs" x="528" y="222">root의 힘을 쪼개 빼고</text>
+  <text class="t-xs" x="528" y="240">시스템 콜을 거른다</text>
+
+  <path class="ln blue" d="M134 258 V290" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M380 258 V290" marker-end="url(#ah-green)"/>
+  <path class="ln warm" d="M626 258 V290" marker-end="url(#ah-warm)"/>
+  <text class="t-code" x="144" y="280">task-&gt;nsproxy</text>
+  <text class="t-code" x="390" y="280">task-&gt;cgroups</text>
+  <text class="t-code" x="636" y="280">task-&gt;cred</text>
+
+  <rect class="box yellow" x="20" y="294" width="720" height="56" rx="10"/>
+  <text class="t-mono t-b" x="36" y="327">task_struct</text>
+  <text class="t-s end" x="724" y="327">커널이 보는 것: 포인터 몇 개가 다른 곳을 가리키는 평범한 태스크</text>
+</svg></div><figcaption><b>그림 22-1</b>컨테이너는 커널 객체가 아니라 세 가지 기능의 조합입니다. 셋은 서로 독립이어서 하나만 쓸 수도 있습니다.</figcaption></figure>
+<p>셋은 서로를 모릅니다. 네임스페이스 없이 cgroup만 쓸 수 있고(systemd가 서비스마다 그렇게 합니다), cgroup 없이 네임스페이스만 쓸 수도 있습니다(<code>unshare</code> 명령). "컨테이너"라는 단위로 묶는 일은 전부 유저 공간에서 일어납니다.</p>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"컨테이너는 가벼운 가상 머신이다." 아닙니다. 가상 머신은 자기 커널을 부팅합니다(<a href="ch23.html">23장</a>). 컨테이너 안의 프로세스는 호스트 커널의 태스크이고, 호스트의 스케줄러가 직접 고르며, 시스템 콜은 호스트 커널이 받습니다. 가벼운 까닭도, 격리가 약한 까닭도 여기 있습니다.</p>
+</div>
+</section>
+<section class="level2" id="namespaces">
+<h2><span class="sec-n">22.2</span>네임스페이스와 nsproxy<a aria-label="이 절의 링크" class="anchor" href="#namespaces">#</a></h2>
+<p>v7.3에는 네임스페이스가 여덟 종류 있습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+</colgroup>
+<thead>
+<tr>
+<th>종류</th>
+<th><code>clone()</code> 플래그</th>
+<th>따로 갖는 것</th>
+<th>도입</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>마운트</td>
+<td><code>CLONE_NEWNS</code></td>
+<td>마운트 트리</td>
+<td>2.4.19</td>
+</tr>
+<tr>
+<td>UTS</td>
+<td><code>CLONE_NEWUTS</code></td>
+<td>호스트 이름, 도메인 이름</td>
+<td>2.6.19</td>
+</tr>
+<tr>
+<td>IPC</td>
+<td><code>CLONE_NEWIPC</code></td>
+<td>System V IPC, POSIX 메시지 큐</td>
+<td>2.6.19</td>
+</tr>
+<tr>
+<td>PID</td>
+<td><code>CLONE_NEWPID</code></td>
+<td>프로세스 ID 번호 공간</td>
+<td>2.6.24</td>
+</tr>
+<tr>
+<td>네트워크</td>
+<td><code>CLONE_NEWNET</code></td>
+<td>장치, 주소, 라우팅 표, 포트, 방화벽 규칙</td>
+<td>2.6.24</td>
+</tr>
+<tr>
+<td>유저</td>
+<td><code>CLONE_NEWUSER</code></td>
+<td>uid·gid와 capability의 범위</td>
+<td>3.8에 완성</td>
+</tr>
+<tr>
+<td>cgroup</td>
+<td><code>CLONE_NEWCGROUP</code></td>
+<td>cgroup 트리에서 루트로 보이는 지점</td>
+<td>4.6</td>
+</tr>
+<tr>
+<td>시간</td>
+<td><code>CLONE_NEWTIME</code></td>
+<td>단조 시계와 부팅 시계의 기준점</td>
+<td>5.6</td>
+</tr>
+</tbody>
+</table></div>
+<p>태스크는 이 가운데 여섯을 <code>nsproxy</code> 하나로 가리킵니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/nsproxy.h#L32" rel="noopener" target="_blank">include/linux/nsproxy.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/nsproxy.h" data-line="32" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="kw">struct</span> nsproxy <span class="op">{</span></span>
+<span id="cb1-2">    refcount_t count<span class="op">;</span></span>
+<span id="cb1-3">    <span class="kw">struct</span> uts_namespace <span class="op">*</span>uts_ns<span class="op">;</span></span>
+<span id="cb1-4">    <span class="kw">struct</span> ipc_namespace <span class="op">*</span>ipc_ns<span class="op">;</span></span>
+<span id="cb1-5">    <span class="kw">struct</span> mnt_namespace <span class="op">*</span>mnt_ns<span class="op">;</span></span>
+<span id="cb1-6">    <span class="kw">struct</span> pid_namespace <span class="op">*</span>pid_ns_for_children<span class="op">;</span></span>
+<span id="cb1-7">    <span class="kw">struct</span> net       <span class="op">*</span>net_ns<span class="op">;</span></span>
+<span id="cb1-8">    <span class="kw">struct</span> time_namespace <span class="op">*</span>time_ns<span class="op">;</span></span>
+<span id="cb1-9">    <span class="kw">struct</span> time_namespace <span class="op">*</span>time_ns_for_children<span class="op">;</span></span>
+<span id="cb1-10">    <span class="kw">struct</span> cgroup_namespace <span class="op">*</span>cgroup_ns<span class="op">;</span></span>
+<span id="cb1-11"><span class="op">};</span></span></code></pre></div></div>
+<p>포인터를 <code>task_struct</code>에 하나씩 두지 않고 <code>nsproxy</code>로 한 단 거친 까닭은 <code>fork()</code>에 있습니다. 대부분의 <code>fork()</code>는 네임스페이스를 하나도 바꾸지 않습니다. 그때는 부모의 <code>nsproxy</code>를 함께 가리키고 참조 카운트 하나만 올리면 됩니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/nsproxy.c#L169" rel="noopener" target="_blank">kernel/nsproxy.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/nsproxy.c" data-line="169" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><span class="dt">int</span> copy_namespaces<span class="op">(</span>u64 flags<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>tsk<span class="op">)</span></span>
+<span id="cb2-2"><span class="op">{</span></span>
+<span id="cb2-3">    <span class="kw">struct</span> nsproxy <span class="op">*</span>old_ns <span class="op">=</span> tsk<span class="op">-&gt;</span>nsproxy<span class="op">;</span></span>
+<span id="cb2-4">    <span class="kw">struct</span> user_namespace <span class="op">*</span>user_ns <span class="op">=</span> task_cred_xxx<span class="op">(</span>tsk<span class="op">,</span> user_ns<span class="op">);</span></span>
+<span id="cb2-5">    <span class="kw">struct</span> nsproxy <span class="op">*</span>new_ns<span class="op">;</span></span>
+<span id="cb2-6"></span>
+<span id="cb2-7">    <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(!(</span>flags <span class="op">&amp;</span> <span class="op">(</span>CLONE_NS_ALL <span class="op">&amp;</span> <span class="op">~</span>CLONE_NEWUSER<span class="op">))))</span> <span class="op">{</span></span>
+<span id="cb2-8">        <span class="cf">if</span> <span class="op">((</span>flags <span class="op">&amp;</span> CLONE_VM<span class="op">)</span> <span class="op">||</span></span>
+<span id="cb2-9">            likely<span class="op">(</span>old_ns<span class="op">-&gt;</span>time_ns_for_children <span class="op">==</span> old_ns<span class="op">-&gt;</span>time_ns<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb2-10">            get_nsproxy<span class="op">(</span>old_ns<span class="op">);</span></span>
+<span id="cb2-11">            <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb2-12">        <span class="op">}</span></span>
+<span id="cb2-13">    <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(!</span>ns_capable<span class="op">(</span>user_ns<span class="op">,</span> CAP_SYS_ADMIN<span class="op">))</span></span>
+<span id="cb2-14">        <span class="cf">return</span> <span class="op">-</span>EPERM<span class="op">;</span></span>
+<span id="cb2-15">    <span class="co">/* ... */</span></span>
+<span id="cb2-16">    new_ns <span class="op">=</span> create_new_namespaces<span class="op">(</span>flags<span class="op">,</span> tsk<span class="op">,</span> user_ns<span class="op">,</span> tsk<span class="op">-&gt;</span>fs<span class="op">);</span></span>
+<span id="cb2-17">    <span class="co">/* ... */</span></span>
+<span id="cb2-18">    tsk<span class="op">-&gt;</span>nsproxy <span class="op">=</span> new_ns<span class="op">;</span></span>
+<span id="cb2-19">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb2-20"><span class="op">}</span></span></code></pre></div></div>
+<p><code>CLONE_NEW*</code> 플래그가 하나라도 있으면 <code>create_new_namespaces()</code>가 <code>nsproxy</code>를 새로 만들고, 종류마다 <code>copy_*_ns()</code>를 부릅니다. 플래그가 선 종류는 새 네임스페이스를 만들고, 나머지는 부모 것의 참조만 얻습니다. 그래서 두 태스크가 네트워크 네임스페이스는 함께 쓰고 마운트 네임스페이스는 따로 쓰는 식의 조합이 됩니다.</p>
+<figure class="fig" id="fig-nsproxy-sharing"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 388" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>태스크 A와 B는 nsproxy 하나를 함께 쓰고, 태스크 C는 마운트·PID·네트워크 네임스페이스만 새로 만든 다른 nsproxy를 쓴다. UTS와 IPC 네임스페이스 객체는 두 nsproxy가 함께 가리킨다</title>
+
+  <rect class="box yellow" x="20" y="36" width="130" height="40" rx="8"/>
+  <text class="t-b" x="32" y="61">태스크 A</text>
+  <rect class="box yellow" x="20" y="96" width="130" height="40" rx="8"/>
+  <text class="t-b" x="32" y="121">태스크 B</text>
+  <rect class="box yellow" x="20" y="252" width="130" height="40" rx="8"/>
+  <text class="t-b" x="32" y="277">태스크 C</text>
+  <text class="t-xs" x="20" y="158">fork()만 했다</text>
+  <text class="t-xs" x="20" y="176">→ nsproxy를 공유</text>
+  <text class="t-xs" x="20" y="314">clone(CLONE_NEWNS |</text>
+  <text class="t-xs" x="20" y="332">NEWPID | NEWNET)</text>
+  <text class="t-xs" x="20" y="350">→ nsproxy를 복사</text>
+  <path class="ln" d="M150 56 H196" marker-end="url(#ah)"/>
+  <path class="ln" d="M150 116 H196" marker-end="url(#ah)"/>
+  <path class="ln" d="M150 272 H196" marker-end="url(#ah)"/>
+  <rect class="box" x="200" y="30" width="150" height="134" rx="10"/>
+  <text class="t-mono t-b" x="212" y="52">nsproxy</text>
+  <text class="t-xs end" x="340" y="52">count 2</text>
+  <text class="t-code" x="212" y="80">mnt_ns</text>
+  <text class="t-code" x="212" y="102">pid_ns_for_…</text>
+  <text class="t-code" x="212" y="124">net_ns</text>
+  <text class="t-code" x="212" y="152">uts_ns · ipc_ns</text>
+  <rect class="box" x="200" y="218" width="150" height="134" rx="10"/>
+  <text class="t-mono t-b" x="212" y="240">nsproxy</text>
+  <text class="t-xs end" x="340" y="240">count 1</text>
+  <text class="t-code" x="212" y="264">uts_ns · ipc_ns</text>
+  <text class="t-code" x="212" y="290">mnt_ns</text>
+  <text class="t-code" x="212" y="312">pid_ns_for_…</text>
+  <text class="t-code" x="212" y="334">net_ns</text>
+  <rect class="box blue" x="470" y="30" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="50">마운트 네임스페이스 ①</text>
+  <text class="t-xs end" x="728" y="50">호스트의 트리</text>
+  <rect class="box blue" x="470" y="66" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="86">PID 네임스페이스 ①</text>
+  <text class="t-xs end" x="728" y="86">level 0</text>
+  <rect class="box blue" x="470" y="102" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="122">네트워크 네임스페이스 ①</text>
+  <text class="t-xs end" x="728" y="122">eth0, lo</text>
+  <rect class="box gray" x="470" y="160" width="270" height="56" rx="8"/>
+  <text class="t-b" x="482" y="183">UTS · IPC 네임스페이스</text>
+  <text class="t-xs" x="482" y="203">바꾸지 않았으므로 세 태스크가 함께 쓴다</text>
+  <rect class="box green" x="470" y="244" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="264">마운트 네임스페이스 ②</text>
+  <text class="t-xs end" x="728" y="264">복사한 트리</text>
+  <rect class="box green" x="470" y="280" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="300">PID 네임스페이스 ②</text>
+  <text class="t-xs end" x="728" y="300">level 1</text>
+  <rect class="box green" x="470" y="316" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="336">네트워크 네임스페이스 ②</text>
+  <text class="t-xs end" x="728" y="336">lo뿐</text>
+  <path class="ln thin blue" d="M350 76 H376 V45 H466" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M350 98 H386 V81 H466" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M350 120 H396 V117 H466" marker-end="url(#ah-blue)"/>
+  <path class="ln thin muted" d="M350 148 H376 V176 H466" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M350 260 H412 V198 H466" marker-end="url(#ah-muted)"/>
+  <path class="ln thin green" d="M350 286 H422 V259 H466" marker-end="url(#ah-green)"/>
+  <path class="ln thin green" d="M350 308 H432 V295 H466" marker-end="url(#ah-green)"/>
+  <path class="ln thin green" d="M350 330 H442 V331 H466" marker-end="url(#ah-green)"/>
+
+  <text class="t-s mid" x="380" y="376">네임스페이스 객체의 참조 카운트는 태스크 수가 아니라 가리키는 nsproxy 수다</text>
+</svg></div><figcaption><b>그림 22-2</b>태스크 A와 B는 <code>nsproxy</code>를 함께 쓰고, C는 마운트·PID·네트워크만 새로 만든 <code>nsproxy</code>를 씁니다. 바꾸지 않은 UTS와 IPC 네임스페이스는 세 태스크가 같은 객체를 가리킵니다.</figcaption></figure>
+<p>두 종류는 <code>nsproxy</code>에 없습니다. 소스의 주석이 밝히는 대로 PID 네임스페이스는 예외입니다. <code>nsproxy</code>의 <code>pid_ns_for_children</code>은 "앞으로 만들 자식이 들어갈 곳"이고, 태스크 자신의 PID 네임스페이스는 그 태스크의 <code>struct pid</code>에서 나옵니다. 태스크의 PID는 만들어진 뒤에 바뀔 수 없기 때문입니다. 유저 네임스페이스는 자격 증명 <code>cred</code>에 있습니다(<code>task-&gt;cred-&gt;user_ns</code>). 권한 판단에 쓰이는 정보이므로 uid, capability와 한곳에 둡니다.</p>
+<p>네임스페이스를 다루는 시스템 콜은 셋입니다. <code>clone()</code>은 새 네임스페이스 안에 자식을 만들고, <code>unshare()</code>는 부르는 태스크 자신을 새 네임스페이스로 옮기고, <code>setns()</code>는 이미 있는 네임스페이스에 들어갑니다. <code>setns()</code>의 인자는 fd입니다. <code>/proc/PID/ns/</code> 아래의 파일을 열거나 pidfd를 넘깁니다. 이 파일들은 <a href="ch20.html">20장</a>의 nsfs에 속하고, 열어서 쥐고 있는 동안에는 안의 프로세스가 모두 끝나도 네임스페이스가 사라지지 않습니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>셸이 속한 네임스페이스를 보고, 새 PID 네임스페이스에 들어가 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ ls -l /proc/$$/ns
+lrwxrwxrwx 1 kim kim 0 ... mnt -&gt; 'mnt:[4026531841]'
+lrwxrwxrwx 1 kim kim 0 ... net -&gt; 'net:[4026531840]'
+lrwxrwxrwx 1 kim kim 0 ... pid -&gt; 'pid:[4026531836]'
+...
+$ sudo unshare --fork --pid --mount-proc bash
+# ps aux
+USER  PID ... COMMAND
+root    1 ... bash
+root    8 ... ps aux
+# readlink /proc/self/ns/pid
+pid:[4026532604]</code></pre></div>
+<p>대괄호 안의 숫자가 네임스페이스의 식별자입니다. 두 프로세스의 숫자가 같으면 같은 네임스페이스에 있습니다. <code>unshare</code> 안에서는 <code>bash</code>가 PID 1입니다. 다른 터미널에서 <code>ps</code>로 보면 같은 <code>bash</code>가 호스트의 PID로 보입니다. <code>lsns</code>는 시스템의 네임스페이스를 종류별로 모아 보여 주고, <code>sudo nsenter -t PID -n ip addr</code>는 그 프로세스의 네트워크 네임스페이스에 <code>setns()</code>로 들어가 명령을 실행합니다.</p>
+</div>
+</section>
+<section class="level2" id="pidns">
+<h2><span class="sec-n">22.3</span>PID 네임스페이스<a aria-label="이 절의 링크" class="anchor" href="#pidns">#</a></h2>
+<p>PID 네임스페이스는 겹쳐집니다. 새 네임스페이스는 만든 쪽의 자식이 되고, 부모 네임스페이스에서는 자식 네임스페이스의 프로세스가 <strong>보입니다</strong>. 반대는 안 됩니다. 그래서 프로세스 하나는 자기가 속한 네임스페이스와 그 조상들 각각에서 번호를 하나씩 갖습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/pid.h#L53" rel="noopener" target="_blank">include/linux/pid.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/pid.h" data-line="53" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="kw">struct</span> upid <span class="op">{</span></span>
+<span id="cb4-2">    <span class="dt">int</span> nr<span class="op">;</span></span>
+<span id="cb4-3">    <span class="kw">struct</span> pid_namespace <span class="op">*</span>ns<span class="op">;</span></span>
+<span id="cb4-4"><span class="op">};</span></span>
+<span id="cb4-5"></span>
+<span id="cb4-6"><span class="kw">struct</span> pid <span class="op">{</span></span>
+<span id="cb4-7">    refcount_t count<span class="op">;</span></span>
+<span id="cb4-8">    <span class="dt">unsigned</span> <span class="dt">int</span> level<span class="op">;</span></span>
+<span id="cb4-9">    <span class="co">/* ... */</span></span>
+<span id="cb4-10">    <span class="co">/* lists of tasks that use this pid */</span></span>
+<span id="cb4-11">    <span class="kw">struct</span> hlist_head tasks<span class="op">[</span>PIDTYPE_MAX<span class="op">];</span></span>
+<span id="cb4-12">    <span class="co">/* ... */</span></span>
+<span id="cb4-13">    <span class="kw">struct</span> upid numbers<span class="op">[];</span></span>
+<span id="cb4-14"><span class="op">};</span></span></code></pre></div></div>
+<p>커널 안에서 프로세스의 정체는 숫자가 아니라 <code>struct pid</code> 객체입니다. 숫자는 <code>numbers[]</code>에 단계별로 들어 있습니다. <code>numbers[0]</code>이 최상위 네임스페이스에서의 번호이고, <code>numbers[level]</code>이 자기 네임스페이스에서의 번호입니다. <code>alloc_pid()</code>는 <code>fork()</code> 때 자기 네임스페이스에서 루트까지 거슬러 올라가며 단계마다 빈 번호를 하나씩 받습니다. 번호를 물을 때는 "어느 네임스페이스에서 본 번호인가"를 함께 물어야 합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/pid.c#L542" rel="noopener" target="_blank">kernel/pid.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/pid.c" data-line="542" id="cb5"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb5-1">pid_t pid_nr_ns<span class="op">(</span><span class="kw">struct</span> pid <span class="op">*</span>pid<span class="op">,</span> <span class="kw">struct</span> pid_namespace <span class="op">*</span>ns<span class="op">)</span></span>
+<span id="cb5-2"><span class="op">{</span></span>
+<span id="cb5-3">    <span class="kw">struct</span> upid <span class="op">*</span>upid<span class="op">;</span></span>
+<span id="cb5-4">    pid_t nr <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb5-5"></span>
+<span id="cb5-6">    <span class="cf">if</span> <span class="op">(</span>pid <span class="op">&amp;&amp;</span> ns <span class="op">&amp;&amp;</span> ns<span class="op">-&gt;</span>level <span class="op">&lt;=</span> pid<span class="op">-&gt;</span>level<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-7">        upid <span class="op">=</span> <span class="op">&amp;</span>pid<span class="op">-&gt;</span>numbers<span class="op">[</span>ns<span class="op">-&gt;</span>level<span class="op">];</span></span>
+<span id="cb5-8">        <span class="cf">if</span> <span class="op">(</span>upid<span class="op">-&gt;</span>ns <span class="op">==</span> ns<span class="op">)</span></span>
+<span id="cb5-9">            nr <span class="op">=</span> upid<span class="op">-&gt;</span>nr<span class="op">;</span></span>
+<span id="cb5-10">    <span class="op">}</span></span>
+<span id="cb5-11">    <span class="cf">return</span> nr<span class="op">;</span></span>
+<span id="cb5-12"><span class="op">}</span></span></code></pre></div></div>
+<p><code>ns-&gt;level &lt;= pid-&gt;level</code>이 "조상에서만 보인다"는 규칙입니다. 묻는 쪽 네임스페이스가 더 깊거나 계보가 다르면 0이 나옵니다. 컨테이너 안에서 <code>getppid()</code>가 0을 돌려주는 경우가 이것입니다. 부모가 바깥에 있어서 안에서는 이름이 없습니다.</p>
+<figure class="fig" id="fig-pidns-nesting"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 356" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>PID 네임스페이스의 중첩: 컨테이너 안의 nginx는 자기 네임스페이스에서 PID 1이고 호스트 네임스페이스에서 48213이다. struct pid 하나가 numbers 배열에 단계마다의 번호를 담는다</title>
+
+  <!-- level 0 -->
+  <rect class="panel gray" x="20" y="14" width="440" height="290" rx="14"/>
+  <text class="t-b" x="36" y="38">PID 네임스페이스 · level 0 (호스트)</text>
+  <rect class="box" x="36" y="52" width="180" height="34" rx="6"/>
+  <text class="t-s t-ink" x="48" y="74">systemd</text>
+  <text class="t-code end" x="204" y="74">1</text>
+  <rect class="box" x="36" y="92" width="180" height="34" rx="6"/>
+  <text class="t-s t-ink" x="48" y="114">containerd-shim</text>
+  <text class="t-code end" x="204" y="114">48190</text>
+  <text class="t-xs" x="236" y="74">여기서 ps를 치면</text>
+  <text class="t-xs" x="236" y="92">아래 두 프로세스가</text>
+  <text class="t-xs" x="236" y="110">48213, 48250으로 보인다</text>
+
+  <!-- level 1 -->
+  <rect class="panel blue" x="36" y="140" width="408" height="150" rx="12"/>
+  <text class="t-b tc-blue" x="52" y="164">PID 네임스페이스 · level 1 (컨테이너)</text>
+  <rect class="box blue" x="52" y="178" width="376" height="42" rx="6"/>
+  <text class="t-s t-ink t-b" x="64" y="204">nginx</text>
+  <text class="t-code" x="130" y="204">안에서 1</text>
+  <text class="t-code end" x="416" y="204">밖에서 48213</text>
+  <rect class="box blue" x="52" y="228" width="376" height="42" rx="6"/>
+  <text class="t-s t-ink t-b" x="64" y="254">worker</text>
+  <text class="t-code" x="130" y="254">안에서 7</text>
+  <text class="t-code end" x="416" y="254">밖에서 48250</text>
+
+  <!-- struct pid -->
+  <rect class="box yellow" x="500" y="14" width="240" height="196" rx="10"/>
+  <text class="t-mono t-b" x="514" y="38">struct pid</text>
+  <text class="t-xs end" x="728" y="38">nginx의 것</text>
+  <text class="t-code" x="514" y="64">level = 1</text>
+  <rect class="box gray" x="514" y="78" width="212" height="52" rx="6"/>
+  <text class="t-code" x="524" y="98">numbers[0]</text>
+  <text class="t-code" x="524" y="118">nr = 48213 · ns = level 0</text>
+  <rect class="box blue" x="514" y="138" width="212" height="52" rx="6"/>
+  <text class="t-code" x="524" y="158">numbers[1]</text>
+  <text class="t-code" x="524" y="178">nr = 1 · ns = level 1</text>
+  <path class="ln yellow" d="M428 199 H470 V112 H496" marker-end="url(#ah-yellow)"/>
+
+  <rect class="box" x="500" y="226" width="240" height="78" rx="10"/>
+  <text class="t-code" x="514" y="250">pid_nr_ns(pid, ns)</text>
+  <text class="t-xs" x="514" y="270">ns가 level 0이면 48213</text>
+  <text class="t-xs" x="514" y="288">ns가 level 1이면 1</text>
+
+  <text class="t-s mid" x="380" y="338">번호는 자기 네임스페이스와 그 조상에만 있다. 안에서 본 바깥 프로세스는 번호가 없다</text>
+</svg></div><figcaption><b>그림 22-3</b>PID 네임스페이스의 중첩. 프로세스 하나에 <code>struct pid</code>가 하나 있고, 그 안에 단계 수만큼 번호가 있습니다.</figcaption></figure>
+<p>네임스페이스에서 처음 만들어진 프로세스가 그 안의 PID 1입니다. 커널은 이 태스크를 <code>child_reaper</code>로 기록하고 진짜 <code>init</code>처럼 대합니다. 고아가 된 프로세스의 부모가 되고, 핸들러를 달지 않은 시그널은 안에서 보내도 전달되지 않습니다(<code>SIGNAL_UNKILLABLE</code>). 이 프로세스가 죽으면 <code>zap_pid_ns_processes()</code>가 네임스페이스의 나머지 프로세스를 모두 <code>SIGKILL</code>로 끝냅니다. 컨테이너의 첫 프로세스가 끝나면 컨테이너가 끝나는 까닭입니다.</p>
+</section>
+<section class="level2" id="mnt-net">
+<h2><span class="sec-n">22.4</span>마운트와 네트워크 네임스페이스<a aria-label="이 절의 링크" class="anchor" href="#mnt-net">#</a></h2>
+<p><strong>마운트 네임스페이스</strong>는 <a href="ch20.html">20장</a>에서 본 마운트 트리를 통째로 따로 갖게 합니다. 만드는 순간에는 부모의 트리를 복사합니다. 그 뒤로 한쪽에서 하는 <code>mount()</code>와 <code>umount()</code>는 다른 쪽에 보이지 않습니다. 컨테이너 런타임은 새 네임스페이스 안에서 이미지의 루트 파일시스템을 마운트하고 <code>pivot_root()</code>를 부릅니다. 이 시스템 콜은 지정한 마운트를 새 루트로 만들고 옛 루트를 그 아래 한 곳으로 옮깁니다. 런타임이 옛 루트를 언마운트하고 나면 호스트의 파일시스템으로 가는 경로가 트리에서 사라집니다. <code>chroot()</code>가 <code>fs_struct</code>의 루트 포인터만 바꾸는 것과 다릅니다.</p>
+<p>복사만으로는 곤란한 경우가 있습니다. 호스트에 USB 디스크를 꽂았을 때 그 마운트가 다른 네임스페이스에도 나타나야 할까요. 이것을 정하는 것이 <strong>마운트 전파</strong>입니다. 마운트마다 유형이 있습니다. <code>shared</code>는 같은 피어 그룹의 마운트끼리 마운트·언마운트 사건을 서로 전합니다. <code>slave</code>는 받기만 합니다. <code>private</code>은 주지도 받지도 않습니다. <code>/proc/self/mountinfo</code>의 <code>shared:N</code>과 <code>master:N</code>이 이 관계입니다. 컨테이너의 루트는 보통 overlayfs입니다. 읽기 전용인 이미지 층들 위에 쓰기 가능한 층 하나를 겹쳐 하나의 디렉터리 트리로 보이게 합니다.</p>
+<p><strong>네트워크 네임스페이스</strong>는 <code>struct net</code>입니다. 네트워크 스택의 전역 상태가 이 구조체 안에 들어 있습니다. 장치 목록, 라우팅 표, 넷필터 규칙, 소켓이 묶이는 포트 공간이 네임스페이스마다 따로입니다. 네트워크 장치 하나는 한 순간에 네임스페이스 하나에만 속합니다. 새로 만든 네임스페이스에는 루프백 장치 하나뿐입니다.</p>
+<p>밖과 통하려면 장치를 넣어 주어야 합니다. 흔한 방법이 <strong>veth</strong> 쌍입니다. 가상의 이더넷 케이블로, 한쪽 끝에 넣은 패킷이 다른 쪽 끝에서 나옵니다. 한쪽 끝을 컨테이너의 네임스페이스로 옮기고 다른 쪽 끝을 호스트의 브리지에 꽂으면, 컨테이너의 패킷은 호스트 커널 안에서 장치 둘을 거쳐 <a href="ch12.html">12장</a>의 수신 경로로 다시 들어갑니다.</p>
+<figure class="fig" id="fig-netns-veth"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 356" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>네트워크 네임스페이스 셋: 컨테이너 둘은 각자 lo와 eth0을 갖고, eth0은 veth 쌍의 한쪽 끝이다. 다른 쪽 끝은 호스트 네임스페이스의 브리지에 꽂혀 있고 브리지는 라우팅과 NAT를 거쳐 실제 NIC로 이어진다</title>
+
+  <!-- 컨테이너 A -->
+  <rect class="panel blue" x="20" y="14" width="340" height="112" rx="14"/>
+  <text class="t-b tc-blue" x="36" y="38">컨테이너 A의 네트워크 네임스페이스</text>
+  <rect class="box" x="36" y="68" width="70" height="36" rx="6"/>
+  <text class="t-mono mid" x="71" y="91">lo</text>
+  <rect class="box blue" x="150" y="68" width="120" height="36" rx="6"/>
+  <text class="t-mono mid" x="210" y="91">eth0</text>
+  <text class="t-xs" x="282" y="82">10.0.0.2</text>
+  <text class="t-xs" x="282" y="100">자기 라우팅 표</text>
+
+  <!-- 컨테이너 B -->
+  <rect class="panel green" x="400" y="14" width="340" height="112" rx="14"/>
+  <text class="t-b tc-green" x="416" y="38">컨테이너 B의 네트워크 네임스페이스</text>
+  <rect class="box green" x="416" y="68" width="120" height="36" rx="6"/>
+  <text class="t-mono mid" x="476" y="91">eth0</text>
+  <text class="t-xs" x="548" y="82">10.0.0.3</text>
+  <text class="t-xs" x="548" y="100">자기 포트 공간</text>
+  <rect class="box" x="654" y="68" width="70" height="36" rx="6"/>
+  <text class="t-mono mid" x="689" y="91">lo</text>
+
+  <!-- 호스트 -->
+  <rect class="panel gray" x="20" y="172" width="720" height="142" rx="14"/>
+  <text class="t-b end" x="724" y="196">호스트의 네트워크 네임스페이스</text>
+  <rect class="box blue" x="150" y="204" width="120" height="34" rx="6"/>
+  <text class="t-mono mid" x="210" y="226">veth1a</text>
+  <rect class="box green" x="416" y="204" width="120" height="34" rx="6"/>
+  <text class="t-mono mid" x="476" y="226">veth7c</text>
+  <rect class="box yellow" x="150" y="264" width="386" height="36" rx="6"/>
+  <text class="t-mono t-b mid" x="343" y="287">br0 · 브리지</text>
+  <rect class="box" x="604" y="264" width="120" height="36" rx="6"/>
+  <text class="t-mono mid" x="664" y="287">eth0 · NIC</text>
+
+  <!-- veth 쌍 -->
+  <path class="ln thick blue" d="M210 104 V204"/>
+  <path class="ln thick green" d="M476 104 V204"/>
+  <text class="t-xs" x="220" y="150">veth 쌍: 한쪽에 넣은 패킷이 다른 쪽에서 나온다</text>
+  <path class="ln blue" d="M210 238 V260" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M476 238 V260" marker-end="url(#ah-green)"/>
+  <path class="ln" d="M536 282 H600" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="570" y="258">라우팅 · NAT</text>
+
+  <text class="t-s mid" x="380" y="340">장치 하나는 네임스페이스 하나에만 속한다. veth의 두 끝이 서로 다른 네임스페이스에 놓여 다리가 된다</text>
+</svg></div><figcaption><b>그림 22-4</b>네트워크 네임스페이스 셋. 컨테이너마다 veth의 한쪽 끝을 <code>eth0</code>으로 갖고, 다른 쪽 끝은 호스트 네임스페이스의 브리지에 꽂혀 있습니다.</figcaption></figure>
+</section>
+<section class="level2" id="userns">
+<h2><span class="sec-n">22.5</span>유저 네임스페이스와 권한<a aria-label="이 절의 링크" class="anchor" href="#userns">#</a></h2>
+<p><strong>유저 네임스페이스</strong>는 uid와 gid를 바꿔 보이게 합니다. <code>/proc/PID/uid_map</code>에 "안의 ID 0부터 65536개는 밖의 ID 100000부터"라는 식의 대응표를 한 번 써넣습니다. 안에서 uid 0인 프로세스가 만든 파일은 밖에서 uid 100000의 소유입니다.</p>
+<p>중요한 것은 capability와의 관계입니다. 리눅스에서 root의 힘은 <code>CAP_NET_ADMIN</code>, <code>CAP_SYS_ADMIN</code> 같은 capability로 쪼개져 있고, 커널의 권한 검사는 "이 태스크가 <strong>이 유저 네임스페이스에 대해</strong> 이 capability를 갖는가"를 묻습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/security/commoncap.c#L68" rel="noopener" target="_blank">security/commoncap.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="security/commoncap.c" data-line="68" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">int</span> cap_capable_helper<span class="op">(</span><span class="dt">const</span> <span class="kw">struct</span> cred <span class="op">*</span>cred<span class="op">,</span></span>
+<span id="cb6-2">                     <span class="kw">struct</span> user_namespace <span class="op">*</span>target_ns<span class="op">,</span></span>
+<span id="cb6-3">                     <span class="dt">const</span> <span class="kw">struct</span> user_namespace <span class="op">*</span>cred_ns<span class="op">,</span></span>
+<span id="cb6-4">                     <span class="dt">int</span> cap<span class="op">)</span></span>
+<span id="cb6-5"><span class="op">{</span></span>
+<span id="cb6-6">    <span class="kw">struct</span> user_namespace <span class="op">*</span>ns <span class="op">=</span> target_ns<span class="op">;</span></span>
+<span id="cb6-7"></span>
+<span id="cb6-8">    <span class="co">/* ... */</span></span>
+<span id="cb6-9">    <span class="cf">for</span> <span class="op">(;;)</span> <span class="op">{</span></span>
+<span id="cb6-10">        <span class="co">/* Do we have the necessary capabilities? */</span></span>
+<span id="cb6-11">        <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(</span>ns <span class="op">==</span> cred_ns<span class="op">))</span></span>
+<span id="cb6-12">            <span class="cf">return</span> cap_raised<span class="op">(</span>cred<span class="op">-&gt;</span>cap_effective<span class="op">,</span> cap<span class="op">)</span> <span class="op">?</span> <span class="dv">0</span> <span class="op">:</span> <span class="op">-</span>EPERM<span class="op">;</span></span>
+<span id="cb6-13"></span>
+<span id="cb6-14">        <span class="co">/* ... */</span></span>
+<span id="cb6-15">        <span class="cf">if</span> <span class="op">(</span>ns<span class="op">-&gt;</span>level <span class="op">&lt;=</span> cred_ns<span class="op">-&gt;</span>level<span class="op">)</span></span>
+<span id="cb6-16">            <span class="cf">return</span> <span class="op">-</span>EPERM<span class="op">;</span></span>
+<span id="cb6-17"></span>
+<span id="cb6-18">        <span class="co">/* ... */</span></span>
+<span id="cb6-19">        <span class="cf">if</span> <span class="op">((</span>ns<span class="op">-&gt;</span>parent <span class="op">==</span> cred_ns<span class="op">)</span> <span class="op">&amp;&amp;</span> uid_eq<span class="op">(</span>ns<span class="op">-&gt;</span>owner<span class="op">,</span> cred<span class="op">-&gt;</span>euid<span class="op">))</span></span>
+<span id="cb6-20">            <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb6-21"></span>
+<span id="cb6-22">        <span class="co">/* ... */</span></span>
+<span id="cb6-23">        ns <span class="op">=</span> ns<span class="op">-&gt;</span>parent<span class="op">;</span></span>
+<span id="cb6-24">    <span class="op">}</span></span>
+<span id="cb6-25"></span>
+<span id="cb6-26">    <span class="co">/* We never get here */</span></span>
+<span id="cb6-27"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li>대상 자원의 네임스페이스(<code>target_ns</code>)가 내 네임스페이스와 같으면 내 capability 비트를 봅니다.</li>
+<li>대상이 내 네임스페이스보다 위거나 같은 높이의 다른 가지면 무조건 거부입니다. 컨테이너 안의 root가 호스트의 자원에 힘을 쓰지 못하는 줄입니다.</li>
+<li>대상이 내 자손이면 허용합니다. 유저 네임스페이스를 만든 사람은 그 안에 대해 모든 capability를 갖습니다.</li>
+</ul>
+<p>다른 네임스페이스들은 저마다 주인 유저 네임스페이스(<code>user_ns</code> 필드)를 기록해 둡니다. 네트워크 장치를 설정하려면 그 <code>struct net</code>의 주인에 대해 <code>CAP_NET_ADMIN</code>이 있어야 합니다. 그래서 일반 사용자가 유저 네임스페이스를 만들고 그 안에서 네트워크 네임스페이스를 만들면, 호스트에서는 아무 권한이 없으면서 자기 네트워크 네임스페이스 안에서는 root처럼 장치를 만들고 방화벽을 고칠 수 있습니다. root 없이 도는 컨테이너가 이렇게 만들어집니다.</p>
+<div class="callout warn"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-warn"></use></svg>주의</div>
+<p>이 설계는 공격 표면을 넓힙니다. 예전에는 root만 닿을 수 있던 커널 코드(마운트, 넷필터, 여러 소켓 종류)에 일반 사용자가 "자기 네임스페이스 안의 root"로서 닿게 됩니다. 그 코드에 버그가 있으면 호스트 커널이 뚫립니다. 그래서 <code>user.max_user_namespaces</code> sysctl을 0으로 두거나 LSM으로 비특권 유저 네임스페이스 생성을 막는 배포판이 있습니다.</p>
+</div>
+</section>
+<section class="level2" id="cgroup">
+<h2><span class="sec-n">22.6</span>cgroup v2: 하나의 트리<a aria-label="이 절의 링크" class="anchor" href="#cgroup">#</a></h2>
+<p>cgroup은 태스크를 트리 모양으로 묶고, 묶음마다 자원을 재고 제한합니다. 인터페이스는 파일시스템입니다. <code>/sys/fs/cgroup</code> 아래에서 <code>mkdir</code>하면 cgroup이 생기고, 파일에 값을 써서 설정합니다. 구현은 sysfs와 같은 kernfs 위에 있습니다.</p>
+<p>자원 종류마다 맡는 코드가 따로 있고 이것을 <strong>컨트롤러</strong>라고 합니다. 커널 구조체는 넷입니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>구조체</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>struct cgroup</code></td>
+<td>트리의 노드 하나. 디렉터리 하나에 대응합니다.</td>
+</tr>
+<tr>
+<td><code>struct cgroup_subsys</code></td>
+<td>컨트롤러 하나. 콜백의 묶음입니다.</td>
+</tr>
+<tr>
+<td><code>struct cgroup_subsys_state</code> (css)</td>
+<td>"이 cgroup에서 이 컨트롤러의 상태". 메모리 컨트롤러는 이것을 <code>struct mem_cgroup</code>에 품습니다.</td>
+</tr>
+<tr>
+<td><code>struct css_set</code></td>
+<td>태스크 하나가 속한 css들의 묶음. 컨트롤러마다 포인터 하나씩입니다.</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>task_struct</code>가 직접 가리키는 것은 <code>css_set</code> 하나입니다(<code>task-&gt;cgroups</code>).</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/cgroup-defs.h#L279" rel="noopener" target="_blank">include/linux/cgroup-defs.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/cgroup-defs.h" data-line="279" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="co">/*</span></span>
+<span id="cb7-2"><span class="co"> * A css_set is a structure holding pointers to a set of</span></span>
+<span id="cb7-3"><span class="co"> * cgroup_subsys_state objects. This saves space in the task struct</span></span>
+<span id="cb7-4"><span class="co"> * object and speeds up fork()/exit(), since a single inc/dec and a</span></span>
+<span id="cb7-5"><span class="co"> * list_add()/del() can bump the reference count on the entire cgroup</span></span>
+<span id="cb7-6"><span class="co"> * set for a task.</span></span>
+<span id="cb7-7"><span class="co"> */</span></span>
+<span id="cb7-8"><span class="kw">struct</span> css_set <span class="op">{</span></span>
+<span id="cb7-9">    <span class="co">/* ... */</span></span>
+<span id="cb7-10">    <span class="kw">struct</span> cgroup_subsys_state <span class="op">*</span>subsys<span class="op">[</span>CGROUP_SUBSYS_COUNT<span class="op">];</span></span>
+<span id="cb7-11"></span>
+<span id="cb7-12">    <span class="co">/* reference count */</span></span>
+<span id="cb7-13">    refcount_t refcount<span class="op">;</span></span>
+<span id="cb7-14">    <span class="co">/* ... */</span></span>
+<span id="cb7-15"><span class="op">};</span></span></code></pre></div></div>
+<p>주석이 이유를 말합니다. 같은 cgroup에 있는 태스크들은 <code>css_set</code>을 함께 쓰므로 <code>fork()</code>는 참조 카운트 하나만 올립니다. 메모리를 할당하는 빠른 경로에서 "이 태스크의 memcg는 무엇인가"는 <code>task-&gt;cgroups-&gt;subsys[memory_cgrp_id]</code>, 포인터 두 번입니다. <code>nsproxy</code>와 같은 발상입니다.</p>
+<figure class="fig" id="fig-css-set"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>태스크, css_set, css, cgroup의 연결: 같은 cgroup에 있는 태스크 둘은 css_set 하나를 함께 가리키고, css_set은 컨트롤러별 css를, css는 cgroup을 가리킨다</title>
+
+  <text class="t-xs" x="20" y="24">task_struct의 cgroups →</text>
+  <text class="t-xs" x="190" y="24">css_set</text>
+  <text class="t-xs" x="400" y="24">css (컨트롤러별 상태)</text>
+  <text class="t-xs" x="630" y="24">cgroup</text>
+
+  <!-- web -->
+  <rect class="box yellow" x="20" y="36" width="120" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="59">nginx</text>
+  <rect class="box yellow" x="20" y="84" width="120" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="107">nginx worker</text>
+  <path class="ln" d="M140 54 H186" marker-end="url(#ah)"/>
+  <path class="ln" d="M140 102 H186" marker-end="url(#ah)"/>
+
+  <rect class="box" x="190" y="36" width="160" height="96" rx="10"/>
+  <text class="t-mono t-b" x="202" y="58">css_set</text>
+  <text class="t-xs end" x="340" y="58">참조 2</text>
+  <text class="t-code" x="202" y="84">subsys[cpu]</text>
+  <text class="t-code" x="202" y="114">subsys[memory]</text>
+  <path class="ln blue" d="M350 80 H396" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M350 110 H372 V118 H396" marker-end="url(#ah-blue)"/>
+
+  <rect class="box blue" x="400" y="36" width="180" height="52" rx="8"/>
+  <text class="t-code t-b" x="412" y="58">task_group</text>
+  <text class="t-xs" x="412" y="76">cpu.weight · cpu.max</text>
+  <rect class="box blue" x="400" y="96" width="180" height="52" rx="8"/>
+  <text class="t-code t-b" x="412" y="118">mem_cgroup</text>
+  <text class="t-xs" x="412" y="136">memory.max · 사용량</text>
+  <path class="ln green" d="M580 62 H604 V84 H626" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M580 122 H604 V100 H626" marker-end="url(#ah-green)"/>
+
+  <rect class="box green" x="630" y="66" width="110" height="52" rx="8"/>
+  <text class="t-mono t-b mid" x="685" y="97">web</text>
+
+  <path class="ln thin muted dash" d="M20 166 H740"/>
+
+  <!-- db -->
+  <rect class="box yellow" x="20" y="196" width="120" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="219">postgres</text>
+  <path class="ln" d="M140 214 H186" marker-end="url(#ah)"/>
+
+  <rect class="box" x="190" y="180" width="160" height="96" rx="10"/>
+  <text class="t-mono t-b" x="202" y="202">css_set</text>
+  <text class="t-xs end" x="340" y="202">참조 1</text>
+  <text class="t-code" x="202" y="228">subsys[cpu]</text>
+  <text class="t-code" x="202" y="258">subsys[memory]</text>
+  <path class="ln blue" d="M350 224 H396" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M350 254 H372 V262 H396" marker-end="url(#ah-blue)"/>
+
+  <rect class="box blue" x="400" y="180" width="180" height="52" rx="8"/>
+  <text class="t-code t-b" x="412" y="202">task_group</text>
+  <text class="t-xs" x="412" y="220">cpu.weight · cpu.max</text>
+  <rect class="box blue" x="400" y="240" width="180" height="52" rx="8"/>
+  <text class="t-code t-b" x="412" y="262">mem_cgroup</text>
+  <text class="t-xs" x="412" y="280">memory.max · 사용량</text>
+  <path class="ln green" d="M580 206 H604 V228 H626" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M580 266 H604 V244 H626" marker-end="url(#ah-green)"/>
+
+  <rect class="box green" x="630" y="210" width="110" height="52" rx="8"/>
+  <text class="t-mono t-b mid" x="685" y="241">db</text>
+
+  <text class="t-s mid" x="380" y="316">fork()한 자식은 부모의 css_set을 가리키고 참조 카운트만 올린다</text>
+</svg></div><figcaption><b>그림 22-5</b>태스크는 <code>css_set</code>을, <code>css_set</code>은 컨트롤러별 css를, css는 cgroup을 가리킵니다. 같은 cgroup의 태스크들은 <code>css_set</code> 하나를 함께 씁니다.</figcaption></figure>
+<p>v2 트리에는 규칙이 둘 있습니다. 첫째, 컨트롤러는 <strong>위에서 켜 준 것만</strong> 쓸 수 있습니다. 부모의 <code>cgroup.subtree_control</code>에 <code>+memory</code>를 써야 자식 디렉터리에 <code>memory.*</code> 파일이 생깁니다. 둘째, <strong>내부 프로세스 금지</strong>입니다. 루트가 아닌 cgroup은 자식에게 자원을 나눠 주는 일과 프로세스를 직접 담는 일을 함께 하지 못합니다. 프로세스는 잎에만 있습니다. 이 규칙이 없으면 "부모에 직접 든 프로세스"와 "자식 cgroup"이 형제처럼 자원을 다투게 되고, 둘 사이의 몫을 정할 방법이 컨트롤러마다 달라집니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/cgroup/cgroup.c#L2870" rel="noopener" target="_blank">kernel/cgroup/cgroup.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/cgroup/cgroup.c" data-line="2870" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="dt">int</span> cgroup_migrate_vet_dst<span class="op">(</span><span class="kw">struct</span> cgroup <span class="op">*</span>dst_cgrp<span class="op">)</span></span>
+<span id="cb8-2"><span class="op">{</span></span>
+<span id="cb8-3">    <span class="co">/* v1 doesn't have any restriction */</span></span>
+<span id="cb8-4">    <span class="cf">if</span> <span class="op">(!</span>cgroup_on_dfl<span class="op">(</span>dst_cgrp<span class="op">))</span></span>
+<span id="cb8-5">        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb8-6">    <span class="co">/* ... */</span></span>
+<span id="cb8-7">    <span class="co">/* apply no-internal-process constraint */</span></span>
+<span id="cb8-8">    <span class="cf">if</span> <span class="op">(</span>dst_cgrp<span class="op">-&gt;</span>subtree_control<span class="op">)</span></span>
+<span id="cb8-9">        <span class="cf">return</span> <span class="op">-</span>EBUSY<span class="op">;</span></span>
+<span id="cb8-10"></span>
+<span id="cb8-11">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb8-12"><span class="op">}</span></span></code></pre></div></div>
+<p><code>cgroup.procs</code>에 PID를 쓰면 이 검사를 거쳐 <code>cgroup_attach_task()</code>가 불립니다. 옮기는 일은 두 단계입니다. 먼저 컨트롤러마다 <code>can_attach()</code>로 거부할 기회를 주고, 모두 통과하면 태스크의 <code>css_set</code> 포인터를 바꾼 뒤 <code>attach()</code>로 알립니다. 중간에 실패하면 아무것도 바뀌지 않습니다. 컨트롤러가 채우는 콜백 표에 이 짝이 보입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/cgroup-defs.h#L784" rel="noopener" target="_blank">include/linux/cgroup-defs.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/cgroup-defs.h" data-line="784" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="kw">struct</span> cgroup_subsys <span class="op">{</span></span>
+<span id="cb9-2">    <span class="kw">struct</span> cgroup_subsys_state <span class="op">*(*</span>css_alloc<span class="op">)(</span><span class="kw">struct</span> cgroup_subsys_state <span class="op">*</span>parent_css<span class="op">);</span></span>
+<span id="cb9-3">    <span class="co">/* ... */</span></span>
+<span id="cb9-4">    <span class="dt">int</span> <span class="op">(*</span>can_attach<span class="op">)(</span><span class="kw">struct</span> cgroup_taskset <span class="op">*</span>tset<span class="op">);</span></span>
+<span id="cb9-5">    <span class="dt">void</span> <span class="op">(*</span>cancel_attach<span class="op">)(</span><span class="kw">struct</span> cgroup_taskset <span class="op">*</span>tset<span class="op">);</span></span>
+<span id="cb9-6">    <span class="dt">void</span> <span class="op">(*</span>attach<span class="op">)(</span><span class="kw">struct</span> cgroup_taskset <span class="op">*</span>tset<span class="op">);</span></span>
+<span id="cb9-7">    <span class="dt">int</span> <span class="op">(*</span>can_fork<span class="op">)(</span><span class="kw">struct</span> task_struct <span class="op">*</span>task<span class="op">,</span></span>
+<span id="cb9-8">            <span class="kw">struct</span> css_set <span class="op">*</span>cset<span class="op">);</span></span>
+<span id="cb9-9">    <span class="dt">void</span> <span class="op">(*</span>cancel_fork<span class="op">)(</span><span class="kw">struct</span> task_struct <span class="op">*</span>task<span class="op">,</span> <span class="kw">struct</span> css_set <span class="op">*</span>cset<span class="op">);</span></span>
+<span id="cb9-10">    <span class="dt">void</span> <span class="op">(*</span>fork<span class="op">)(</span><span class="kw">struct</span> task_struct <span class="op">*</span>task<span class="op">);</span></span>
+<span id="cb9-11">    <span class="dt">void</span> <span class="op">(*</span>exit<span class="op">)(</span><span class="kw">struct</span> task_struct <span class="op">*</span>task<span class="op">);</span></span>
+<span id="cb9-12">    <span class="co">/* ... */</span></span>
+<span id="cb9-13"><span class="op">};</span></span></code></pre></div></div>
+<p><code>can_*</code>과 <code>cancel_*</code>이 짝을 이룹니다. 여러 컨트롤러 가운데 하나가 거부하면 앞에서 허락한 컨트롤러들에게 취소를 알립니다. 태스크가 cgroup에 들어오는 길은 옮겨 오는 것(<code>attach</code>)과 태어나는 것(<code>fork</code>) 둘이고, 나가는 길은 <code>exit</code>입니다.</p>
+<figure class="fig" id="fig-cgroup-tree"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>cgroup v2 트리: 루트가 subtree_control로 컨트롤러를 자식에게 내려 주고, 중간 노드는 다시 그 일부를 내려 준다. 프로세스는 잎 cgroup에만 있다</title>
+
+  <rect class="box yellow" x="234" y="14" width="292" height="58" rx="10"/>
+  <text class="t-mono t-b" x="250" y="38">/sys/fs/cgroup</text>
+  <text class="t-xs end" x="512" y="38">루트</text>
+  <text class="t-code" x="250" y="60">subtree_control: cpu io memory pids</text>
+  <path class="ln" d="M380 72 V92 H130 V108" marker-end="url(#ah)"/>
+  <path class="ln" d="M380 92 H630 V108" marker-end="url(#ah)"/>
+  <path class="ln" d="M380 92 V108" marker-end="url(#ah)"/>
+  <rect class="box yellow" x="20" y="112" width="220" height="74" rx="10"/>
+  <text class="t-mono t-b" x="32" y="135">system.slice</text>
+  <text class="t-code" x="32" y="156">subtree_control: memory pids</text>
+  <text class="t-xs" x="32" y="175">프로세스 없음 · 나눠 주기만</text>
+  <rect class="box yellow" x="270" y="112" width="220" height="74" rx="10"/>
+  <text class="t-mono t-b" x="282" y="135">user.slice</text>
+  <text class="t-code" x="282" y="156">subtree_control: (비어 있음)</text>
+  <text class="t-xs" x="282" y="175">자식에게 내려 준 것이 없다</text>
+  <rect class="box yellow" x="520" y="112" width="220" height="74" rx="10"/>
+  <text class="t-mono t-b" x="532" y="135">containers</text>
+  <text class="t-code" x="532" y="156">subtree_control: cpu memory</text>
+  <text class="t-xs" x="532" y="175">프로세스 없음 · 나눠 주기만</text>
+  <path class="ln" d="M130 186 V226" marker-end="url(#ah)"/>
+  <path class="ln" d="M630 186 V206 H530 V226" marker-end="url(#ah)"/>
+  <path class="ln" d="M630 206 H690 V226" marker-end="url(#ah)"/>
+  <rect class="box green" x="20" y="230" width="220" height="104" rx="10"/>
+  <text class="t-mono t-b" x="32" y="253">sshd.service</text>
+  <text class="t-code" x="32" y="275">memory.max = max</text>
+  <text class="t-code" x="32" y="295">pids.max = 512</text>
+  <text class="t-xs tc-green" x="32" y="318">프로세스 2개 · 잎</text>
+  <rect class="box green" x="440" y="230" width="150" height="104" rx="10"/>
+  <text class="t-mono t-b" x="452" y="253">web</text>
+  <text class="t-code" x="452" y="275">cpu.max = 50000</text>
+  <text class="t-code" x="452" y="295">memory.max = 512M</text>
+  <text class="t-xs tc-green" x="452" y="318">프로세스 5개 · 잎</text>
+  <rect class="box green" x="600" y="230" width="140" height="104" rx="10"/>
+  <text class="t-mono t-b" x="612" y="253">db</text>
+  <text class="t-code" x="612" y="275">cpu.weight = 300</text>
+  <text class="t-code" x="612" y="295">memory.low = 1G</text>
+  <text class="t-xs tc-green" x="612" y="318">프로세스 1개 · 잎</text>
+  <text class="t-xs" x="258" y="252">web과 db에는 cpu.*와</text>
+  <text class="t-xs" x="258" y="270">memory.* 파일만 있다.</text>
+  <text class="t-xs" x="258" y="288">io와 pids는 부모가</text>
+  <text class="t-xs" x="258" y="306">내려 주지 않았다</text>
+
+  <rect class="box yellow" x="150" y="358" width="26" height="14" rx="3"/>
+  <text class="t-xs" x="184" y="370">자식에게 자원을 나눠 주는 cgroup</text>
+  <rect class="box green" x="420" y="358" width="26" height="14" rx="3"/>
+  <text class="t-xs" x="454" y="370">프로세스를 담는 cgroup</text>
+  <text class="t-xs mid" x="380" y="390">루트가 아닌 cgroup은 둘 중 하나만 한다 (내부 프로세스 금지)</text>
+</svg></div><figcaption><b>그림 22-6</b>cgroup v2 트리. 컨트롤러는 <code>subtree_control</code>로 한 단씩 내려 주고, 프로세스는 잎에만 있습니다.</figcaption></figure>
+<p>트리의 일부를 덜 신뢰하는 쪽에 맡기는 <strong>위임</strong>도 이 구조에서 나옵니다. 디렉터리와 그 안의 <code>cgroup.procs</code>, <code>cgroup.subtree_control</code>의 소유자를 바꿔 주면, 받은 쪽은 그 아래에서 자유롭게 cgroup을 만들고 프로세스를 옮기지만 위에서 정한 한도는 넘지 못합니다. systemd가 사용자 세션에 하위 트리를 넘겨주는 방식입니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>많은 자료가 <code>/sys/fs/cgroup/memory/</code>, <code>/sys/fs/cgroup/cpu,cpuacct/</code>처럼 컨트롤러마다 따로 마운트된 트리와 <code>tasks</code> 파일, <code>memory.limit_in_bytes</code>를 보여 줍니다. cgroup v1입니다. v1에서는 계층을 몇 개든 만들 수 있었고 태스크가 계층마다 다른 위치에 속할 수 있었습니다. v7.3에서도 v1 코드는 남아 있지만 물러나는 중입니다. 메모리 컨트롤러의 v1 인터페이스는 <code>CONFIG_MEMCG_V1</code>, cpuset의 v1 인터페이스는 <code>CONFIG_CPUSETS_V1</code> 뒤에 있고 둘 다 기본값이 <code>n</code>입니다. Kconfig의 설명은 "deprecated"이고 새로 쓰지 말라고 적혀 있습니다. v2에는 <code>tasks</code> 파일이 없고 계층은 하나입니다.</p>
+</div>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>v2의 제약은 v1의 실패에서 나왔습니다. v1은 "컨트롤러마다 원하는 대로 계층을 짜라"는 최대한의 자유를 주었습니다. 결과는 <code>Documentation/admin-guide/cgroup-v2.rst</code>가 적은 대로입니다. 대부분의 설정이 컨트롤러마다 계층을 따로 두었고, 유저 공간은 비슷한 트리 여러 개를 똑같이 관리해야 했습니다. 더 큰 문제는 컨트롤러끼리 협력할 수 없다는 것이었습니다. 페이지 캐시의 더티 페이지를 디스크에 쓸 때 그 I/O를 누구에게 과금할지 알려면 메모리 컨트롤러와 io 컨트롤러가 같은 cgroup을 보아야 하는데, 태스크가 두 계층에서 서로 다른 자리에 있으면 답이 없습니다. v2는 자유를 줄여 이 문제를 없앴습니다. 인터페이스에서 선택지를 줄이는 일이 구현과 사용 양쪽을 단순하게 만든 사례입니다.</p>
+</div>
+</section>
+<section class="level2" id="controllers">
+<h2><span class="sec-n">22.7</span>컨트롤러<a aria-label="이 절의 링크" class="anchor" href="#controllers">#</a></h2>
+<p>v7.3의 <code>include/linux/cgroup_subsys.h</code>에는 컨트롤러가 열여섯 개 등록되어 있습니다. 자주 쓰는 것은 다섯입니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>컨트롤러</th>
+<th>대표 파일</th>
+<th>하는 일</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cpu</code></td>
+<td><code>cpu.weight</code>, <code>cpu.max</code></td>
+<td>CPU 시간을 가중치로 나누고, 주기당 상한을 둡니다.</td>
+</tr>
+<tr>
+<td><code>memory</code></td>
+<td><code>memory.min</code>·<code>low</code>·<code>high</code>·<code>max</code></td>
+<td>메모리 사용량을 과금하고, 보호하고, 제한합니다.</td>
+</tr>
+<tr>
+<td><code>io</code></td>
+<td><code>io.weight</code>, <code>io.max</code></td>
+<td>장치별 I/O를 가중치와 상한으로 조절합니다(<a href="ch21.html">21장</a>).</td>
+</tr>
+<tr>
+<td><code>pids</code></td>
+<td><code>pids.max</code></td>
+<td>태스크 수를 제한합니다.</td>
+</tr>
+<tr>
+<td><code>cpuset</code></td>
+<td><code>cpuset.cpus</code>, <code>cpuset.mems</code></td>
+<td>쓸 수 있는 CPU와 메모리 노드를 고정합니다.</td>
+</tr>
+</tbody>
+</table></div>
+<p>나머지는 <code>hugetlb</code>, <code>rdma</code>, <code>misc</code>, <code>dmem</code>, <code>perf_event</code>, <code>freezer</code>, <code>devices</code>와 v1 전용인 <code>cpuacct</code>, <code>net_cls</code>, <code>net_prio</code>, 그리고 <code>debug</code>입니다. v2에서 장치 접근 제어는 파일이 아니라 cgroup에 붙인 BPF 프로그램으로 합니다. cgroup은 BPF의 부착 지점이기도 해서, 소켓 생성이나 패킷 송수신에 cgroup 단위로 프로그램을 걸 수 있습니다(<a href="ch24.html">24장</a>).</p>
+<section class="level3" id="cpu-가중치와-상한">
+<h3>cpu: 가중치와 상한</h3>
+<p><code>cpu.weight</code>(기본 100)는 <strong>비율</strong>입니다. 형제 cgroup끼리 CPU를 다툴 때의 몫을 정하고, 다투지 않으면 아무 효과가 없습니다. 스케줄러는 cgroup마다 런큐를 두고 cgroup 자체를 스케줄링 단위로 취급합니다(<a href="ch05.html">5장</a>).</p>
+<p><code>cpu.max</code>는 <strong>상한</strong>입니다. <code>50000 100000</code>이라고 쓰면 100ms 주기마다 50ms까지만 돕니다. CPU가 남아돌아도 그렇습니다. 실행 시간을 깎는 자리가 이것입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L6901" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="6901" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="dt">static</span> <span class="dt">bool</span> __account_cfs_rq_runtime<span class="op">(</span><span class="kw">struct</span> cfs_rq <span class="op">*</span>cfs_rq<span class="op">,</span> u64 delta_exec<span class="op">)</span></span>
+<span id="cb10-2"><span class="op">{</span></span>
+<span id="cb10-3">    <span class="co">/* dock delta_exec before expiring quota (as it could span periods) */</span></span>
+<span id="cb10-4">    cfs_rq<span class="op">-&gt;</span>runtime_remaining <span class="op">-=</span> delta_exec<span class="op">;</span></span>
+<span id="cb10-5"></span>
+<span id="cb10-6">    <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(</span>cfs_rq<span class="op">-&gt;</span>runtime_remaining <span class="op">&gt;</span> <span class="dv">0</span><span class="op">))</span></span>
+<span id="cb10-7">        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb10-8"></span>
+<span id="cb10-9">    <span class="cf">if</span> <span class="op">(</span>cfs_rq<span class="op">-&gt;</span>throttled<span class="op">)</span></span>
+<span id="cb10-10">        <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb10-11">    <span class="co">/*</span></span>
+<span id="cb10-12"><span class="co">     * throttle_cfs_rq() will try to extend the runtime first</span></span>
+<span id="cb10-13"><span class="co">     * before throttling the hierarchy.</span></span>
+<span id="cb10-14"><span class="co">     */</span></span>
+<span id="cb10-15">    <span class="cf">return</span> throttle_cfs_rq<span class="op">(</span>cfs_rq<span class="op">);</span></span>
+<span id="cb10-16"><span class="op">}</span></span></code></pre></div></div>
+<p>cgroup의 런큐는 전역 몫에서 실행 시간을 조금씩 받아 와 쓰고, 다 쓰면 더 받으려 합니다. 주기의 몫이 바닥났으면 <strong>스로틀</strong>됩니다. 다음 주기의 타이머가 몫을 다시 채울 때까지 그 cgroup의 태스크는 돌지 못합니다. <code>cpu.stat</code>의 <code>nr_throttled</code>와 <code>throttled_usec</code>이 그 횟수와 시간입니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>스로틀링을 "cgroup의 런큐를 통째로 떼어 내 그 안의 태스크가 즉시 멈춘다"고 설명한 자료가 많습니다. v7.3은 태스크 단위로 합니다. 몫이 바닥나면 <code>throttle_cfs_rq()</code>가 계층에 표시만 하고, 각 태스크에는 task_work(<code>throttle_cfs_rq_work()</code>)를 걸어 둡니다. 태스크는 <strong>유저 모드로 돌아가는 길에</strong> 스스로 런큐에서 빠집니다. 예전 방식에서는 커널 안에서 락을 쥔 태스크가 스로틀되어, 그 락을 기다리는 다른 cgroup의 태스크까지 한 주기 동안 멈추는 일이 있었습니다.</p>
+</div>
+</section>
+<section class="level3" id="memory-과금과-네-개의-선">
+<h3>memory: 과금과 네 개의 선</h3>
+<p>메모리 컨트롤러는 페이지를 <strong>할당하는 순간에</strong> 과금합니다. 페이지 폴트로 익명 페이지를 받을 때, 페이지 캐시에 폴리오를 넣을 때, 커널이 그 태스크를 위해 슬랩 객체를 만들 때입니다. 과금 함수가 한도를 집행합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/mm/memcontrol.c#L2645" rel="noopener" target="_blank">mm/memcontrol.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="mm/memcontrol.c" data-line="2645" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1"><span class="dt">static</span> <span class="dt">int</span> try_charge_memcg<span class="op">(</span><span class="kw">struct</span> mem_cgroup <span class="op">*</span>memcg<span class="op">,</span> gfp_t gfp_mask<span class="op">,</span></span>
+<span id="cb11-2">                <span class="dt">unsigned</span> <span class="dt">int</span> nr_pages<span class="op">)</span></span>
+<span id="cb11-3"><span class="op">{</span></span>
+<span id="cb11-4">    <span class="co">/* ... */</span></span>
+<span id="cb11-5">retry<span class="op">:</span></span>
+<span id="cb11-6">    <span class="cf">if</span> <span class="op">(</span>consume_stock<span class="op">(</span>memcg<span class="op">,</span> nr_pages<span class="op">))</span></span>
+<span id="cb11-7">        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb11-8">    <span class="co">/* ... */</span></span>
+<span id="cb11-9">        <span class="cf">if</span> <span class="op">(</span>page_counter_try_charge<span class="op">(&amp;</span>memcg<span class="op">-&gt;</span>memory<span class="op">,</span> batch<span class="op">,</span> <span class="op">&amp;</span>counter<span class="op">))</span></span>
+<span id="cb11-10">            <span class="cf">goto</span> done_restock<span class="op">;</span></span>
+<span id="cb11-11">    <span class="co">/* ... */</span></span>
+<span id="cb11-12">    __memcg_memory_event<span class="op">(</span>mem_over_limit<span class="op">,</span> MEMCG_MAX<span class="op">,</span> allow_spinning<span class="op">);</span></span>
+<span id="cb11-13">    raised_max_event <span class="op">=</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb11-14"></span>
+<span id="cb11-15">    psi_memstall_enter<span class="op">(&amp;</span>pflags<span class="op">);</span></span>
+<span id="cb11-16">    nr_reclaimed <span class="op">=</span> try_to_free_mem_cgroup_pages<span class="op">(</span>mem_over_limit<span class="op">,</span> nr_pages<span class="op">,</span></span>
+<span id="cb11-17">                            gfp_mask<span class="op">,</span> reclaim_options<span class="op">,</span> NULL<span class="op">);</span></span>
+<span id="cb11-18">    psi_memstall_leave<span class="op">(&amp;</span>pflags<span class="op">);</span></span>
+<span id="cb11-19">    <span class="co">/* ... */</span></span>
+<span id="cb11-20">    <span class="cf">if</span> <span class="op">(</span>mem_cgroup_oom<span class="op">(</span>mem_over_limit<span class="op">,</span> gfp_mask<span class="op">,</span></span>
+<span id="cb11-21">               get_order<span class="op">(</span>nr_pages <span class="op">*</span> PAGE_SIZE<span class="op">)))</span> <span class="op">{</span></span>
+<span id="cb11-22">        passed_oom <span class="op">=</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb11-23">        nr_retries <span class="op">=</span> MAX_RECLAIM_RETRIES<span class="op">;</span></span>
+<span id="cb11-24">        <span class="cf">goto</span> retry<span class="op">;</span></span>
+<span id="cb11-25">    <span class="op">}</span></span>
+<span id="cb11-26">    <span class="co">/* ... */</span></span>
+<span id="cb11-27"><span class="op">}</span></span></code></pre></div></div>
+<p>순서대로 읽으면 이렇습니다. <code>consume_stock()</code>은 CPU별로 미리 받아 둔 몫에서 꺼내 쓰는 빠른 길입니다. 없으면 <code>page_counter_try_charge()</code>가 이 cgroup과 모든 조상의 카운터를 올려 보고, 어느 하나라도 <code>memory.max</code>를 넘으면 실패합니다. 그러면 <strong>그 cgroup 안에서만</strong> 회수를 돌립니다(<a href="ch18.html">18장</a>). 회수로도 자리가 나지 않으면 <code>mem_cgroup_oom()</code>이 그 cgroup의 프로세스 가운데 하나를 죽입니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>파일</th>
+<th>넘거나 밑돌 때</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>memory.min</code></td>
+<td>사용량이 이 아래면 회수하지 않습니다. 절대 보호입니다.</td>
+</tr>
+<tr>
+<td><code>memory.low</code></td>
+<td>이 아래면 다른 곳에 회수할 것이 남아 있는 한 건드리지 않습니다.</td>
+</tr>
+<tr>
+<td><code>memory.high</code></td>
+<td>넘으면 할당하는 태스크가 회수 일을 떠맡고 유저 모드 복귀 길에 강제로 잠듭니다. OOM은 없습니다.</td>
+</tr>
+<tr>
+<td><code>memory.max</code></td>
+<td>넘을 수 없습니다. 회수로 안 되면 cgroup 안에서 OOM 킬이 일어납니다.</td>
+</tr>
+</tbody>
+</table></div>
+<figure class="fig" id="fig-limit-behaviors"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>두 가지 상한의 동작: cpu.max는 100ms 주기마다 50ms를 쓰면 다음 주기까지 스로틀하고, 메모리는 memory.high를 넘으면 할당이 느려지고 memory.max에 닿으면 cgroup 안에서 회수와 OOM 킬이 일어난다</title>
+
+  <text class="t-code t-b" x="20" y="26">cpu.max = 50000 100000</text>
+  <text class="t-xs" x="200" y="26">100ms 주기마다 50ms까지</text>
+  <rect class="box green" x="40" y="38" width="110" height="30"/>
+  <text class="t-xs t-ink mid" x="95" y="58">실행 50ms</text>
+  <rect class="box red" x="150" y="38" width="110" height="30"/>
+  <rect x="150" y="38" width="110" height="30" fill="url(#hatch-red)"/>
+  <text class="t-xs t-ink t-b mid" x="205" y="58">스로틀</text>
+  <rect class="box green" x="260" y="38" width="110" height="30"/>
+  <text class="t-xs t-ink mid" x="315" y="58">실행 50ms</text>
+  <rect class="box red" x="370" y="38" width="110" height="30"/>
+  <rect x="370" y="38" width="110" height="30" fill="url(#hatch-red)"/>
+  <text class="t-xs t-ink t-b mid" x="425" y="58">스로틀</text>
+  <rect class="box green" x="480" y="38" width="110" height="30"/>
+  <text class="t-xs t-ink mid" x="535" y="58">실행 50ms</text>
+  <rect class="box red" x="590" y="38" width="110" height="30"/>
+  <rect x="590" y="38" width="110" height="30" fill="url(#hatch-red)"/>
+  <text class="t-xs t-ink t-b mid" x="645" y="58">스로틀</text>
+  <path class="ln thin" d="M40 68 V76"/>
+  <text class="t-code" x="40" y="90">0</text>
+  <path class="ln thin" d="M260 68 V76"/>
+  <text class="t-code mid" x="260" y="90">100ms</text>
+  <path class="ln thin" d="M480 68 V76"/>
+  <text class="t-code mid" x="480" y="90">200ms</text>
+  <path class="ln thin" d="M700 68 V76"/>
+  <text class="t-code mid" x="700" y="90">300ms</text>
+  <text class="t-xs mid" x="260" y="108">주기 타이머가 몫을 다시 채운다</text>
+  <text class="t-xs end" x="740" y="108">CPU가 놀고 있어도 스로틀된다</text>
+
+  <path class="ln thin muted dash" d="M20 124 H740"/>
+
+  <text class="t-code t-b" x="20" y="150">memory.high = 400M · memory.max = 500M</text>
+  <rect class="box" x="40" y="162" width="480" height="30"/>
+  <text class="t-xs t-ink mid" x="280" y="182">과금만 한다</text>
+  <rect class="box warm" x="520" y="162" width="120" height="30"/>
+  <text class="t-xs t-ink t-b mid" x="580" y="182">느려진다</text>
+  <rect class="box red" x="640" y="162" width="60" height="30"/>
+  <rect x="640" y="162" width="60" height="30" fill="url(#hatch-red)"/>
+  <path class="ln thin" d="M40 192 V200"/>
+  <text class="t-code" x="40" y="214">0</text>
+  <path class="ln thin" d="M520 192 V200"/>
+  <text class="t-code mid" x="520" y="214">400M</text>
+  <path class="ln thin" d="M640 192 V200"/>
+  <text class="t-code mid" x="640" y="214">500M</text>
+  <text class="t-xs" x="100" y="214">cgroup의 메모리 사용량 →</text>
+
+  <rect class="box" x="20" y="232" width="250" height="68" rx="10"/>
+  <text class="t-b" x="32" y="255">그 아래</text>
+  <text class="t-xs" x="32" y="274">memory.min · low 아래의 메모리는</text>
+  <text class="t-xs" x="32" y="290">회수로부터 보호받는다</text>
+  <rect class="box warm" x="284" y="232" width="250" height="68" rx="10"/>
+  <text class="t-b" x="296" y="255">memory.high를 넘으면</text>
+  <text class="t-xs" x="296" y="274">할당한 태스크가 회수를 떠맡고</text>
+  <text class="t-xs" x="296" y="290">유저 모드 복귀 길에 강제로 잠든다</text>
+  <rect class="box red" x="548" y="232" width="192" height="68" rx="10"/>
+  <text class="t-b" x="560" y="255">memory.max에 닿으면</text>
+  <text class="t-xs" x="560" y="274">cgroup 안에서 회수한다</text>
+  <text class="t-xs" x="560" y="290">안 되면 OOM 킬</text>
+</svg></div><figcaption><b>그림 22-7</b>두 가지 상한이 걸리는 모습. <code>cpu.max</code>는 주기마다 실행을 끊고, 메모리는 <code>high</code>에서 느려지고 <code>max</code>에서 죽습니다.</figcaption></figure>
+</section>
+<section class="level3" id="pids-압력-얼리기">
+<h3>pids, 압력, 얼리기</h3>
+<p><code>pids</code> 컨트롤러는 <code>fork()</code> 경로(<a href="ch01.html">1장</a>)의 <code>can_fork()</code> 콜백으로 구현됩니다. <code>pids_can_fork()</code>가 이 cgroup에서 루트까지 카운터를 올려 보고, 어느 단계에서든 <code>pids.max</code>를 넘으면 <code>fork()</code>가 <code>EAGAIN</code>으로 실패합니다. 포크 폭탄이 컨테이너 밖으로 번지지 못하게 하는 장치입니다.</p>
+<p><strong>PSI</strong>(pressure stall information)는 한도가 아니라 측정입니다. "자원이 모자라 태스크가 기다린 시간의 비율"을 CPU, 메모리, I/O별로 냅니다. 시스템 전체는 <code>/proc/pressure/</code>에, cgroup별로는 <code>cpu.pressure</code>·<code>memory.pressure</code>·<code>io.pressure</code>에 나옵니다. 앞의 코드에 있던 <code>psi_memstall_enter()</code>가 그 계측 지점입니다. 사용량이 한도의 몇 퍼센트인지보다 "모자라서 실제로 얼마나 느려졌는가"가 운영에 쓸모 있는 신호입니다.</p>
+<p><code>cgroup.freeze</code>에 1을 쓰면 하위 트리의 모든 프로세스가 멈추고, <code>cgroup.kill</code>에 1을 쓰면 모두 <code>SIGKILL</code>을 받습니다. 그 사이에 <code>fork()</code>로 빠져나가는 프로세스가 없게 커널이 처리합니다. PID를 하나씩 찾아 죽이는 방식으로는 막을 수 없던 경쟁입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>손으로 cgroup을 만들어 셸을 가둡니다. root 셸에서 합니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># cat /sys/fs/cgroup/cgroup.subtree_control
+cpu io memory pids
+# mkdir /sys/fs/cgroup/demo
+# echo $$ &gt; /sys/fs/cgroup/demo/cgroup.procs
+# echo "50000 100000" &gt; /sys/fs/cgroup/demo/cpu.max
+# echo 200M &gt; /sys/fs/cgroup/demo/memory.max
+# while :; do :; done &amp;
+# grep -E 'nr_|throttled' /sys/fs/cgroup/demo/cpu.stat
+nr_periods 152
+nr_throttled 151
+throttled_usec 7391204
+# cat /sys/fs/cgroup/demo/memory.events
+low 0
+high 0
+max 0
+oom 0
+oom_kill 0
+...</code></pre></div>
+<p><code>top</code>으로 보면 무한 루프가 CPU 50%에서 멈춰 있습니다. <code>nr_throttled</code>가 <code>nr_periods</code>와 거의 같다는 것은 주기마다 몫을 다 썼다는 뜻입니다. 이 셸에서 200MB 넘게 메모리를 잡는 프로그램을 돌리면 <code>max</code>와 <code>oom_kill</code>이 올라갑니다. <code>cat /proc/pressure/cpu</code>의 <code>some avg10=</code>이 최근 10초 동안 누군가 CPU를 기다린 시간의 비율이고, <code>systemd-cgls</code>는 트리 전체를 그려 줍니다.</p>
+</div>
+</section>
+</section>
+<section class="level2" id="assembly">
+<h2><span class="sec-n">22.8</span>컨테이너 조립<a aria-label="이 절의 링크" class="anchor" href="#assembly">#</a></h2>
+<p>런타임이 컨테이너 하나를 띄울 때 부르는 시스템 콜을 순서대로 늘어놓으면 이 장의 내용이 다 나옵니다.</p>
+<figure class="fig" id="fig-runtime-assembly"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 352" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>컨테이너 런타임의 조립 순서 여섯 단계: 네임스페이스를 만들며 clone, 파일시스템 구성과 pivot_root, veth로 네트워크 연결, cgroup 한도, capability와 seccomp로 권한 축소, 마지막으로 execve</title>
+
+  <!-- 1 -->
+  <rect class="box blue" x="20" y="14" width="228" height="96" rx="10"/>
+  <text class="t-b" x="34" y="38">① 자식을 만든다</text>
+  <text class="t-code" x="34" y="62">clone3(CLONE_NEW*,</text>
+  <text class="t-code" x="34" y="80">CLONE_INTO_CGROUP)</text>
+  <text class="t-xs tc-blue" x="34" y="100">네임스페이스 · cgroup</text>
+  <path class="ln" d="M248 62 H262" marker-end="url(#ah)"/>
+
+  <!-- 2 -->
+  <rect class="box blue" x="266" y="14" width="228" height="96" rx="10"/>
+  <text class="t-b" x="280" y="38">② 파일시스템을 꾸민다</text>
+  <text class="t-code" x="280" y="62">mount("overlay", …)</text>
+  <text class="t-code" x="280" y="80">pivot_root()</text>
+  <text class="t-xs tc-blue" x="280" y="100">마운트 네임스페이스</text>
+  <path class="ln" d="M494 62 H508" marker-end="url(#ah)"/>
+
+  <!-- 3 -->
+  <rect class="box blue" x="512" y="14" width="228" height="96" rx="10"/>
+  <text class="t-b" x="526" y="38">③ 네트워크를 잇는다</text>
+  <text class="t-code" x="526" y="62">veth 쌍을 만들어</text>
+  <text class="t-code" x="526" y="80">한쪽을 자식의 netns로</text>
+  <text class="t-xs tc-blue" x="526" y="100">네트워크 네임스페이스</text>
+
+  <path class="ln" d="M626 110 V128 H134 V142" marker-end="url(#ah)"/>
+
+  <!-- 4 -->
+  <rect class="box green" x="20" y="146" width="228" height="96" rx="10"/>
+  <text class="t-b" x="34" y="170">④ 한도를 건다</text>
+  <text class="t-code" x="34" y="194">cpu.max · memory.max</text>
+  <text class="t-code" x="34" y="212">pids.max</text>
+  <text class="t-xs tc-green" x="34" y="232">cgroup</text>
+  <path class="ln" d="M248 194 H262" marker-end="url(#ah)"/>
+
+  <!-- 5 -->
+  <rect class="box warm" x="266" y="146" width="228" height="96" rx="10"/>
+  <text class="t-b" x="280" y="170">⑤ 권한을 줄인다</text>
+  <text class="t-code" x="280" y="194">capset() · no_new_privs</text>
+  <text class="t-code" x="280" y="212">seccomp()</text>
+  <text class="t-xs tc-warm" x="280" y="232">되돌릴 수 없으므로 맨 나중에</text>
+  <path class="ln" d="M494 194 H508" marker-end="url(#ah)"/>
+
+  <!-- 6 -->
+  <rect class="solid" x="512" y="146" width="228" height="96" rx="10"/>
+  <text class="t-b t-on" x="526" y="170">⑥ execve()</text>
+  <text class="t-s t-on" x="526" y="196">컨테이너의 프로그램이</text>
+  <text class="t-s t-on" x="526" y="216">PID 1로 시작한다</text>
+
+  <!-- 남는 것 -->
+  <rect class="box yellow" x="20" y="270" width="720" height="66" rx="10"/>
+  <text class="t-b" x="34" y="294">커널에 남은 것</text>
+  <text class="t-s" x="150" y="294">포인터 넷이 다른 곳을 가리키는 task_struct 하나</text>
+  <text class="t-code" x="34" y="320">nsproxy → 새 네임스페이스</text>
+  <text class="t-code" x="222" y="320">cgroups → css_set</text>
+  <text class="t-code" x="372" y="320">cred → 줄어든 capability</text>
+  <text class="t-code" x="574" y="320">seccomp → 필터</text>
+</svg></div><figcaption><b>그림 22-8</b>컨테이너 런타임의 조립 순서. 단계마다 쓰는 커널 기능이 다르고, 마지막 <code>execve()</code> 뒤에는 커널에 "컨테이너"라는 흔적이 따로 남지 않습니다.</figcaption></figure>
+<ol type="1">
+<li><strong>네임스페이스를 만들며 자식을 만든다.</strong> <code>clone3()</code>에 <code>CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWNET | CLONE_NEWIPC | CLONE_NEWUTS | CLONE_NEWCGROUP</code>을 줍니다. <code>CLONE_INTO_CGROUP</code>과 cgroup 디렉터리의 fd를 함께 주면 자식이 처음부터 그 cgroup에서 태어납니다.</li>
+<li><strong>파일시스템을 꾸민다.</strong> 자식이 새 마운트 네임스페이스에서 전파를 <code>private</code>으로 바꾸고, overlayfs로 루트를 조립하고, <code>/proc</code>과 <code>/sys</code>를 새로 마운트한 뒤 <code>pivot_root()</code>를 부릅니다.</li>
+<li><strong>네트워크를 잇는다.</strong> 부모가 veth 쌍을 만들어 한쪽 끝을 자식의 네트워크 네임스페이스로 옮깁니다.</li>
+<li><strong>한도를 건다.</strong> cgroup 디렉터리의 <code>cpu.max</code>, <code>memory.max</code>, <code>pids.max</code>에 값을 씁니다.</li>
+<li><strong>권한을 줄인다.</strong> capability를 필요한 것만 남기고, <code>no_new_privs</code>를 세우고, seccomp 필터를 올립니다. 이 단계는 되돌릴 수 없으므로 맨 나중에 합니다.</li>
+<li><strong><code>execve()</code>.</strong> 여기서부터는 컨테이너 안의 프로그램입니다.</li>
+</ol>
+<p>쿠버네티스의 파드는 이 조립을 조금 다르게 합니다. 파드 안의 컨테이너들은 네트워크와 IPC 네임스페이스를 <strong>함께</strong> 쓰고 마운트 네임스페이스는 따로 씁니다. 그래서 한 파드의 컨테이너끼리는 <code>localhost</code>로 통신합니다. 네임스페이스를 종류별로 따로 공유할 수 있다는 <code>nsproxy</code>의 구조가 그대로 드러나는 자리입니다.</p>
+<div class="callout note"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-book"></use></svg>참고 · v7.3의 네임스페이스 관리</div>
+<p>네임스페이스를 밖에서 들여다보는 수단이 최근에 늘었습니다. 예전에는 시스템의 네임스페이스 목록을 얻으려면 모든 프로세스의 <code>/proc/PID/ns/</code>를 훑어야 했고, 프로세스 없이 fd로만 살아 있는 네임스페이스는 찾을 수 없었습니다. 6.19에서 들어온 <code>listns()</code> 시스템 콜은 커널이 관리하는 네임스페이스 트리(<code>kernel/nstree.c</code>)에서 식별자 목록을 직접 돌려줍니다. nsfs는 파일 핸들도 지원합니다(<code>nsfs_export_operations</code>). 네임스페이스를 가리키는 핸들을 저장해 두었다가 나중에 다시 열 수 있습니다.</p>
+</div>
+</section>
+<section class="level2" id="limits">
+<h2><span class="sec-n">22.9</span>격리의 한계<a aria-label="이 절의 링크" class="anchor" href="#limits">#</a></h2>
+<p>네임스페이스는 이름을 가리고 cgroup은 양을 제한합니다. 가리지 못하는 것이 하나 있습니다. <strong>커널 자체</strong>입니다. 컨테이너의 프로세스는 호스트와 같은 시스템 콜 테이블로 같은 커널 코드를 실행합니다. 그 코드의 버그 하나가 모든 컨테이너와 호스트의 경계를 한꺼번에 무너뜨립니다. 네임스페이스에 들어가지 않은 전역 상태도 있습니다. 커널 모듈, 여러 sysctl, 실제 시각을 가리키는 시계가 그렇습니다.</p>
+<p>경계를 더 두껍게 하는 길은 둘입니다. 하나는 시스템 콜을 호스트 커널에 닿기 전에 가로채는 것입니다. gVisor 같은 샌드박스는 유저 공간에서 커널의 인터페이스를 다시 구현해, 컨테이너가 호스트 커널에 직접 내는 시스템 콜의 종류를 크게 줄입니다. 다른 하나는 컨테이너마다 가상 머신을 띄워 커널을 따로 주는 것입니다. 하드웨어 가상화가 경계가 됩니다. <a href="ch23.html">23장</a>의 주제입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>"컨테이너"라는 큰 기능을 커널에 넣지 않은 것은 <strong>메커니즘과 정책의 분리</strong>입니다. 커널은 직교하는 작은 메커니즘 여럿을 줍니다. 네임스페이스 여덟 종류, 컨트롤러 여러 개, capability, seccomp가 각각 독립된 스위치입니다. 무엇을 묶어 "컨테이너"라고 부를지는 유저 공간이 정합니다. 덕분에 같은 부품으로 Docker의 컨테이너, 쿠버네티스의 파드, systemd의 서비스, 브라우저의 탭 샌드박스가 서로 다른 조합으로 만들어집니다. 커널에 <code>struct container</code>를 넣었다면 그 가운데 하나의 모양으로 굳었을 것입니다. 치르는 값도 분명합니다. 조합을 올바르게 하는 책임이 런타임에 있고, 빠뜨린 스위치 하나가 탈출구가 됩니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.4.19 · 2002</dt>
+<dd>
+마운트 네임스페이스(<code>CLONE_NEWNS</code>). 첫 네임스페이스라서 플래그 이름에 종류가 없습니다.
+</dd>
+<dt>2.6.19 · 2006</dt>
+<dd>
+UTS, IPC 네임스페이스.
+</dd>
+<dt>2.6.24 · 2008</dt>
+<dd>
+PID, 네트워크 네임스페이스. cgroup(v1)도 이 버전에 들어옵니다.
+</dd>
+<dt>3.8 · 2013</dt>
+<dd>
+비특권 사용자가 유저 네임스페이스를 만들 수 있게 됩니다.
+</dd>
+<dt>4.5 · 2016</dt>
+<dd>
+cgroup v2가 공식 인터페이스가 됩니다.
+</dd>
+<dt>4.20 · 2018</dt>
+<dd>
+PSI.
+</dd>
+<dt>5.6 · 2020</dt>
+<dd>
+시간 네임스페이스.
+</dd>
+<dt>5.8 · 2020</dt>
+<dd>
+<code>setns()</code>가 pidfd를 받습니다. 여러 네임스페이스에 한 번에 들어갈 수 있습니다.
+</dd>
+<dt>5.14 · 2021</dt>
+<dd>
+<code>cgroup.kill</code>.
+</dd>
+<dt>6.19 · 2026</dt>
+<dd>
+<code>listns()</code>.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>커널에는 컨테이너 객체가 없습니다. 네임스페이스(무엇이 보이는가), cgroup(얼마나 쓰는가), 권한 제한(무엇을 할 수 있는가)을 유저 공간이 조합한 것입니다.</li>
+<li>태스크는 <code>nsproxy</code>로 네임스페이스들을 가리킵니다. 네임스페이스를 바꾸지 않는 <code>fork()</code>는 <code>nsproxy</code>를 공유하고, 하나라도 바꾸면 복사합니다. PID 네임스페이스는 <code>struct pid</code>에서, 유저 네임스페이스는 <code>cred</code>에서 나옵니다.</li>
+<li><code>struct pid</code>는 네임스페이스 단계마다 번호를 하나씩 갖습니다. 번호는 조상 네임스페이스에서만 보입니다.</li>
+<li>capability는 유저 네임스페이스에 대해 판정됩니다. 네임스페이스를 만든 사람은 그 안에서 전권을 갖고, 밖에 대해서는 아무것도 갖지 못합니다.</li>
+<li>cgroup v2는 트리가 하나입니다. 컨트롤러는 <code>subtree_control</code>로 위에서 내려 주고, 프로세스는 잎에만 둡니다. 태스크는 <code>css_set</code> 하나로 모든 컨트롤러의 상태에 닿습니다.</li>
+<li><code>cpu.max</code>를 넘으면 다음 주기까지 스로틀되고, <code>memory.high</code>를 넘으면 느려지고, <code>memory.max</code>를 넘으면 cgroup 안에서 회수와 OOM이 일어납니다.</li>
+<li>컨테이너는 호스트와 커널을 공유합니다. 그보다 두꺼운 경계가 필요하면 시스템 콜을 가로채는 샌드박스나 가상 머신을 씁니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p>프로세스가 <code>unshare(CLONE_NEWPID)</code>를 부른 뒤 <code>getpid()</code>를 부르면 값이 바뀌어 있습니까? 그 뒤 <code>fork()</code>로 만든 자식의 PID는 자식에게 얼마로 보입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>바뀌지 않습니다. 태스크의 <code>struct pid</code>는 만들어질 때 <code>numbers[]</code>가 정해지고 그 뒤로 바뀌지 않습니다. <code>unshare(CLONE_NEWPID)</code>는 <code>nsproxy</code>의 <code>pid_ns_for_children</code>만 새 네임스페이스로 바꿉니다. 그 뒤의 <code>fork()</code>에서 <code>alloc_pid()</code>가 새 네임스페이스부터 루트까지 번호를 받으므로, 자식은 새 네임스페이스의 첫 프로세스이고 자기에게 PID 1로 보입니다. 부모가 보는 자식의 PID는 부모 네임스페이스에서의 번호입니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>일반 사용자가 유저 네임스페이스와 네트워크 네임스페이스를 새로 만들었습니다. 그 안에서 <code>ip link add</code>로 장치를 만드는 것은 되는데, 호스트의 <code>eth0</code> 설정을 바꾸는 것은 안 됩니다. <code>cap_capable_helper()</code>로 설명해 보세요.</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>새 유저 네임스페이스 안에서 이 프로세스는 모든 capability를 갖습니다. 새 네트워크 네임스페이스의 주인(<code>net-&gt;user_ns</code>)은 이 유저 네임스페이스이므로, <code>CAP_NET_ADMIN</code> 검사에서 <code>target_ns == cred_ns</code>가 되어 capability 비트를 보고 통과합니다. 호스트의 <code>eth0</code>은 초기 네트워크 네임스페이스에 속하고 그 주인은 초기 유저 네임스페이스입니다. <code>target_ns</code>가 초기 유저 네임스페이스이면 반복문의 둘째 검사 <code>ns-&gt;level &lt;= cred_ns-&gt;level</code>에 걸려 <code>-EPERM</code>이 나옵니다. 대상이 내 네임스페이스의 조상이기 때문입니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>cgroup v2에서 프로세스가 들어 있는 cgroup <code>A</code>의 <code>cgroup.subtree_control</code>에 <code>+memory</code>를 쓰면 실패합니다. 왜 이런 규칙이 있습니까? 어떻게 해야 <code>A</code> 아래에서 메모리를 나눠 줄 수 있습니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>내부 프로세스 금지 규칙입니다. <code>A</code>가 자식에게 메모리를 나눠 주면서 자기도 프로세스를 직접 담으면, <code>A</code>의 프로세스들과 자식 cgroup들이 <code>A</code>의 몫을 두고 형제처럼 다투게 되고 그 사이의 분배를 정할 일관된 방법이 없습니다. 프로세스를 잎에만 두면 컨트롤러는 언제나 cgroup끼리만 비교하면 됩니다. 해결은 <code>A</code> 아래에 자식 cgroup을 만들어 <code>A</code>의 프로세스를 모두 그리로 옮긴 다음 <code>subtree_control</code>에 쓰는 것입니다. 반대 방향의 검사가 <code>cgroup_migrate_vet_dst()</code>에 있습니다. <code>subtree_control</code>이 켜진 cgroup에 프로세스를 넣으려 하면 <code>-EBUSY</code>입니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>컨테이너에 <code>memory.max</code>만 500MB로 걸었더니 한도 근처에서 프로세스가 갑자기 죽습니다. <code>memory.high</code>를 450MB로 함께 걸면 무엇이 달라집니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>memory.max</code>만 있으면 사용량이 500MB에 닿을 때 <code>try_charge_memcg()</code>가 cgroup 안에서 회수를 시도하고, 회수할 것이 없으면 곧바로 OOM 킬이 일어납니다. <code>memory.high</code>를 450MB로 두면 그 선을 넘은 순간부터 할당하는 태스크가 회수 일을 직접 하고 유저 모드 복귀 길에 강제로 잠듭니다. 메모리를 늘리는 속도가 꺾이므로 500MB에 닿기 전에 시간이 생깁니다. 그 사이에 <code>memory.events</code>의 <code>high</code>나 <code>memory.pressure</code>를 지켜보던 관리 프로세스가 부하를 줄이거나 한도를 올릴 수 있습니다. <code>high</code>는 속도를 늦추는 선이고 <code>max</code>는 넘지 못하는 벽입니다.</p>
+</div></details></div></div>
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>네임스페이스<small>namespace</small></dt>
+<dd>
+전역 자원의 이름 공간을 태스크 묶음마다 따로 갖게 하는 커널 기능.
+</dd>
+<dt>nsproxy</dt>
+<dd>
+태스크가 속한 네임스페이스들의 포인터를 모은 구조체. 조합이 같은 태스크끼리 공유한다.
+</dd>
+<dt>struct pid</dt>
+<dd>
+프로세스 하나의 커널 안 정체. 네임스페이스 단계마다의 번호를 <code>numbers[]</code>에 담는다.
+</dd>
+<dt>유저 네임스페이스<small>user namespace</small></dt>
+<dd>
+uid·gid의 대응표와 capability가 미치는 범위를 정하는 네임스페이스.
+</dd>
+<dt>veth</dt>
+<dd>
+한쪽 끝에 넣은 패킷이 다른 쪽 끝에서 나오는 가상 이더넷 장치 쌍.
+</dd>
+<dt>cgroup<small>control group</small></dt>
+<dd>
+태스크를 트리로 묶어 자원 사용을 재고 제한하는 커널 기능.
+</dd>
+<dt>컨트롤러<small>controller</small></dt>
+<dd>
+cgroup에서 자원 한 종류를 맡는 코드. <code>cpu</code>, <code>memory</code>, <code>io</code>, <code>pids</code> 등.
+</dd>
+<dt>css<small>cgroup_subsys_state</small></dt>
+<dd>
+한 cgroup에서 한 컨트롤러가 갖는 상태 객체.
+</dd>
+<dt>css_set</dt>
+<dd>
+태스크 하나가 속한 css들의 묶음. 같은 cgroup의 태스크끼리 공유한다.
+</dd>
+<dt>스로틀<small>throttle</small></dt>
+<dd>
+주기당 몫을 다 쓴 cgroup의 태스크를 다음 주기까지 실행하지 않는 일.
+</dd>
+<dt>PSI<small>pressure stall information</small></dt>
+<dd>
+자원이 모자라 태스크가 기다린 시간의 비율을 재는 계측.
+</dd>
+<dt>위임<small>delegation</small></dt>
+<dd>
+cgroup 트리의 일부를 덜 신뢰하는 쪽이 관리하도록 소유권을 넘기는 일.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/admin-guide/cgroup-v2.html" rel="noopener" target="_blank"><code>Documentation/admin-guide/cgroup-v2.rst</code></a>: cgroup v2의 규칙과 모든 인터페이스 파일. 끝부분에 v1의 문제와 v2의 근거가 있습니다.</li>
+<li><a href="https://docs.kernel.org/accounting/psi.html" rel="noopener" target="_blank"><code>Documentation/accounting/psi.rst</code></a>: PSI의 뜻과 읽는 법.</li>
+<li><a href="https://docs.kernel.org/filesystems/sharedsubtree.html" rel="noopener" target="_blank"><code>Documentation/filesystems/sharedsubtree.rst</code></a>: 마운트 전파의 유형과 예.</li>
+<li><a href="https://docs.kernel.org/admin-guide/namespaces/resource-control.html" rel="noopener" target="_blank"><code>Documentation/admin-guide/namespaces/resource-control.rst</code></a>: 유저 네임스페이스를 켤 때의 자원 제어.</li>
+<li><a href="https://man7.org/linux/man-pages/man7/namespaces.7.html" rel="noopener" target="_blank"><code>namespaces(7)</code></a>: 여덟 종류의 개요와 <code>/proc/PID/ns/</code>.</li>
+<li><a href="https://man7.org/linux/man-pages/man7/cgroups.7.html" rel="noopener" target="_blank"><code>cgroups(7)</code></a>: v1과 v2의 차이, 위임 규칙.</li>
+<li><a href="https://man7.org/linux/man-pages/man2/clone.2.html" rel="noopener" target="_blank"><code>clone(2)</code></a>: <code>CLONE_NEW*</code>와 <code>CLONE_INTO_CGROUP</code>.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch21.html"><small>← 21장</small><b>블록 계층과 io_uring</b></a><a class="next" href="ch23.html"><small>23장 →</small><b>가상화와 KVM</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#no-container">커널에는 컨테이너가 없다</a><a href="#namespaces">네임스페이스와 nsproxy</a><a href="#pidns">PID 네임스페이스</a><a href="#mnt-net">마운트와 네트워크 네임스페이스</a><a href="#userns">유저 네임스페이스와 권한</a><a href="#cgroup">cgroup v2: 하나의 트리</a><a href="#controllers">컨트롤러</a><a href="#assembly">컨테이너 조립</a><a href="#limits">격리의 한계</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

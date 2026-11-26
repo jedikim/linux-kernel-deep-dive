@@ -1,0 +1,59 @@
+<svg viewBox="0 0 760 486" xmlns="http://www.w3.org/2000/svg">
+  <title>패킷 하나가 NIC에서 유저 버퍼까지 가는 열한 단계와, 각 단계가 실행되는 컨텍스트: 하드웨어, hardirq, softirq, 프로세스 컨텍스트</title>
+
+  <rect class="panel gray" x="20" y="12" width="118" height="80" rx="10"/>
+  <text class="t-xs t-ink t-b mid" x="79" y="56">하드웨어</text>
+  <rect class="panel warm" x="20" y="92" width="118" height="40" rx="10"/>
+  <text class="t-xs t-ink t-b mid" x="79" y="116">hardirq</text>
+  <rect class="panel purple" x="20" y="132" width="118" height="280" rx="10"/>
+  <text class="t-xs t-ink t-b mid" x="79" y="276">softirq</text>
+  <rect class="panel blue" x="20" y="412" width="118" height="40" rx="10"/>
+  <text class="t-xs t-ink t-b mid" x="79" y="436">프로세스 컨텍스트</text>
+  <path class="ln thin muted" d="M168 26 V426"/>
+  <rect class="box gray" x="150" y="16" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="37">1</text>
+  <text class="t-s t-ink" x="188" y="37">NIC가 프레임을 받아 DMA로 RX 링 버퍼에 쓴다</text>
+  <rect class="box gray" x="150" y="56" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="77">2</text>
+  <text class="t-s t-ink" x="188" y="77">MSI-X 인터럽트를 건다</text>
+  <rect class="box warm" x="150" y="96" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="117">3</text>
+  <text class="t-s t-ink" x="188" y="117">장치 인터럽트를 막고 NAPI를 예약한다</text>
+  <text class="t-code" x="534" y="117">e1000_intr_msix_rx()</text>
+  <rect class="box purple" x="150" y="136" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="157">4</text>
+  <text class="t-s t-ink" x="188" y="157">NET_RX softirq가 폴링 목록을 돈다</text>
+  <text class="t-code" x="534" y="157">net_rx_action()</text>
+  <rect class="box purple" x="150" y="176" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="197">5</text>
+  <text class="t-s t-ink" x="188" y="197">드라이버 poll이 링에서 꺼내 skb를 만든다</text>
+  <text class="t-code" x="534" y="197">e1000e_poll()</text>
+  <rect class="box purple" x="150" y="216" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="237">6</text>
+  <text class="t-s t-ink" x="188" y="237">GRO가 같은 흐름의 세그먼트를 묶는다</text>
+  <text class="t-code" x="534" y="237">gro_receive_skb()</text>
+  <rect class="box purple" x="150" y="256" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="277">7</text>
+  <text class="t-s t-ink" x="188" y="277">프로토콜을 가른다 (탭, tc 훅)</text>
+  <text class="t-code" x="534" y="277">__netif_receive_skb_core()</text>
+  <rect class="box purple" x="150" y="296" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="317">8</text>
+  <text class="t-s t-ink" x="188" y="317">IP: 헤더 검사, 넷필터, 라우팅</text>
+  <text class="t-code" x="534" y="317">ip_list_rcv()</text>
+  <rect class="box purple" x="150" y="336" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="357">9</text>
+  <text class="t-s t-ink" x="188" y="357">TCP: 소켓을 찾아 수신 큐에 넣는다</text>
+  <text class="t-code" x="534" y="357">tcp_v4_rcv()</text>
+  <rect class="box purple" x="150" y="376" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="397">10</text>
+  <text class="t-s t-ink" x="188" y="397">잠든 읽는 쪽을 깨운다</text>
+  <text class="t-code" x="534" y="397">sock_def_readable()</text>
+  <rect class="box blue" x="150" y="416" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="437">11</text>
+  <text class="t-s t-ink" x="188" y="437">recv()가 수신 큐에서 유저 버퍼로 복사한다</text>
+  <text class="t-code" x="534" y="437">tcp_recvmsg()</text>
+  <text class="t-xs" x="534" y="37">장치 안에서 일어나는 일</text>
+  <text class="t-xs" x="534" y="57">커널 코드는 아직 돌지 않는다</text>
+
+  <text class="t-s mid" x="380" y="474">단계 4–10이 한 번의 softirq 실행 안에서 이어진다. 패킷 처리의 대부분이 여기서 일어난다.</text>
+</svg>

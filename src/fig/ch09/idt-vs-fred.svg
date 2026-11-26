@@ -1,0 +1,78 @@
+<svg viewBox="0 0 760 446" xmlns="http://www.w3.org/2000/svg">
+  <title>IDT 방식과 FRED 방식의 비교: IDT는 벡터마다 진입점이 있고 프레임이 5~6칸이며 swapgs와 IST를 소프트웨어가 다룬다. FRED는 진입점이 둘이고 64바이트 프레임에 이벤트 종류와 벡터가 실려 온다</title>
+
+  <text class="t-l" x="20" y="26">IDT 방식</text>
+  <text class="t-s" x="100" y="26">벡터마다 진입점</text>
+  <text class="t-l tc-green" x="390" y="26">FRED 방식</text>
+  <text class="t-s" x="480" y="26">진입점 둘</text>
+
+  <!-- 진입 -->
+  <rect class="box" x="20" y="40" width="350" height="84" rx="10"/>
+  <text class="t-b" x="34" y="64">CPU가 IDT[벡터]의 주소로 점프한다</text>
+  <text class="t-xs" x="34" y="86">진입점이 256개다. 유저에서 왔는지 커널에서 왔는지는</text>
+  <text class="t-xs" x="34" y="106">진입 코드가 저장된 CS를 보고 가려야 한다.</text>
+
+  <rect class="box green" x="390" y="40" width="350" height="84" rx="10"/>
+  <text class="t-b" x="404" y="64">CPU가 온 곳에 따라 진입점을 고른다</text>
+  <text class="t-code" x="404" y="86">asm_fred_entrypoint_user</text>
+  <text class="t-xs end" x="728" y="86">링 3에서 왔을 때</text>
+  <text class="t-code" x="404" y="106">asm_fred_entrypoint_kernel</text>
+  <text class="t-xs end" x="728" y="106">링 0에서 왔을 때</text>
+
+  <!-- 프레임 -->
+  <text class="t-s t-ink t-b" x="40" y="198">CPU가 쌓는 프레임</text>
+  <rect class="box blue" x="40" y="208" width="156" height="24"/>
+  <text class="t-code mid" x="118" y="225">SS</text>
+  <rect class="box blue" x="40" y="232" width="156" height="24"/>
+  <text class="t-code mid" x="118" y="249">RSP</text>
+  <rect class="box blue" x="40" y="256" width="156" height="24"/>
+  <text class="t-code mid" x="118" y="273">RFLAGS</text>
+  <rect class="box blue" x="40" y="280" width="156" height="24"/>
+  <text class="t-code mid" x="118" y="297">CS</text>
+  <rect class="box blue" x="40" y="304" width="156" height="24"/>
+  <text class="t-code mid" x="118" y="321">RIP</text>
+  <rect class="ghost dash" x="40" y="328" width="156" height="24"/>
+  <text class="t-xs t-ink mid" x="118" y="345">오류 코드</text>
+  <text class="t-xs" x="206" y="345">일부 예외에만 있다</text>
+  <text class="t-xs" x="206" y="249">벡터도, 폴트 주소(CR2)도</text>
+  <text class="t-xs" x="206" y="267">프레임에는 없다</text>
+
+  <text class="t-s t-ink t-b" x="410" y="150">CPU가 쌓는 프레임 (언제나 64바이트)</text>
+  <rect class="box gray" x="410" y="160" width="156" height="24"/>
+  <text class="t-xs mid" x="488" y="177">예약</text>
+  <rect class="box green" x="410" y="184" width="156" height="24"/>
+  <text class="t-xs t-ink mid" x="488" y="201">이벤트 데이터</text>
+  <rect class="box green" x="410" y="208" width="156" height="24"/>
+  <text class="t-xs t-ink mid" x="488" y="225">SS + 종류·벡터</text>
+  <rect class="box blue" x="410" y="232" width="156" height="24"/>
+  <text class="t-code mid" x="488" y="249">RSP</text>
+  <rect class="box blue" x="410" y="256" width="156" height="24"/>
+  <text class="t-code mid" x="488" y="273">RFLAGS</text>
+  <rect class="box green" x="410" y="280" width="156" height="24"/>
+  <text class="t-xs t-ink mid" x="488" y="297">CS + 스택 레벨</text>
+  <rect class="box blue" x="410" y="304" width="156" height="24"/>
+  <text class="t-code mid" x="488" y="321">RIP</text>
+  <rect class="box green" x="410" y="328" width="156" height="24"/>
+  <text class="t-xs t-ink mid" x="488" y="345">오류 코드</text>
+  <text class="t-xs" x="576" y="201">폴트 주소(CR2) 등</text>
+  <text class="t-xs" x="576" y="225">무슨 이벤트인지</text>
+  <text class="t-xs" x="576" y="297">끊긴 자리의 레벨</text>
+  <text class="t-xs" x="576" y="345">언제나 있다</text>
+
+  <path class="ln thin muted" d="M20 368 H740"/>
+
+  <!-- 나머지 차이 -->
+  <text class="t-xs t-ink t-b" x="20" y="390">GS</text>
+  <text class="t-xs" x="62" y="390">진입 코드가 swapgs를 직접 실행한다</text>
+  <text class="t-xs t-ink t-b" x="20" y="410">스택</text>
+  <text class="t-xs" x="62" y="410">IST는 같은 예외가 겹치면 같은 자리를 덮어쓴다</text>
+  <text class="t-xs t-ink t-b" x="20" y="430">복귀</text>
+  <text class="t-xs" x="62" y="430">iretq는 NMI 차단을 무조건 푼다</text>
+
+  <text class="t-xs t-ink t-b" x="390" y="390">GS</text>
+  <text class="t-xs" x="432" y="390">CPU가 바꾼다. swapgs는 쓸 수 없다</text>
+  <text class="t-xs t-ink t-b" x="390" y="410">스택</text>
+  <text class="t-xs" x="432" y="410">레벨 0–3. 더 높은 레벨로만 갈아탄다</text>
+  <text class="t-xs t-ink t-b" x="390" y="430">복귀</text>
+  <text class="t-xs" x="432" y="430">ERETU(유저로), ERETS(커널로)</text>
+</svg>

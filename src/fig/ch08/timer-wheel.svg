@@ -1,0 +1,73 @@
+<svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg">
+  <title>HZ=1000일 때 타이머 휠의 아홉 레벨: 레벨마다 버킷 64개가 있고 위로 갈수록 한 칸의 폭이 8배씩 넓어진다. 만료까지 남은 시간이 길수록 높은 레벨에 들어간다</title>
+
+  <text class="t-h" x="20" y="26">타이머 휠</text>
+  <text class="t-s" x="104" y="26">HZ=1000, CPU마다 하나</text>
+  <text class="t-xs mid" x="40" y="46">레벨</text>
+  <text class="t-xs" x="64" y="46">버킷 64개 (세로선은 8칸마다)</text>
+  <text class="t-xs" x="400" y="46">한 칸의 폭</text>
+  <text class="t-xs" x="484" y="46">맡는 범위</text>
+  <text class="t-xs" x="612" y="46">예</text>
+
+  <text class="t-mono t-b mid" x="40" y="70">0</text>
+  <rect class="box blue" x="64" y="56" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 56 V74 M144 56 V74 M184 56 V74 M224 56 V74 M264 56 V74 M304 56 V74 M344 56 V74"/>
+  <rect class="solid warm" x="89" y="56" width="8" height="18"/>
+  <text class="t-xs t-ink t-b" x="108" y="70">A</text>
+  <text class="t-s tc-warm t-b" x="612" y="70">A · 5 ms 뒤 만료</text>
+  <text class="t-code" x="400" y="70">1 ms</text>
+  <text class="t-code" x="484" y="70">0 – 63 ms</text>
+  <text class="t-mono t-b mid" x="40" y="97">1</text>
+  <rect class="box blue" x="64" y="83" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 83 V101 M144 83 V101 M184 83 V101 M224 83 V101 M264 83 V101 M304 83 V101 M344 83 V101"/>
+  <rect class="solid warm" x="189" y="83" width="8" height="18"/>
+  <text class="t-xs t-ink t-b" x="201" y="97">B</text>
+  <text class="t-s tc-warm t-b" x="612" y="97">B · 200 ms 뒤</text>
+  <text class="t-code" x="400" y="97">8 ms</text>
+  <text class="t-code" x="484" y="97">64 – 511 ms</text>
+  <text class="t-mono t-b mid" x="40" y="124">2</text>
+  <rect class="box blue" x="64" y="110" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 110 V128 M144 110 V128 M184 110 V128 M224 110 V128 M264 110 V128 M304 110 V128 M344 110 V128"/>
+  <text class="t-code" x="400" y="124">64 ms</text>
+  <text class="t-code" x="484" y="124">512 ms – 4 s</text>
+  <text class="t-mono t-b mid" x="40" y="151">3</text>
+  <rect class="box blue" x="64" y="137" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 137 V155 M144 137 V155 M184 137 V155 M224 137 V155 M264 137 V155 M304 137 V155 M344 137 V155"/>
+  <rect class="solid warm" x="164" y="137" width="8" height="18"/>
+  <text class="t-xs t-ink t-b" x="176" y="151">C</text>
+  <text class="t-s tc-warm t-b" x="612" y="151">C · 10 s 뒤</text>
+  <text class="t-code" x="400" y="151">512 ms</text>
+  <text class="t-code" x="484" y="151">4 s – 32 s</text>
+  <text class="t-mono t-b mid" x="40" y="178">4</text>
+  <rect class="box blue" x="64" y="164" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 164 V182 M144 164 V182 M184 164 V182 M224 164 V182 M264 164 V182 M304 164 V182 M344 164 V182"/>
+  <text class="t-code" x="400" y="178">약 4 s</text>
+  <text class="t-code" x="484" y="178">32 s – 4 m</text>
+  <text class="t-mono t-b mid" x="40" y="205">5</text>
+  <rect class="box blue" x="64" y="191" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 191 V209 M144 191 V209 M184 191 V209 M224 191 V209 M264 191 V209 M304 191 V209 M344 191 V209"/>
+  <text class="t-code" x="400" y="205">약 32 s</text>
+  <text class="t-code" x="484" y="205">4 m – 34 m</text>
+  <text class="t-mono t-b mid" x="40" y="232">6</text>
+  <rect class="box blue" x="64" y="218" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 218 V236 M144 218 V236 M184 218 V236 M224 218 V236 M264 218 V236 M304 218 V236 M344 218 V236"/>
+  <rect class="solid warm" x="134" y="218" width="8" height="18"/>
+  <text class="t-xs t-ink t-b" x="146" y="232">D</text>
+  <text class="t-s tc-warm t-b" x="612" y="232">D · 1 h 뒤</text>
+  <text class="t-code" x="400" y="232">약 4 m</text>
+  <text class="t-code" x="484" y="232">34 m – 4 h</text>
+  <text class="t-mono t-b mid" x="40" y="259">7</text>
+  <rect class="box blue" x="64" y="245" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 245 V263 M144 245 V263 M184 245 V263 M224 245 V263 M264 245 V263 M304 245 V263 M344 245 V263"/>
+  <text class="t-code" x="400" y="259">약 34 m</text>
+  <text class="t-code" x="484" y="259">4 h – 1 d</text>
+  <text class="t-mono t-b mid" x="40" y="286">8</text>
+  <rect class="box blue" x="64" y="272" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 272 V290 M144 272 V290 M184 272 V290 M224 272 V290 M264 272 V290 M304 272 V290 M344 272 V290"/>
+  <text class="t-code" x="400" y="286">약 4 h</text>
+  <text class="t-code" x="484" y="286">1 d – 12 d</text>
+
+  <path class="ln thin muted" d="M20 304 H740"/>
+  <text class="t-s" x="20" y="326">타이머를 걸 때 만료까지 남은 시간으로 레벨을 고른다. 한번 넣은 타이머는 다른 레벨로 옮기지 않는다.</text>
+  <text class="t-s" x="20" y="348">레벨 n은 8의 n제곱 틱마다 한 칸씩 만료된다. 타이머는 일찍 울리지 않고, 늦어도 한 칸의 폭만큼만 늦는다.</text>
+</svg>

@@ -1,0 +1,39 @@
+<svg viewBox="0 0 760 292" xmlns="http://www.w3.org/2000/svg">
+  <title>kCFI의 간접 호출 검사: 호출하는 쪽이 목적지 함수 바로 앞에 심긴 타입 해시를 읽어 기대하는 해시와 견주고, 다르면 트랩을 낸다</title>
+
+  <!-- 호출하는 쪽 -->
+  <text class="t-b" x="20" y="28">간접 호출을 하는 쪽</text>
+  <rect class="box code" x="20" y="40" width="290" height="176" rx="10"/>
+  <text class="t-code" x="34" y="66">movl $(-HASH_T), %r10d</text>
+  <text class="t-code" x="34" y="86">addl -4(%r11), %r10d</text>
+  <text class="t-code" x="34" y="106">jz   1f</text>
+  <text class="t-code t-b tc-red" x="34" y="126">ud2</text>
+  <text class="t-xs tc-red" x="72" y="126">← 합이 0이 아니면 트랩</text>
+  <text class="t-code" x="34" y="146">1: call *%r11</text>
+  <text class="t-xs" x="34" y="178">HASH_T: 이 호출이 기대하는 함수 타입에서</text>
+  <text class="t-xs" x="34" y="196">컴파일러가 계산해 둔 값</text>
+
+  <!-- 맞는 함수 -->
+  <text class="t-s t-b tc-green" x="430" y="28">타입이 맞는 함수</text>
+  <rect class="box green" x="430" y="40" width="310" height="30"/>
+  <text class="t-code" x="442" y="60">__cfi_foo:  movl $HASH_T, %eax</text>
+  <rect class="box" x="430" y="70" width="310" height="46"/>
+  <text class="t-code" x="442" y="90">foo:        endbr64</text>
+  <text class="t-code" x="442" y="108">            ... ret</text>
+  <text class="t-xs tc-green" x="430" y="134">foo 바로 앞 4바이트 = HASH_T → 합이 0 → 호출</text>
+
+  <path class="ln green" d="M310 100 C360 100 380 82 426 82" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-green" x="320" y="72">%r11이 foo를 가리킴</text>
+
+  <!-- 다른 타입의 함수 -->
+  <text class="t-s t-b tc-red" x="430" y="172">덮어쓴 포인터가 가리키는 다른 타입의 함수</text>
+  <rect class="box red" x="430" y="184" width="310" height="30"/>
+  <text class="t-code" x="442" y="204">__cfi_bar:  movl $HASH_U, %eax</text>
+  <rect class="box" x="430" y="214" width="310" height="46"/>
+  <text class="t-code" x="442" y="234">bar:        endbr64</text>
+  <text class="t-code" x="442" y="252">            ... ret</text>
+  <text class="t-xs tc-red" x="430" y="278">bar 바로 앞 4바이트 = HASH_U → 합이 0이 아님 → ud2</text>
+
+  <path class="ln red dash" d="M310 140 C366 140 376 226 426 226" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="318" y="248">덮어쓴 %r11</text>
+</svg>

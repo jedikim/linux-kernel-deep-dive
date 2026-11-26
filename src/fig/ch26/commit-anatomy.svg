@@ -1,0 +1,52 @@
+<svg viewBox="0 0 760 362" xmlns="http://www.w3.org/2000/svg">
+  <title>커밋 메시지의 해부: 제목, 본문, 버그의 출처를 가리키는 태그, 사람과 경로를 남기는 태그, 다음에 갈 곳을 알리는 태그, 그리고 커밋에 남지 않는 --- 아래</title>
+
+  <rect class="box code" x="20" y="16" width="420" height="330" rx="10"/>
+
+  <text class="t-code t-b t-ink" x="34" y="40">subsys/component: Summary phrase</text>
+
+  <text class="t-code" x="34" y="76">문제가 무엇이고 사용자에게 어떤 영향이 있는지,</text>
+  <text class="t-code" x="34" y="94">왜 이렇게 고치는지 쓴다. 75열에서 줄을 바꾼다.</text>
+
+  <text class="t-code" x="34" y="130">Fixes: 54a4f0239f2e ("KVM: MMU: make ...")</text>
+  <text class="t-code" x="34" y="148">Reported-by: Reporter &lt;reporter@mail&gt;</text>
+  <text class="t-code" x="34" y="166">Closes: https://example.com/issues/1234</text>
+
+  <text class="t-code" x="34" y="190">Signed-off-by: Author &lt;author@mail&gt;</text>
+  <text class="t-code" x="34" y="208">Signed-off-by: Patch handler &lt;handler@mail&gt;</text>
+  <text class="t-code" x="34" y="226">Tested-by: Tester &lt;tester@mail&gt;</text>
+  <text class="t-code" x="34" y="244">Reviewed-by: Reviewer &lt;reviewer@mail&gt;</text>
+
+  <text class="t-code" x="34" y="268">Cc: stable@vger.kernel.org</text>
+  <text class="t-code" x="34" y="286">Link: https://patch.msgid.link/...</text>
+
+  <text class="t-code" x="34" y="310">---</text>
+  <text class="t-code" x="34" y="328">v1 -&gt; v2: 리뷰에서 지적된 점을 고침</text>
+
+  <!-- 묶음 표시 -->
+  <rect class="solid blue" x="448" y="28" width="4" height="18" rx="2"/>
+  <rect class="solid green" x="448" y="64" width="4" height="36" rx="2"/>
+  <rect class="solid warm" x="448" y="118" width="4" height="54" rx="2"/>
+  <rect class="solid purple" x="448" y="178" width="4" height="72" rx="2"/>
+  <rect class="solid warm" x="448" y="256" width="4" height="36" rx="2"/>
+  <rect class="solid gray" x="448" y="298" width="4" height="36" rx="2"/>
+
+  <!-- 풀이 -->
+  <text class="t-s t-b tc-blue" x="464" y="36">제목</text>
+  <text class="t-xs" x="464" y="54">접두어는 서브시스템. 한 줄 로그에 이것만 보인다</text>
+
+  <text class="t-s t-b tc-green" x="464" y="78">본문</text>
+  <text class="t-xs" x="464" y="96">무엇을 바꿨나보다 왜 바꿨나. 몇 해 뒤의 독자를 위해</text>
+
+  <text class="t-s t-b tc-warm" x="464" y="140">버그의 출처</text>
+  <text class="t-xs" x="464" y="158">원인 커밋, 알린 사람, 보고가 있는 곳</text>
+
+  <text class="t-s t-b tc-purple" x="464" y="208">사람과 경로</text>
+  <text class="t-xs" x="464" y="226">출처 보증(DCO), 거쳐 간 손, 시험·검토한 사람</text>
+
+  <text class="t-s t-b tc-warm" x="464" y="270">다음에 갈 곳</text>
+  <text class="t-xs" x="464" y="288">안정 트리 백포트, 원래의 메일 스레드</text>
+
+  <text class="t-s t-b tc-muted" x="464" y="312">--- 아래</text>
+  <text class="t-xs" x="464" y="330">리뷰어에게만 하는 말. 커밋에는 남지 않는다</text>
+</svg>

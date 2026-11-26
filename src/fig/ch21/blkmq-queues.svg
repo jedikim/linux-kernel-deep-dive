@@ -1,0 +1,93 @@
+<svg viewBox="0 0 760 388" xmlns="http://www.w3.org/2000/svg">
+  <title>blk-mq의 큐 대응: CPU 8개마다 소프트웨어 큐가 하나씩 있고, 두 개씩 하드웨어 큐 하나에 묶이며, 하드웨어 큐는 NVMe 장치의 제출 큐·완료 큐 한 쌍에 대응한다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="50">CPU</text>
+  <text class="t-s t-ink t-b" x="20" y="108">소프트웨어 큐</text>
+  <text class="t-code" x="20" y="126">blk_mq_ctx</text>
+  <text class="t-s t-ink t-b" x="20" y="192">하드웨어 큐</text>
+  <text class="t-code" x="20" y="210">blk_mq_hw_ctx</text>
+  <text class="t-s t-ink t-b" x="20" y="300">NVMe 장치</text>
+  <text class="t-xs" x="20" y="318">큐 쌍마다 MSI-X 벡터</text>
+
+  <rect class="box blue" x="170" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="200" y="50">CPU 0</text>
+  <path class="ln thin blue" d="M200 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="170" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="200" y="116">ctx</text>
+  <path class="ln thin yellow" d="M200 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="242" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="272" y="50">CPU 1</text>
+  <path class="ln thin blue" d="M272 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="242" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="272" y="116">ctx</text>
+  <path class="ln thin yellow" d="M272 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="314" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="344" y="50">CPU 2</text>
+  <path class="ln thin blue" d="M344 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="314" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="344" y="116">ctx</text>
+  <path class="ln thin yellow" d="M344 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="386" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="416" y="50">CPU 3</text>
+  <path class="ln thin blue" d="M416 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="386" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="416" y="116">ctx</text>
+  <path class="ln thin yellow" d="M416 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="458" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="488" y="50">CPU 4</text>
+  <path class="ln thin blue" d="M488 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="458" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="488" y="116">ctx</text>
+  <path class="ln thin yellow" d="M488 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="530" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="560" y="50">CPU 5</text>
+  <path class="ln thin blue" d="M560 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="530" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="560" y="116">ctx</text>
+  <path class="ln thin yellow" d="M560 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="602" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="632" y="50">CPU 6</text>
+  <path class="ln thin blue" d="M632 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="602" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="632" y="116">ctx</text>
+  <path class="ln thin yellow" d="M632 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="674" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="704" y="50">CPU 7</text>
+  <path class="ln thin blue" d="M704 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="674" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="704" y="116">ctx</text>
+  <path class="ln thin yellow" d="M704 126 V166" marker-end="url(#ah-yellow)"/>
+
+  <rect class="panel gray" x="170" y="262" width="564" height="84" rx="12"/>
+  <rect class="box yellow" x="170" y="170" width="132" height="56" rx="8"/>
+  <text class="t-b mid" x="236" y="194">hctx 0</text>
+  <text class="t-xs mid" x="236" y="213">태그 · sbitmap</text>
+  <path class="ln" d="M236 226 V270" marker-end="url(#ah)"/>
+  <rect class="box" x="176" y="274" width="120" height="60" rx="8"/>
+  <text class="t-code mid" x="236" y="298">SQ 1 · CQ 1</text>
+  <text class="t-xs mid" x="236" y="318">→ CPU 0, 1</text>
+  <rect class="box yellow" x="314" y="170" width="132" height="56" rx="8"/>
+  <text class="t-b mid" x="380" y="194">hctx 1</text>
+  <text class="t-xs mid" x="380" y="213">태그 · sbitmap</text>
+  <path class="ln" d="M380 226 V270" marker-end="url(#ah)"/>
+  <rect class="box" x="320" y="274" width="120" height="60" rx="8"/>
+  <text class="t-code mid" x="380" y="298">SQ 2 · CQ 2</text>
+  <text class="t-xs mid" x="380" y="318">→ CPU 2, 3</text>
+  <rect class="box yellow" x="458" y="170" width="132" height="56" rx="8"/>
+  <text class="t-b mid" x="524" y="194">hctx 2</text>
+  <text class="t-xs mid" x="524" y="213">태그 · sbitmap</text>
+  <path class="ln" d="M524 226 V270" marker-end="url(#ah)"/>
+  <rect class="box" x="464" y="274" width="120" height="60" rx="8"/>
+  <text class="t-code mid" x="524" y="298">SQ 3 · CQ 3</text>
+  <text class="t-xs mid" x="524" y="318">→ CPU 4, 5</text>
+  <rect class="box yellow" x="602" y="170" width="132" height="56" rx="8"/>
+  <text class="t-b mid" x="668" y="194">hctx 3</text>
+  <text class="t-xs mid" x="668" y="213">태그 · sbitmap</text>
+  <path class="ln" d="M668 226 V270" marker-end="url(#ah)"/>
+  <rect class="box" x="608" y="274" width="120" height="60" rx="8"/>
+  <text class="t-code mid" x="668" y="298">SQ 4 · CQ 4</text>
+  <text class="t-xs mid" x="668" y="318">→ CPU 6, 7</text>
+  <text class="t-code" x="246" y="250">queue_rq()</text>
+
+  <text class="t-s mid" x="380" y="372">제출도 완료도 같은 CPU 묶음 안에서 끝난다. 큐 사이에 공유하는 락이 없다</text>
+</svg>

@@ -1,0 +1,59 @@
+<svg viewBox="0 0 760 356" xmlns="http://www.w3.org/2000/svg">
+  <title>BPF 훅의 지도: 추적점, kprobe와 fentry, uprobe, perf 이벤트는 커널 어디에든 붙어 관찰만 하고, XDP와 tc, cgroup 훅, LSM, struct_ops는 네트워크 스택, cgroup, 보안 검사, 스케줄러의 결정을 바꾼다.</title>
+
+  <!-- 관찰 -->
+  <rect class="panel blue" x="20" y="16" width="216" height="290" rx="14"/>
+  <text class="t-b tc-blue" x="36" y="41">관찰하는 훅</text>
+  <rect class="box blue" x="36" y="54" width="184" height="50" rx="8"/>
+  <text class="t-s t-ink t-b" x="48" y="75">추적점</text>
+  <text class="t-xs" x="48" y="93">소스에 미리 심어 둔 지점</text>
+  <rect class="box blue" x="36" y="114" width="184" height="50" rx="8"/>
+  <text class="t-s t-ink t-b" x="48" y="135">kprobe · fentry/fexit</text>
+  <text class="t-xs" x="48" y="153">커널 함수의 진입과 반환</text>
+  <rect class="box blue" x="36" y="174" width="184" height="50" rx="8"/>
+  <text class="t-s t-ink t-b" x="48" y="195">uprobe</text>
+  <text class="t-xs" x="48" y="213">유저 프로그램의 함수</text>
+  <rect class="box blue" x="36" y="234" width="184" height="50" rx="8"/>
+  <text class="t-s t-ink t-b" x="48" y="255">perf 이벤트</text>
+  <text class="t-xs" x="48" y="273">주기적 샘플, 하드웨어 카운터</text>
+
+  <!-- 커널 서브시스템 -->
+  <rect class="panel yellow" x="272" y="16" width="216" height="290" rx="14"/>
+  <text class="t-b tc-yellow" x="288" y="41">커널</text>
+  <rect class="box yellow" x="288" y="54" width="184" height="40" rx="8"/>
+  <text class="t-s t-ink t-b" x="300" y="79">네트워크 스택</text><text class="t-xs end" x="462" y="79">12장</text>
+  <rect class="box yellow" x="288" y="104" width="184" height="40" rx="8"/>
+  <text class="t-s t-ink t-b" x="300" y="129">cgroup</text><text class="t-xs end" x="462" y="129">22장</text>
+  <rect class="box yellow" x="288" y="154" width="184" height="40" rx="8"/>
+  <text class="t-s t-ink t-b" x="300" y="179">보안 검사</text><text class="t-xs end" x="462" y="179">LSM</text>
+  <rect class="box yellow" x="288" y="204" width="184" height="40" rx="8"/>
+  <text class="t-s t-ink t-b" x="300" y="229">스케줄러</text><text class="t-xs end" x="462" y="229">4·5장</text>
+  <rect class="box yellow" x="288" y="254" width="184" height="40" rx="8"/>
+  <text class="t-s t-ink t-b" x="300" y="279">시스템 콜 진입</text><text class="t-xs end" x="462" y="279">19장</text>
+
+  <!-- 결정 -->
+  <rect class="panel green" x="524" y="16" width="216" height="290" rx="14"/>
+  <text class="t-b tc-green" x="540" y="41">결정을 바꾸는 훅</text>
+  <rect class="box green" x="540" y="54" width="184" height="40" rx="8"/>
+  <text class="t-s t-ink t-b" x="552" y="72">XDP · tc</text>
+  <text class="t-xs" x="552" y="88">통과 · 폐기 · 전달</text>
+  <rect class="box green" x="540" y="104" width="184" height="40" rx="8"/>
+  <text class="t-s t-ink t-b" x="552" y="122">cgroup 훅</text>
+  <text class="t-xs" x="552" y="138">소켓 · 장치 · sysctl 허용</text>
+  <rect class="box green" x="540" y="154" width="184" height="40" rx="8"/>
+  <text class="t-s t-ink t-b" x="552" y="172">LSM 프로그램</text>
+  <text class="t-xs" x="552" y="188">접근 허용 · 거부</text>
+  <rect class="box green" x="540" y="204" width="184" height="40" rx="8"/>
+  <text class="t-s t-ink t-b" x="552" y="222">struct_ops</text>
+  <text class="t-xs" x="552" y="238">sched_ext, TCP 혼잡 제어</text>
+
+  <!-- 연결 -->
+  <path class="ln blue" d="M236 169 H268" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M540 74 H476" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M540 124 H476" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M540 174 H476" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M540 224 H476" marker-end="url(#ah-green)"/>
+
+  <text class="t-s" x="20" y="334">왼쪽은 어느 서브시스템에든 붙지만 읽기만 한다</text>
+  <text class="t-s end" x="740" y="334">오른쪽은 정해진 자리에 붙고 반환값이 커널의 판정이 된다</text>
+</svg>

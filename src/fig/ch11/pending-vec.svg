@@ -1,0 +1,107 @@
+<svg viewBox="0 0 760 362" xmlns="http://www.w3.org/2000/svg">
+  <title>CPU마다 따로 있는 softirq pending 비트맵과 전역 배열 softirq_vec의 대응. 비트 번호가 곧 배열 인덱스이고, 선 비트의 핸들러가 번호 순서로 불린다.</title>
+
+  <text class="t-code mid" x="271" y="24">__softirq_pending (CPU별)</text>
+  <text class="t-code mid" x="585" y="24">softirq_vec[] (전역 배열 하나)</text>
+  <text class="t-xs mid" x="35" y="46">비트</text>
+  <text class="t-xs" x="60" y="46">이름</text>
+  <text class="t-xs mid" x="236" y="46">CPU 0</text>
+  <text class="t-xs mid" x="306" y="46">CPU 1</text>
+  <text class="t-xs" x="440" y="46">.action</text>
+  <text class="t-xs end" x="732" y="46">하는 일</text>
+  <text class="t-code mid" x="35" y="73">0</text>
+  <text class="t-code" x="60" y="73">HI_SOFTIRQ</text>
+  <rect class="box" x="206" y="58" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="236" y="73">0</text>
+  <rect class="box" x="276" y="58" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="306" y="73">0</text>
+  <rect class="box code" x="430" y="58" width="310" height="22" rx="4"/>
+  <text class="t-code" x="440" y="73">tasklet_hi_action</text>
+  <text class="t-xs end" x="732" y="73">급한 태스크릿 · BH 워크</text>
+  <text class="t-code mid" x="35" y="99">1</text>
+  <text class="t-code" x="60" y="99">TIMER_SOFTIRQ</text>
+  <rect class="solid purple" x="206" y="84" width="60" height="22" rx="4"/>
+  <text class="t-code t-on t-b mid" x="236" y="99">1</text>
+  <rect class="box" x="276" y="84" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="306" y="99">0</text>
+  <rect class="box purple" x="430" y="84" width="310" height="22" rx="4"/>
+  <text class="t-code" x="440" y="99">run_timer_softirq</text>
+  <text class="t-xs end" x="732" y="99">타이머 휠</text>
+  <path class="ln purple" d="M342 95 H424" marker-end="url(#ah-purple)"/>
+  <text class="t-code mid" x="35" y="125">2</text>
+  <text class="t-code" x="60" y="125">NET_TX_SOFTIRQ</text>
+  <rect class="box" x="206" y="110" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="236" y="125">0</text>
+  <rect class="box" x="276" y="110" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="306" y="125">0</text>
+  <rect class="box code" x="430" y="110" width="310" height="22" rx="4"/>
+  <text class="t-code" x="440" y="125">net_tx_action</text>
+  <text class="t-xs end" x="732" y="125">송신 마무리</text>
+  <text class="t-code mid" x="35" y="151">3</text>
+  <text class="t-code" x="60" y="151">NET_RX_SOFTIRQ</text>
+  <rect class="solid purple" x="206" y="136" width="60" height="22" rx="4"/>
+  <text class="t-code t-on t-b mid" x="236" y="151">1</text>
+  <rect class="solid purple" x="276" y="136" width="60" height="22" rx="4"/>
+  <text class="t-code t-on t-b mid" x="306" y="151">1</text>
+  <rect class="box purple" x="430" y="136" width="310" height="22" rx="4"/>
+  <text class="t-code" x="440" y="151">net_rx_action</text>
+  <text class="t-xs end" x="732" y="151">패킷 수신 (NAPI)</text>
+  <path class="ln purple" d="M342 147 H424" marker-end="url(#ah-purple)"/>
+  <text class="t-code mid" x="35" y="177">4</text>
+  <text class="t-code" x="60" y="177">BLOCK_SOFTIRQ</text>
+  <rect class="box" x="206" y="162" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="236" y="177">0</text>
+  <rect class="box" x="276" y="162" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="306" y="177">0</text>
+  <rect class="box code" x="430" y="162" width="310" height="22" rx="4"/>
+  <text class="t-code" x="440" y="177">blk_done_softirq</text>
+  <text class="t-xs end" x="732" y="177">블록 I/O 완료</text>
+  <text class="t-code mid" x="35" y="203">5</text>
+  <text class="t-code" x="60" y="203">IRQ_POLL_SOFTIRQ</text>
+  <rect class="box" x="206" y="188" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="236" y="203">0</text>
+  <rect class="box" x="276" y="188" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="306" y="203">0</text>
+  <rect class="box code" x="430" y="188" width="310" height="22" rx="4"/>
+  <text class="t-code" x="440" y="203">irq_poll_softirq</text>
+  <text class="t-xs end" x="732" y="203">블록 장치 폴링</text>
+  <text class="t-code mid" x="35" y="229">6</text>
+  <text class="t-code" x="60" y="229">TASKLET_SOFTIRQ</text>
+  <rect class="box" x="206" y="214" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="236" y="229">0</text>
+  <rect class="box" x="276" y="214" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="306" y="229">0</text>
+  <rect class="box code" x="430" y="214" width="310" height="22" rx="4"/>
+  <text class="t-code" x="440" y="229">tasklet_action</text>
+  <text class="t-xs end" x="732" y="229">태스크릿 · BH 워크</text>
+  <text class="t-code mid" x="35" y="255">7</text>
+  <text class="t-code" x="60" y="255">SCHED_SOFTIRQ</text>
+  <rect class="box" x="206" y="240" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="236" y="255">0</text>
+  <rect class="box" x="276" y="240" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="306" y="255">0</text>
+  <rect class="box code" x="430" y="240" width="310" height="22" rx="4"/>
+  <text class="t-code" x="440" y="255">sched_balance_softirq</text>
+  <text class="t-xs end" x="732" y="255">부하 분산</text>
+  <text class="t-code mid" x="35" y="281">8</text>
+  <text class="t-code" x="60" y="281">HRTIMER_SOFTIRQ</text>
+  <rect class="box" x="206" y="266" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="236" y="281">0</text>
+  <rect class="box" x="276" y="266" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="306" y="281">0</text>
+  <rect class="box code" x="430" y="266" width="310" height="22" rx="4"/>
+  <text class="t-code" x="440" y="281">hrtimer_run_softirq</text>
+  <text class="t-xs end" x="732" y="281">고해상도 타이머</text>
+  <text class="t-code mid" x="35" y="307">9</text>
+  <text class="t-code" x="60" y="307">RCU_SOFTIRQ</text>
+  <rect class="box" x="206" y="292" width="60" height="22" rx="4"/>
+  <text class="t-code tc-muted mid" x="236" y="307">0</text>
+  <rect class="solid purple" x="276" y="292" width="60" height="22" rx="4"/>
+  <text class="t-code t-on t-b mid" x="306" y="307">1</text>
+  <rect class="box purple" x="430" y="292" width="310" height="22" rx="4"/>
+  <text class="t-code" x="440" y="307">rcu_core_si</text>
+  <text class="t-xs end" x="732" y="307">RCU 콜백</text>
+  <path class="ln purple" d="M342 303 H424" marker-end="url(#ah-purple)"/>
+
+  <text class="t-s mid" x="380" y="344">비트 번호가 배열 인덱스다. handle_softirqs()는 비트 0부터 훑으므로 번호가 낮을수록 먼저 실행된다.</text>
+</svg>

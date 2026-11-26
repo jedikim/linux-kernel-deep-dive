@@ -1,0 +1,57 @@
+<svg viewBox="0 0 760 266" xmlns="http://www.w3.org/2000/svg">
+  <title>방어의 겹: 코드를 쓸 때, 컴파일할 때, 패치를 게시할 때, 통합과 rc 기간, 운영 환경의 다섯 단계와 각 단계의 검사 도구</title>
+
+  <text class="t-xs tc-warm mid" x="380" y="18">늦게 잡힐수록 버그 하나를 고치는 비용이 커진다</text>
+  <path class="ln warm" d="M20 30 H734" marker-end="url(#ah-warm)"/>
+
+  <rect class="solid" x="20" y="42" width="136" height="32" rx="8"/>
+  <text class="t-b t-on mid" x="88" y="63">① 쓸 때</text>
+  <rect class="box green" x="20" y="82" width="136" height="126" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="88" y="106">타입과 주석</text>
+  <text class="t-code mid" x="88" y="128">__user, __rcu</text>
+  <text class="t-code mid" x="88" y="150">__guarded_by</text>
+  <text class="t-code mid" x="88" y="172">guard()</text>
+  <text class="t-s t-ink mid" x="88" y="194">Rust의 타입</text>
+
+  <rect class="solid" x="166" y="42" width="136" height="32" rx="8"/>
+  <text class="t-b t-on mid" x="234" y="63">② 컴파일</text>
+  <rect class="box green" x="166" y="82" width="136" height="126" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="234" y="106">컴파일러 경고</text>
+  <text class="t-code mid" x="234" y="128">static_assert</text>
+  <text class="t-s t-ink mid" x="234" y="150">sparse</text>
+  <text class="t-s t-ink mid" x="234" y="172">컨텍스트 분석</text>
+  <text class="t-s t-ink mid" x="234" y="194">objtool</text>
+
+  <rect class="solid" x="312" y="42" width="136" height="32" rx="8"/>
+  <text class="t-b t-on mid" x="380" y="63">③ 패치 게시</text>
+  <rect class="box yellow" x="312" y="82" width="136" height="126" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="380" y="106">사람의 리뷰</text>
+  <text class="t-code mid" x="380" y="128">checkpatch.pl</text>
+  <text class="t-s t-ink mid" x="380" y="150">빌드 봇</text>
+  <text class="t-s t-ink mid" x="380" y="172">Coccinelle</text>
+  <text class="t-s t-ink mid" x="380" y="194">LLM 리뷰 봇</text>
+
+  <rect class="solid" x="458" y="42" width="136" height="32" rx="8"/>
+  <text class="t-b t-on mid" x="526" y="63">④ 통합 · rc</text>
+  <rect class="box warm" x="458" y="82" width="136" height="126" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="526" y="106">lockdep</text>
+  <text class="t-s t-ink mid" x="526" y="128">KASAN · KCSAN</text>
+  <text class="t-s t-ink mid" x="526" y="150">KUnit · kselftest</text>
+  <text class="t-s t-ink mid" x="526" y="172">syzbot</text>
+  <text class="t-s t-ink mid" x="526" y="194">linux-next</text>
+
+  <rect class="solid" x="604" y="42" width="136" height="32" rx="8"/>
+  <text class="t-b t-on mid" x="672" y="63">⑤ 운영</text>
+  <rect class="box red" x="604" y="82" width="136" height="126" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="672" y="106">KFENCE</text>
+  <text class="t-s t-ink mid" x="672" y="128">하드닝 (CFI 등)</text>
+  <text class="t-s t-ink mid" x="672" y="150">WARN → 버그 보고</text>
+  <text class="t-s t-ink mid" x="672" y="172">회귀 추적</text>
+  <text class="t-s t-ink mid" x="672" y="194">안정 트리 백포트</text>
+
+  <path class="ln thin muted" d="M20 222 H302 M312 222 H448 M458 222 H594 M604 222 H740"/>
+  <text class="t-xs mid" x="161" y="242">작성자의 책상에서</text>
+  <text class="t-xs mid" x="380" y="242">리뷰어와 봇</text>
+  <text class="t-xs mid" x="526" y="242">CI와 퍼저</text>
+  <text class="t-xs mid" x="672" y="242">사용자의 기계에서</text>
+</svg>

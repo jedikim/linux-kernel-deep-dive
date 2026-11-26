@@ -1,0 +1,50 @@
+<svg viewBox="0 0 760 292" xmlns="http://www.w3.org/2000/svg">
+  <title>거짓 공유: 서로 다른 CPU가 쓰는 두 필드가 한 캐시 라인에 있으면 쓸 때마다 라인이 CPU 사이를 오간다. 필드를 다른 캐시 라인으로 떼면 각 CPU가 자기 라인을 독점한다.</title>
+
+  <!-- 위: 같은 라인 -->
+  <text class="t-b" x="30" y="28">두 필드가 같은 캐시 라인에 있을 때</text>
+  <text class="t-xs mid" x="380" y="44">캐시 라인 하나 (64바이트)</text>
+
+  <rect class="box blue" x="30" y="50" width="130" height="36" rx="8"/>
+  <text class="t-s t-ink mid" x="95" y="73">CPU 0 · a에 쓰기</text>
+  <rect class="box green" x="600" y="50" width="130" height="36" rx="8"/>
+  <text class="t-s t-ink mid" x="665" y="73">CPU 1 · b에 쓰기</text>
+
+  <rect class="box blue" x="220" y="52" width="70" height="32"/>
+  <text class="t-mono t-b mid" x="255" y="73">a</text>
+  <rect class="box gray" x="290" y="52" width="180" height="32"/>
+  <text class="t-xs mid" x="380" y="72">다른 필드</text>
+  <rect class="box green" x="470" y="52" width="70" height="32"/>
+  <text class="t-mono t-b mid" x="505" y="73">b</text>
+
+  <path class="ln blue" d="M160 68 H214" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M600 68 H546" marker-end="url(#ah-green)"/>
+
+  <path class="ln red dash" d="M168 106 H592" marker-start="url(#ah-red)" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red mid" x="380" y="128">한쪽이 쓰면 다른 쪽 캐시에서 이 라인이 무효가 된다. 쓸 때마다 라인이 오간다</text>
+
+  <path class="ln thin muted dash" d="M30 146 H730"/>
+
+  <!-- 아래: 다른 라인 -->
+  <text class="t-b" x="30" y="174">서로 다른 캐시 라인으로 떼었을 때</text>
+  <text class="t-code mid" x="465" y="188">____cacheline_aligned_in_smp</text>
+
+  <rect class="box blue" x="30" y="194" width="130" height="36" rx="8"/>
+  <text class="t-s t-ink mid" x="95" y="217">CPU 0 · a에 쓰기</text>
+  <rect class="box green" x="600" y="194" width="130" height="36" rx="8"/>
+  <text class="t-s t-ink mid" x="665" y="217">CPU 1 · b에 쓰기</text>
+
+  <rect class="box blue" x="220" y="196" width="70" height="32"/>
+  <text class="t-mono t-b mid" x="255" y="217">a</text>
+  <rect class="box gray" x="290" y="196" width="80" height="32"/>
+  <text class="t-xs mid" x="330" y="216">다른 필드</text>
+  <rect class="box green" x="390" y="196" width="70" height="32"/>
+  <text class="t-mono t-b mid" x="425" y="217">b</text>
+  <rect class="ghost dash" x="460" y="196" width="80" height="32"/>
+  <text class="t-xs mid" x="500" y="216">빈 자리</text>
+
+  <path class="ln blue" d="M160 212 H214" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M665 230 V250 H425 V234" marker-end="url(#ah-green)"/>
+
+  <text class="t-s mid" x="380" y="276">각 CPU가 자기 라인을 독점한다. 한쪽의 쓰기가 다른 쪽의 캐시를 건드리지 않는다.</text>
+</svg>

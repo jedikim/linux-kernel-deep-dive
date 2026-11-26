@@ -1,0 +1,39 @@
+<svg viewBox="0 0 760 326" xmlns="http://www.w3.org/2000/svg">
+  <title>스케줄러로 들어가는 네 가지 길: 유저 모드 복귀, 인터럽트에서 커널로 복귀, preempt_enable(), 자발적 양보</title>
+
+  <rect class="box blue" x="20" y="16" width="480" height="58" rx="10"/>
+  <text class="t-b" x="34" y="40">① 유저 모드로 돌아갈 때</text>
+  <text class="t-code" x="34" y="61">__exit_to_user_mode_loop() → schedule()</text>
+  <text class="t-xs tc-blue end" x="488" y="40">유저 선점</text>
+
+  <rect class="box warm" x="20" y="86" width="480" height="58" rx="10"/>
+  <text class="t-b" x="34" y="110">② 인터럽트에서 커널 코드로 돌아갈 때</text>
+  <text class="t-code" x="34" y="131">raw_irqentry_exit_cond_resched() → preempt_schedule_irq()</text>
+  <text class="t-xs tc-warm end" x="488" y="110">커널 선점</text>
+
+  <rect class="box warm" x="20" y="156" width="480" height="58" rx="10"/>
+  <text class="t-b" x="34" y="180">③ preempt_enable()에서 카운터가 0이 될 때</text>
+  <text class="t-code" x="34" y="201">__preempt_schedule() → preempt_schedule()</text>
+  <text class="t-xs tc-warm end" x="488" y="180">커널 선점</text>
+
+  <rect class="box green" x="20" y="226" width="480" height="58" rx="10"/>
+  <text class="t-b" x="34" y="250">④ 스스로 양보할 때</text>
+  <text class="t-code" x="34" y="271">schedule(), cond_resched()</text>
+  <text class="t-xs tc-green end" x="488" y="250">자발적</text>
+
+  <path class="ln blue" d="M500 45 H604" marker-end="url(#ah-blue)"/>
+  <text class="t-code mid" x="552" y="37">SM_NONE</text>
+  <path class="ln warm" d="M500 115 H604" marker-end="url(#ah-warm)"/>
+  <text class="t-code mid" x="552" y="107">SM_PREEMPT</text>
+  <path class="ln warm" d="M500 185 H604" marker-end="url(#ah-warm)"/>
+  <text class="t-code mid" x="552" y="177">SM_PREEMPT</text>
+  <path class="ln green" d="M500 255 H604" marker-end="url(#ah-green)"/>
+  <text class="t-code mid" x="552" y="247">SM_NONE</text>
+
+  <rect class="box" x="608" y="16" width="132" height="268" rx="12"/>
+  <text class="t-mono t-b mid" x="674" y="136">__schedule()</text>
+  <text class="t-s mid" x="674" y="160">다음 태스크 고르기</text>
+  <text class="t-s mid" x="674" y="178">컨텍스트 스위치</text>
+
+  <text class="t-s mid" x="380" y="310">②와 ③은 NONE·VOLUNTARY에서 닫혀 있고 FULL·LAZY·RT에서 열린다</text>
+</svg>

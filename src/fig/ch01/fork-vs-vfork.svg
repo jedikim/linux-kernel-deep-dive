@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg">
+  <title>fork와 vfork의 시간선 비교: fork는 주소 공간을 복사한 뒤 부모와 자식이 함께 실행된다. vfork는 복사하지 않고, 자식이 execve나 exit로 부모의 mm에서 손을 뗄 때까지 부모가 잠들어 기다린다.</title>
+
+  <!-- 위: fork -->
+  <text class="t-b" x="20" y="26">fork() 뒤에 execve()</text>
+
+  <text class="t-s t-ink t-b" x="20" y="60">부모</text>
+  <rect class="box yellow" x="110" y="40" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="185" y="60">fork(): mm을 복사</text>
+  <rect class="box blue" x="260" y="40" width="480" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="500" y="60">부모는 기다리지 않고 계속 실행</text>
+
+  <text class="t-s t-ink t-b" x="20" y="100">자식</text>
+  <rect class="box green" x="260" y="80" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="335" y="100">복사본 mm으로 실행</text>
+  <rect class="box yellow" x="410" y="80" width="90" height="30" rx="6"/>
+  <text class="t-code mid" x="455" y="100">execve()</text>
+  <rect class="box green" x="500" y="80" width="240" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="100">새 프로그램</text>
+  <text class="t-s mid" x="425" y="134">자식은 방금 복사한 페이지 테이블을 execve()에서 통째로 버린다</text>
+
+  <path class="ln thin muted dash" d="M20 154 H740"/>
+
+  <!-- 아래: vfork -->
+  <text class="t-b" x="20" y="184">vfork() 뒤에 execve()</text>
+
+  <text class="t-s t-ink t-b" x="20" y="218">부모</text>
+  <rect class="box yellow" x="110" y="198" width="70" height="30" rx="6"/>
+  <text class="t-code mid" x="145" y="218">vfork()</text>
+  <rect class="box red" x="180" y="198" width="240" height="30" rx="6"/>
+  <rect x="180" y="198" width="240" height="30" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box blue" x="420" y="198" width="320" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="580" y="218">부모 재개</text>
+
+  <text class="t-s t-ink t-b" x="20" y="258">자식</text>
+  <rect class="box green" x="180" y="238" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="255" y="258">부모의 mm을 빌려 실행</text>
+  <rect class="box yellow" x="330" y="238" width="90" height="30" rx="6"/>
+  <text class="t-code mid" x="375" y="258">execve()</text>
+  <rect class="box green" x="420" y="238" width="320" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="580" y="258">새 프로그램</text>
+
+  <path class="ln thin blue dash" d="M420 190 V276"/>
+  <text class="t-s tc-red" x="186" y="296">부모는 wait_for_vfork_done()에서 잠든다</text>
+  <text class="t-s tc-blue end" x="740" y="296">mm_release()가 complete()로 깨운다</text>
+</svg>

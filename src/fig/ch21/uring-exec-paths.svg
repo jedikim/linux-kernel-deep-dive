@@ -1,0 +1,47 @@
+<svg viewBox="0 0 760 358" xmlns="http://www.w3.org/2000/svg">
+  <title>io_uring 요청이 완료에 이르는 세 길: 논블로킹 시도로 그 자리에서 끝나거나, 폴링을 걸어 두었다가 준비되면 재시도하거나, io-wq 워커 스레드가 블로킹으로 실행한다</title>
+
+  <rect class="box blue" x="20" y="30" width="150" height="56" rx="10"/>
+  <text class="t-b mid" x="95" y="54">SQE</text>
+  <text class="t-xs mid" x="95" y="74">제출한 태스크 · SQPOLL</text>
+  <path class="ln" d="M95 86 V126" marker-end="url(#ah)"/>
+
+  <rect class="solid" x="20" y="130" width="150" height="84" rx="10"/>
+  <text class="t-code t-on t-b mid" x="95" y="160">io_issue_sqe()</text>
+  <text class="t-xs t-on mid" x="95" y="182">논블로킹으로</text>
+  <text class="t-xs t-on mid" x="95" y="200">먼저 해 본다</text>
+
+  <!-- 1 -->
+  <path class="ln green" d="M170 150 H195 V58 H216" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="220" y="30" width="380" height="56" rx="10"/>
+  <text class="t-b" x="236" y="54">① 그 자리에서 끝난다</text>
+  <text class="t-xs" x="236" y="74">페이지 캐시에 있는 읽기 · 데이터가 와 있는 recv</text>
+
+  <!-- 2 -->
+  <path class="ln blue" d="M170 172 H216" marker-end="url(#ah-blue)"/>
+  <text class="t-xs mid" x="95" y="236">-EAGAIN이면 ② 또는 ③</text>
+  <rect class="panel blue" x="220" y="116" width="380" height="112" rx="12"/>
+  <text class="t-b tc-blue" x="236" y="140">② 준비되면 다시 한다</text>
+  <rect class="box" x="236" y="152" width="170" height="30" rx="6"/>
+  <text class="t-code mid" x="321" y="172">io_arm_poll_handler()</text>
+  <path class="ln blue" d="M406 167 H426" marker-end="url(#ah-blue)"/>
+  <rect class="box" x="430" y="152" width="154" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="507" y="172">task_work에서 재시도</text>
+  <text class="t-xs" x="236" y="206">소켓 · 파이프: 파일의 대기 큐에 콜백을 걸어 둔다</text>
+
+  <!-- 3 -->
+  <path class="ln warm" d="M170 194 H195 V286 H216" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="220" y="258" width="380" height="56" rx="10"/>
+  <text class="t-b" x="236" y="282">③ 워커에 넘긴다</text>
+  <text class="t-xs" x="236" y="302">io_queue_iowq() → iou-wrk 스레드가 블로킹으로 실행</text>
+
+  <!-- CQ -->
+  <path class="ln green" d="M600 58 H625 V140 H646" marker-end="url(#ah-green)"/>
+  <path class="ln blue" d="M600 172 H646" marker-end="url(#ah-blue)"/>
+  <path class="ln warm" d="M600 286 H625 V204 H646" marker-end="url(#ah-warm)"/>
+  <rect class="box yellow" x="650" y="116" width="90" height="112" rx="10"/>
+  <text class="t-b mid" x="695" y="166">CQE</text>
+  <text class="t-xs mid" x="695" y="186">완료 큐에</text>
+
+  <text class="t-s mid" x="380" y="342">아래로 갈수록 비싸다. 흔한 경우는 ①과 ②에서 끝난다</text>
+</svg>

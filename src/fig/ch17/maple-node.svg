@@ -1,0 +1,85 @@
+<svg viewBox="0 0 760 348" xmlns="http://www.w3.org/2000/svg">
+  <title>메이플 트리의 내부 노드와 리프 노드: 피벗 배열이 각 슬롯이 맡는 범위의 끝 주소를 담고, 리프의 슬롯은 VMA 또는 NULL을, 내부 노드의 슬롯은 자식 노드를 가리킨다</title>
+
+  <!-- 내부 노드 -->
+  <text class="t-b" x="20" y="20">내부 노드</text>
+  <text class="t-code" x="92" y="20">maple_arange_64</text>
+  <text class="t-code end" x="202" y="45">pivot</text>
+  <text class="t-code end" x="202" y="71">gap</text>
+  <text class="t-code end" x="202" y="97">slot</text>
+
+  <rect class="box blue" x="210" y="28" width="100" height="26"/>
+  <text class="t-code mid" x="260" y="45">0xffff</text>
+  <rect class="box blue" x="310" y="28" width="100" height="26"/>
+  <text class="t-code mid" x="360" y="45">0x2ffff</text>
+  <rect class="box blue" x="410" y="28" width="100" height="26"/>
+  <text class="t-code mid" x="460" y="45">0x7ffff</text>
+  <rect class="box blue" x="510" y="28" width="100" height="26"/>
+  <text class="t-code mid" x="560" y="45">⋯</text>
+
+  <rect class="box" x="210" y="54" width="100" height="26"/>
+  <text class="t-code mid" x="260" y="71">0x6000</text>
+  <rect class="box" x="310" y="54" width="100" height="26"/>
+  <text class="t-code mid" x="360" y="71">0x10000</text>
+  <rect class="box" x="410" y="54" width="100" height="26"/>
+  <text class="t-code mid" x="460" y="71">0x3000</text>
+  <rect class="box" x="510" y="54" width="100" height="26"/>
+  <text class="t-code mid" x="560" y="71">⋯</text>
+
+  <rect class="box" x="210" y="80" width="100" height="26"/>
+  <text class="t-xs mid" x="260" y="97">자식 노드</text>
+  <rect class="box" x="310" y="80" width="100" height="26"/>
+  <text class="t-xs mid" x="360" y="97">자식 노드</text>
+  <rect class="box" x="410" y="80" width="100" height="26"/>
+  <text class="t-xs mid" x="460" y="97">자식 노드</text>
+  <rect class="box" x="510" y="80" width="100" height="26"/>
+  <text class="t-code mid" x="560" y="97">⋯</text>
+
+  <text class="t-xs" x="620" y="66">이 자식 아래에서</text>
+  <text class="t-xs" x="620" y="82">가장 큰 빈 범위</text>
+
+  <path class="ln blue" d="M260 106 V132 H222 V154" marker-end="url(#ah-blue)"/>
+
+  <!-- 리프 노드 -->
+  <text class="t-b" x="20" y="150">리프 노드</text>
+  <text class="t-code" x="92" y="150">maple_range_64</text>
+  <text class="t-code end" x="132" y="179">pivot</text>
+  <text class="t-code end" x="132" y="209">slot</text>
+
+  <rect class="box blue" x="140" y="160" width="104" height="30"/>
+  <text class="t-code mid" x="192" y="179">0x3fff</text>
+  <rect class="box blue" x="244" y="160" width="104" height="30"/>
+  <text class="t-code mid" x="296" y="179">0x5fff</text>
+  <rect class="box blue" x="348" y="160" width="104" height="30"/>
+  <text class="t-code mid" x="400" y="179">0x8fff</text>
+  <rect class="box blue" x="452" y="160" width="104" height="30"/>
+  <text class="t-code mid" x="504" y="179">0xefff</text>
+  <rect class="box blue" x="556" y="160" width="104" height="30"/>
+  <text class="t-code mid" x="608" y="179">0xffff</text>
+
+  <rect class="box gray" x="140" y="190" width="104" height="30"/>
+  <text class="t-code mid" x="192" y="209">NULL</text>
+  <rect class="box green" x="244" y="190" width="104" height="30"/>
+  <text class="t-s t-ink t-b mid" x="296" y="210">VMA A</text>
+  <rect class="box green" x="348" y="190" width="104" height="30"/>
+  <text class="t-s t-ink t-b mid" x="400" y="210">VMA B</text>
+  <rect class="box gray" x="452" y="190" width="104" height="30"/>
+  <text class="t-code mid" x="504" y="209">NULL</text>
+  <rect class="box green" x="556" y="190" width="104" height="30"/>
+  <text class="t-s t-ink t-b mid" x="608" y="210">VMA C</text>
+
+  <rect class="ghost warm" x="346" y="158" width="108" height="64" rx="4"/>
+
+  <text class="t-xs end" x="132" y="240">맡는 범위</text>
+  <text class="t-code mid tc-muted" x="192" y="240">0x0000–0x3fff</text>
+  <text class="t-code mid tc-muted" x="296" y="240">0x4000–0x5fff</text>
+  <text class="t-code mid tc-warm" x="400" y="240">0x6000–0x8fff</text>
+  <text class="t-code mid tc-muted" x="504" y="240">0x9000–0xefff</text>
+  <text class="t-code mid tc-muted" x="608" y="240">0xf000–0xffff</text>
+
+  <!-- 찾기 예 -->
+  <rect class="box warm" x="140" y="258" width="520" height="74" rx="10"/>
+  <text class="t-b" x="156" y="282">주소 0x7200을 찾는다</text>
+  <text class="t-s t-ink" x="156" y="303">① 피벗을 왼쪽부터 훑어 0x7200 이상인 첫 칸을 고른다 → 0x8fff</text>
+  <text class="t-s t-ink" x="156" y="322">② 같은 칸의 슬롯이 답이다 → VMA B</text>
+</svg>

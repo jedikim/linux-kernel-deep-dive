@@ -1,0 +1,61 @@
+<svg viewBox="0 0 760 304" xmlns="http://www.w3.org/2000/svg">
+  <title>lockdep이 교착 없이 교착 가능성을 찾는 원리: 따로 실행된 두 락 순서 A-B와 B-A가 그래프에 순환을 만들면 보고한다</title>
+
+  <!-- 1: 실제로 일어난 일 -->
+  <rect class="panel green" x="20" y="14" width="232" height="276" rx="14"/>
+  <text class="t-b" x="34" y="40">실제로 일어난 일</text>
+
+  <text class="t-s t-ink t-b" x="34" y="70">태스크 1</text>
+  <rect class="box blue" x="34" y="78" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="66" y="96">lock(A)</text>
+  <rect class="box purple" x="102" y="78" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="134" y="96">lock(B)</text>
+  <rect class="box gray" x="170" y="78" width="68" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="204" y="96">둘 다 풂</text>
+
+  <text class="t-xs mid" x="136" y="132">⋮ 한참 뒤 ⋮</text>
+
+  <text class="t-s t-ink t-b" x="34" y="160">태스크 2</text>
+  <rect class="box purple" x="34" y="168" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="66" y="186">lock(B)</text>
+  <rect class="box blue" x="102" y="168" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="134" y="186">lock(A)</text>
+  <rect class="box gray" x="170" y="168" width="68" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="204" y="186">둘 다 풂</text>
+
+  <text class="t-xs" x="34" y="232">두 일은 겹치지 않았다.</text>
+  <text class="t-xs" x="34" y="250">교착은 일어나지 않았다.</text>
+
+  <!-- 2: 그래프 -->
+  <rect class="panel yellow" x="264" y="14" width="232" height="276" rx="14"/>
+  <text class="t-b" x="278" y="40">lockdep이 기록한 순서</text>
+
+  <text class="t-xs tc-green mid" x="380" y="74">① A를 쥐고 B를 잡음</text>
+  <path class="ln green" d="M338 112 Q380 78 420 110" marker-end="url(#ah-green)"/>
+  <circle class="solid blue" cx="320" cy="132" r="26"/>
+  <text class="t-l t-on mid" x="320" y="138">A</text>
+  <circle class="solid purple" cx="440" cy="132" r="26"/>
+  <text class="t-l t-on mid" x="440" y="138">B</text>
+  <path class="ln red" d="M422 152 Q380 186 340 154" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red mid" x="380" y="200">② B를 쥐고 A를 잡음</text>
+
+  <text class="t-s t-ink t-b mid" x="380" y="236">②가 순환을 만든다</text>
+  <text class="t-xs mid" x="380" y="256">그 순간 보고한다.</text>
+  <text class="t-xs mid" x="380" y="274">실제 교착은 필요 없다.</text>
+
+  <!-- 3: 보고서의 시나리오 -->
+  <rect class="panel red" x="508" y="14" width="232" height="276" rx="14"/>
+  <text class="t-b" x="522" y="40">보고서 속의 시나리오</text>
+
+  <text class="t-code t-b t-ink mid" x="572" y="72">CPU0</text>
+  <text class="t-code t-b t-ink mid" x="676" y="72">CPU1</text>
+  <path class="ln thin muted" d="M522 82 H726"/>
+  <text class="t-code mid" x="572" y="106">lock(A);</text>
+  <text class="t-code mid" x="676" y="130">lock(B);</text>
+  <text class="t-code tc-red mid" x="676" y="154">lock(A);</text>
+  <text class="t-code tc-red mid" x="572" y="178">lock(B);</text>
+  <text class="t-code t-b tc-red mid" x="624" y="214">*** DEADLOCK ***</text>
+
+  <text class="t-xs mid" x="624" y="250">둘이 동시에 돌았다면</text>
+  <text class="t-xs mid" x="624" y="268">서로를 영원히 기다린다.</text>
+</svg>

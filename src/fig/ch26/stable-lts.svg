@@ -1,0 +1,71 @@
+<svg viewBox="0 0 760 334" xmlns="http://www.w3.org/2000/svg">
+  <title>2026년 11월의 LTS 커널 여섯 개와 지원 종료 예정 시점, 그리고 11주 만에 끝난 일반 안정판 7.2.y</title>
+
+  <!-- 연도 눈금 -->
+  <text class="t-xs mid" x="183.9" y="22">2021</text>
+  <text class="t-xs mid" x="251.7" y="22">2022</text>
+  <text class="t-xs mid" x="319.5" y="22">2023</text>
+  <text class="t-xs mid" x="387.3" y="22">2024</text>
+  <text class="t-xs mid" x="455.1" y="22">2025</text>
+  <text class="t-xs mid" x="522.9" y="22">2026</text>
+  <text class="t-xs mid" x="590.7" y="22">2027</text>
+  <text class="t-xs mid" x="658.5" y="22">2028</text>
+  <text class="t-xs mid" x="726.3" y="22">2029</text>
+  <path class="ln thin muted" d="M183.9 27 V34 M251.7 27 V34 M319.5 27 V34 M387.3 27 V34 M455.1 27 V34 M522.9 27 V34 M590.7 27 V34 M658.5 27 V34 M726.3 27 V34"/>
+  <path class="ln thin muted" d="M172 34 H740"/>
+
+  <!-- 6.18 -->
+  <text class="t-mono t-b" x="20" y="57">6.18</text>
+  <text class="t-xs" x="62" y="57">2025-11 → 2028-12</text>
+  <rect class="box green" x="516.8" y="40" width="206.8" height="24" rx="5"/>
+  <rect x="584" y="40" width="139.6" height="24" rx="5" fill="url(#hatch)"/>
+  <text class="t-xs t-ink" x="526" y="56">약 3년</text>
+
+  <!-- 6.12 -->
+  <text class="t-mono t-b" x="20" y="93">6.12</text>
+  <text class="t-xs" x="62" y="93">2024-11 → 2028-12</text>
+  <rect class="box green" x="447" y="76" width="276.6" height="24" rx="5"/>
+  <rect x="584" y="76" width="139.6" height="24" rx="5" fill="url(#hatch)"/>
+  <text class="t-xs t-ink" x="457" y="92">약 4년</text>
+
+  <!-- 6.6 -->
+  <text class="t-mono t-b" x="20" y="129">6.6</text>
+  <text class="t-xs" x="62" y="129">2023-10 → 2027-12</text>
+  <rect class="box green" x="375.8" y="112" width="280" height="24" rx="5"/>
+  <rect x="584" y="112" width="71.8" height="24" rx="5" fill="url(#hatch)"/>
+  <text class="t-xs t-ink" x="386" y="128">약 4년</text>
+
+  <!-- 6.1 -->
+  <text class="t-mono t-b" x="20" y="165">6.1</text>
+  <text class="t-xs" x="62" y="165">2022-12 → 2027-12</text>
+  <rect class="box green" x="315.4" y="148" width="340.4" height="24" rx="5"/>
+  <rect x="584" y="148" width="71.8" height="24" rx="5" fill="url(#hatch)"/>
+  <text class="t-xs t-ink" x="326" y="164">5년</text>
+
+  <!-- 5.15 -->
+  <text class="t-mono t-b" x="20" y="201">5.15</text>
+  <text class="t-xs" x="62" y="201">2021-10 → 2026-12</text>
+  <rect class="box green" x="240.2" y="184" width="347.8" height="24" rx="5"/>
+  <text class="t-xs t-ink" x="250" y="200">약 5년</text>
+
+  <!-- 5.10 -->
+  <text class="t-mono t-b" x="20" y="237">5.10</text>
+  <text class="t-xs" x="62" y="237">2020-12 → 2026-12</text>
+  <rect class="box green" x="180.5" y="220" width="407.5" height="24" rx="5"/>
+  <text class="t-xs t-ink" x="190" y="236">6년</text>
+
+  <!-- 일반 안정판 -->
+  <text class="t-mono t-b" x="20" y="285">7.2.y</text>
+  <text class="t-xs" x="72" y="285">2026-08-16 → 11-01</text>
+  <rect class="box warm" x="565" y="268" width="14.2" height="24" rx="4"/>
+  <text class="t-xs tc-warm end" x="557" y="284">일반 안정판은 11주</text>
+
+  <!-- 오늘 -->
+  <path class="ln thin red dash" d="M584 34 V300"/>
+  <text class="t-xs tc-red mid" x="584" y="318">오늘 2026-11</text>
+
+  <!-- 범례 -->
+  <rect class="box green" x="20" y="306" width="26" height="14" rx="3"/>
+  <rect x="20" y="306" width="26" height="14" rx="3" fill="url(#hatch)"/>
+  <text class="t-xs" x="54" y="318">앞으로 남은 지원 기간(예정)</text>
+</svg>

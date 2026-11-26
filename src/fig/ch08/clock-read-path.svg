@@ -1,0 +1,53 @@
+<svg viewBox="0 0 760 374" xmlns="http://www.w3.org/2000/svg">
+  <title>시계를 읽는 두 길: 유저 프로그램은 vDSO 코드가 데이터 페이지와 TSC를 직접 읽고, 커널 코드는 ktime_get()이 timekeeper와 clocksource를 읽는다. 틱마다 update_wall_time()이 둘을 갱신한다</title>
+
+  <!-- 유저 공간 -->
+  <rect class="panel blue" x="20" y="14" width="720" height="104" rx="12"/>
+  <text class="t-b tc-blue" x="34" y="37">유저 공간</text>
+  <rect class="box" x="34" y="48" width="170" height="58" rx="8"/>
+  <text class="t-mono t-b" x="46" y="71">clock_gettime()</text>
+  <text class="t-xs" x="46" y="93">시스템 콜 없이 끝난다</text>
+  <path class="ln blue" d="M204 77 H223" marker-end="url(#ah-blue)"/>
+  <rect class="box" x="228" y="48" width="220" height="58" rx="8"/>
+  <text class="t-mono t-b" x="240" y="71">vDSO: do_hres()</text>
+  <text class="t-xs" x="240" y="93">커널이 매핑해 준 코드, 유저 모드</text>
+  <path class="ln blue" d="M448 77 H485" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue mid" x="466" y="69">읽기</text>
+  <rect class="box" x="490" y="48" width="236" height="58" rx="8"/>
+  <text class="t-b" x="502" y="71">vDSO 데이터 페이지</text>
+  <text class="t-code" x="502" y="93">seq cycle_last mult shift</text>
+
+  <!-- 커널 -->
+  <rect class="panel yellow" x="20" y="134" width="720" height="118" rx="12"/>
+  <text class="t-b tc-yellow" x="34" y="157">커널</text>
+  <rect class="box" x="34" y="170" width="170" height="68" rx="8"/>
+  <text class="t-mono t-b" x="46" y="193">ktime_get()</text>
+  <text class="t-xs" x="46" y="215">커널 코드가 부른다</text>
+  <path class="ln" d="M204 204 H257" marker-end="url(#ah)"/>
+  <rect class="box" x="262" y="170" width="186" height="68" rx="8"/>
+  <text class="t-mono t-b" x="274" y="193">tk_core.timekeeper</text>
+  <text class="t-code" x="274" y="212">cycle_last mult shift</text>
+  <text class="t-xs" x="274" y="230">seqcount로 보호</text>
+  <path class="ln warm" d="M490 204 H453" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm mid" x="471" y="196">쓰기</text>
+  <rect class="box warm" x="490" y="170" width="236" height="68" rx="8"/>
+  <text class="t-mono t-b" x="502" y="193">update_wall_time()</text>
+  <text class="t-xs" x="502" y="212">틱마다 지난 사이클을 누적하고</text>
+  <text class="t-xs" x="502" y="230">NTP 보정을 mult에 반영한다</text>
+
+  <path class="ln warm" d="M660 170 V111" marker-end="url(#ah-warm)"/>
+  <text class="t-code end" x="652" y="130">update_vsyscall()</text>
+
+  <!-- 하드웨어 -->
+  <rect class="box gray" x="20" y="274" width="720" height="50" rx="10"/>
+  <use href="#i-chip" x="30" y="284" width="30" height="30" class="ic gray"/>
+  <text class="t-b" x="70" y="304">TSC</text>
+  <text class="t-s" x="110" y="304">CPU 안의 64비트 카운터. rdtsc 명령은 유저 모드에서도 실행된다</text>
+
+  <path class="ln blue dash" d="M240 106 V269" marker-end="url(#ah-blue)"/>
+  <text class="t-code tc-blue" x="248" y="264">rdtsc</text>
+  <path class="ln" d="M119 238 V269" marker-end="url(#ah)"/>
+  <text class="t-code" x="127" y="264">clock-&gt;read()</text>
+
+  <text class="t-s mid" x="380" y="354">시각 = 기준값 + ((지금 사이클 − cycle_last) × mult + xtime_nsec) &gt;&gt; shift</text>
+</svg>

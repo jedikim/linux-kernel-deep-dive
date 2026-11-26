@@ -1,0 +1,47 @@
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+  <title>커널 스레드와 lazy TLB: 유저 태스크 A에서 커널 스레드 K로 스위치할 때는 페이지 테이블을 바꾸지 않고 K가 A의 mm을 active_mm으로 빌린다. 다시 유저 태스크 B로 갈 때에만 페이지 테이블을 바꾼다.</title>
+
+  <text class="t-xs mid" x="290" y="20">스위치 ①</text>
+  <text class="t-xs mid" x="520" y="20">스위치 ②</text>
+  <path class="ln thin muted dash" d="M290 26 V214"/>
+  <path class="ln thin muted dash" d="M520 26 V214"/>
+
+  <!-- CPU에서 도는 태스크 -->
+  <text class="t-s t-ink t-b" x="20" y="52">실행 중인</text>
+  <text class="t-s t-ink t-b" x="20" y="70">태스크</text>
+  <rect class="box blue" x="120" y="38" width="170" height="40" rx="6"/>
+  <text class="t-s t-ink t-b mid" x="205" y="56">유저 태스크 A</text>
+  <text class="t-code mid" x="205" y="72">mm = mm_A</text>
+  <rect class="box yellow" x="290" y="38" width="230" height="40" rx="6"/>
+  <text class="t-s t-ink t-b mid" x="405" y="56">커널 스레드 K</text>
+  <text class="t-code mid" x="405" y="72">mm = NULL</text>
+  <rect class="box green" x="520" y="38" width="220" height="40" rx="6"/>
+  <text class="t-s t-ink t-b mid" x="630" y="56">유저 태스크 B</text>
+  <text class="t-code mid" x="630" y="72">mm = mm_B</text>
+
+  <!-- active_mm -->
+  <text class="t-s t-ink t-b" x="20" y="116">active_mm</text>
+  <rect class="box blue" x="120" y="96" width="170" height="30" rx="6"/>
+  <text class="t-code mid" x="205" y="116">mm_A</text>
+  <rect class="box blue" x="290" y="96" width="230" height="30" rx="6"/>
+  <rect x="290" y="96" width="230" height="30" rx="6" fill="url(#hatch-blue)"/>
+  <text class="t-code t-b mid" x="405" y="116">mm_A를 빌림</text>
+  <rect class="box green" x="520" y="96" width="220" height="30" rx="6"/>
+  <text class="t-code mid" x="630" y="116">mm_B</text>
+
+  <!-- CPU의 페이지 테이블 -->
+  <text class="t-s t-ink t-b" x="20" y="158">CPU에 실린</text>
+  <text class="t-s t-ink t-b" x="20" y="176">페이지 테이블</text>
+  <rect class="box blue" x="120" y="146" width="400" height="34" rx="6"/>
+  <text class="t-s t-ink mid" x="320" y="168">mm_A의 페이지 테이블. 바뀌지 않는다</text>
+  <rect class="box green" x="520" y="146" width="220" height="34" rx="6"/>
+  <text class="t-s t-ink mid" x="630" y="168">mm_B의 페이지 테이블</text>
+
+  <!-- 설명 -->
+  <text class="t-s tc-blue t-b" x="120" y="236">① 유저 → 커널 스레드</text>
+  <text class="t-s" x="120" y="256">페이지 테이블을 그대로 둔다. TLB도 그대로다.</text>
+  <text class="t-code" x="120" y="276">K가 mm_A를 빌린다: mmgrab_lazy_tlb()</text>
+  <text class="t-s tc-green t-b" x="450" y="236">② 커널 스레드 → 다른 유저 태스크</text>
+  <text class="t-s" x="450" y="256">여기서만 페이지 테이블을 바꾼다.</text>
+  <text class="t-code" x="450" y="276">switch_mm_irqs_off(), mmdrop_lazy_tlb()</text>
+</svg>

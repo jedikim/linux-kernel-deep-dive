@@ -1,0 +1,62 @@
+<svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg">
+  <title>동시성을 다루는 도구를 비용 순으로 놓은 사다리: CPU별 데이터, 원자 연산, 선점 끄기, BH 끄기, 인터럽트 끄기, 스핀락, 잠드는 락이 각각 무엇을 막는지와, 읽기 위주 데이터를 위한 RCU와 seqlock</title>
+
+  <text class="t-xs" x="62" y="38">도구</text>
+  <text class="t-xs mid" x="518" y="16">같은 데이터에 끼어드는 것 가운데 무엇을 막는가</text>
+  <text class="t-s t-ink t-b mid" x="392" y="38">선점</text>
+  <text class="t-s t-ink t-b mid" x="476" y="38">softirq</text>
+  <text class="t-s t-ink t-b mid" x="560" y="38">hardirq</text>
+  <text class="t-s t-ink t-b mid" x="644" y="38">다른 CPU</text>
+  <path class="ln thin muted" d="M32 56 V326" marker-end="url(#ah-muted)"/>
+  <text class="t-xs mid" x="32" y="350">비용</text>
+  <rect class="box green" x="50" y="50" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="73">CPU별 데이터</text>
+  <text class="t-code end" x="310" y="73">this_cpu_inc()</text>
+  <rect class="ghost dash" x="350" y="53" width="336" height="30" rx="15"/>
+  <text class="t-xs mid" x="518" y="73">공유 자체를 없앤다</text>
+  <rect class="box green" x="50" y="92" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="115">원자 연산</text>
+  <text class="t-code end" x="310" y="115">atomic_t, cmpxchg</text>
+  <rect class="ghost dash" x="350" y="95" width="336" height="30" rx="15"/>
+  <text class="t-xs mid" x="518" y="115">명령어 하나라 끼어들 틈이 없다</text>
+  <rect class="box warm" x="50" y="134" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="157">선점 끄기</text>
+  <text class="t-code end" x="310" y="157">preempt_disable()</text>
+  <circle class="solid warm" cx="392" cy="152" r="8"/>
+  <circle class="ghost" cx="476" cy="152" r="8"/>
+  <circle class="ghost" cx="560" cy="152" r="8"/>
+  <circle class="ghost" cx="644" cy="152" r="8"/>
+  <rect class="box warm" x="50" y="176" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="199">BH 끄기</text>
+  <text class="t-code end" x="310" y="199">local_bh_disable()</text>
+  <circle class="solid warm" cx="392" cy="194" r="8"/>
+  <circle class="solid warm" cx="476" cy="194" r="8"/>
+  <circle class="ghost" cx="560" cy="194" r="8"/>
+  <circle class="ghost" cx="644" cy="194" r="8"/>
+  <rect class="box warm" x="50" y="218" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="241">인터럽트 끄기</text>
+  <text class="t-code end" x="310" y="241">local_irq_save()</text>
+  <circle class="solid warm" cx="392" cy="236" r="8"/>
+  <circle class="solid warm" cx="476" cy="236" r="8"/>
+  <circle class="solid warm" cx="560" cy="236" r="8"/>
+  <circle class="ghost" cx="644" cy="236" r="8"/>
+  <rect class="box blue" x="50" y="260" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="283">스핀락</text>
+  <text class="t-code end" x="310" y="283">spin_lock()</text>
+  <circle class="solid blue" cx="392" cy="278" r="8"/>
+  <text class="t-code tc-blue mid" x="476" y="282">_bh</text>
+  <text class="t-code tc-blue mid" x="560" y="282">_irqsave</text>
+  <circle class="solid blue" cx="644" cy="278" r="8"/>
+  <rect class="box blue" x="50" y="302" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="325">잠드는 락</text>
+  <text class="t-code end" x="310" y="325">mutex, rwsem</text>
+  <rect class="ghost dash" x="350" y="305" width="336" height="30" rx="15"/>
+  <text class="t-xs mid" x="518" y="325">다른 태스크만. 쥔 채 잠들 수 있다</text>
+  <path class="ln thin muted dash" d="M50 352 H740"/>
+  <rect class="box green" x="50" y="362" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="385">RCU, seqlock</text>
+  <text class="t-xs end" x="310" y="385">읽기가 훨씬 많을 때</text>
+  <rect class="ghost dash" x="350" y="365" width="336" height="30" rx="15"/>
+  <text class="t-xs mid" x="518" y="385">읽는 쪽은 기다리지 않는다</text>
+  <text class="t-xs" x="664" y="282">← 변형으로</text>
+</svg>

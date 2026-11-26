@@ -1,0 +1,33 @@
+<svg viewBox="0 0 760 276" xmlns="http://www.w3.org/2000/svg">
+  <title>커널 개발의 순환: 호스트에서 고치고 빌드한 뒤 가상 머신에서 부팅해 시험하고, 결과를 보고 다시 고친다</title>
+
+  <rect class="panel blue" x="20" y="16" width="720" height="96" rx="14"/>
+  <text class="t-s t-b tc-blue" x="36" y="40">호스트</text>
+  <rect class="panel yellow" x="20" y="140" width="720" height="96" rx="14"/>
+  <text class="t-s t-b tc-yellow" x="36" y="164">가상 머신</text>
+  <text class="t-xs" x="36" y="184">버려도 된다</text>
+
+  <rect class="box" x="130" y="34" width="230" height="60" rx="10"/>
+  <text class="t-b" x="146" y="58">① 고친다</text>
+  <text class="t-code" x="146" y="80">kernel/sched/fair.c</text>
+  <path class="ln" d="M360 64 H436" marker-end="url(#ah)"/>
+
+  <rect class="box" x="440" y="34" width="280" height="60" rx="10"/>
+  <text class="t-b" x="456" y="58">② 빌드한다</text>
+  <text class="t-code" x="456" y="80">make -j$(nproc)</text>
+  <text class="t-xs end" x="706" y="80">바뀐 파일만 다시</text>
+  <path class="ln" d="M580 94 V154" marker-end="url(#ah)"/>
+
+  <rect class="box" x="440" y="158" width="280" height="60" rx="10"/>
+  <text class="t-b" x="456" y="182">③ 부팅한다</text>
+  <text class="t-code" x="456" y="204">vng</text>
+  <text class="t-xs end" x="706" y="204">디스크 이미지 없이</text>
+  <path class="ln" d="M440 188 H364" marker-end="url(#ah)"/>
+
+  <rect class="box" x="130" y="158" width="230" height="60" rx="10"/>
+  <text class="t-b" x="146" y="182">④ 시험하고 관찰한다</text>
+  <text class="t-code" x="146" y="204">dmesg, ftrace, kselftest</text>
+  <path class="ln" d="M245 158 V98" marker-end="url(#ah)"/>
+
+  <text class="t-s mid" x="380" y="262">커널이 죽으면 가상 머신만 다시 띄운다. 호스트의 소스와 빌드 결과는 그대로다.</text>
+</svg>

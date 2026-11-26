@@ -1,0 +1,53 @@
+<svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg">
+  <title>수신 경로에서 패킷을 가로챌 수 있는 자리: 드라이버의 XDP, 프로토콜 분기 지점의 generic XDP와 패킷 탭과 tc ingress, IP의 넷필터 PRE_ROUTING과 LOCAL_IN, TCP의 소켓 필터</title>
+
+  <path class="ln thin muted" d="M36 28 V340" marker-end="url(#ah-muted)"/>
+  <text class="t-xs" x="50" y="38">위에서 버릴수록</text>
+  <text class="t-xs" x="50" y="56">치른 비용이 적다</text>
+  <text class="t-xs" x="50" y="322">아래로 갈수록</text>
+  <text class="t-xs" x="50" y="340">아는 것이 많다</text>
+  <rect class="box purple" x="190" y="16" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="35">드라이버 poll</text>
+  <text class="t-xs" x="204" y="52">RX 링의 버퍼를 그대로 본다</text>
+  <path class="ln green" d="M470 38 H438" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="470" y="16" width="270" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="484" y="35">XDP</text>
+  <text class="t-xs" x="484" y="52">skb를 만들기 전에 BPF 프로그램 실행</text>
+  <path class="ln thin" d="M310 60 V72"/>
+  <rect class="box purple" x="190" y="72" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="91">skb 할당, GRO</text>
+  <text class="t-code" x="204" y="108">gro_receive_skb()</text>
+  <path class="ln thin" d="M310 116 V128"/>
+  <rect class="box purple" x="190" y="128" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="147">프로토콜 분기</text>
+  <text class="t-code" x="204" y="164">__netif_receive_skb_core()</text>
+  <path class="ln green" d="M470 150 H438" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="470" y="128" width="270" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="484" y="147">generic XDP · 패킷 탭 · tc ingress</text>
+  <text class="t-xs" x="484" y="164">tcpdump가 보는 곳. tc BPF가 붙는 곳</text>
+  <path class="ln thin" d="M310 172 V184"/>
+  <rect class="box purple" x="190" y="184" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="203">IP 수신</text>
+  <text class="t-code" x="204" y="220">ip_rcv()</text>
+  <path class="ln warm" d="M470 206 H438" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="470" y="184" width="270" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="484" y="203">넷필터 PRE_ROUTING</text>
+  <text class="t-xs" x="484" y="220">연결 추적, 목적지 NAT</text>
+  <path class="ln thin" d="M310 228 V240"/>
+  <rect class="box purple" x="190" y="240" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="259">로컬 전달</text>
+  <text class="t-code" x="204" y="276">ip_local_deliver()</text>
+  <path class="ln warm" d="M470 262 H438" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="470" y="240" width="270" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="484" y="259">넷필터 LOCAL_IN</text>
+  <text class="t-xs" x="484" y="276">방화벽의 INPUT 규칙</text>
+  <path class="ln thin" d="M310 284 V296"/>
+  <rect class="box purple" x="190" y="296" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="315">TCP</text>
+  <text class="t-code" x="204" y="332">tcp_v4_rcv()</text>
+  <path class="ln blue" d="M470 318 H438" marker-end="url(#ah-blue)"/>
+  <rect class="box blue" x="470" y="296" width="270" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="484" y="315">소켓 필터</text>
+  <text class="t-xs" x="484" y="332">소켓에 붙인 BPF 필터</text>
+  <text class="t-s mid" x="380" y="358">왼쪽은 패킷이 지나는 길, 오른쪽은 그 길에 끼어들 수 있는 훅이다</text>
+</svg>

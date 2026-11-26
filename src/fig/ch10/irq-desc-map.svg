@@ -1,0 +1,80 @@
+<svg viewBox="0 0 760 476" xmlns="http://www.w3.org/2000/svg">
+  <title>irq_desc 구조 지도: irq_data가 irq_chip을, handle_irq가 플로 핸들러를, action이 irqaction 사슬을, kstat_irqs가 CPU별 횟수를 가리키고, lock과 depth와 내부 상태가 함께 들어 있다</title>
+
+  <!-- irq_desc -->
+  <rect class="panel blue" x="20" y="16" width="250" height="444" rx="12"/>
+  <text class="t-mono t-b" x="34" y="40">struct irq_desc</text>
+  <text class="t-xs" x="34" y="58">리눅스 IRQ 번호 하나에 하나</text>
+
+  <rect class="box" x="34" y="70" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="87">irq_common_data</text>
+  <text class="t-xs" x="44" y="103">상태(IRQD_*), 친화성 마스크</text>
+  <rect class="box" x="34" y="116" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="133">irq_data</text>
+  <text class="t-xs" x="44" y="149">irq, hwirq, chip, domain</text>
+  <rect class="box" x="34" y="162" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="179">handle_irq</text>
+  <text class="t-xs" x="44" y="195">플로 핸들러 포인터</text>
+  <rect class="box" x="34" y="208" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="225">action</text>
+  <text class="t-xs" x="44" y="241">핸들러 사슬의 머리</text>
+  <rect class="box" x="34" y="254" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="271">kstat_irqs</text>
+  <text class="t-xs" x="44" y="287">CPU별 발생 횟수</text>
+  <rect class="box red" x="34" y="300" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="317">lock</text>
+  <text class="t-xs" x="44" y="333">이 구조체를 지키는 raw 스핀락</text>
+  <rect class="box red" x="34" y="346" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="363">depth</text>
+  <text class="t-xs" x="44" y="379">disable_irq() 중첩 횟수</text>
+  <rect class="box red" x="34" y="392" width="222" height="54" rx="6"/>
+  <text class="t-code" x="44" y="409">core_internal_state__</text>
+  <text class="t-code" x="44" y="424">do_not_mess_with_it</text>
+  <text class="t-xs" x="44" y="440">코어만 쓰는 상태(IRQS_*)</text>
+
+  <!-- irq_chip -->
+  <path class="ln warm" d="M256 136 H325" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="330" y="96" width="410" height="84" rx="10"/>
+  <text class="t-mono t-b" x="344" y="120">struct irq_chip</text>
+  <text class="t-xs tc-warm end" x="728" y="120">하드웨어를 아는 쪽</text>
+  <text class="t-code" x="344" y="144">.irq_mask() .irq_unmask() .irq_ack() .irq_eoi()</text>
+  <text class="t-code" x="344" y="164">.irq_set_affinity() .irq_set_type()</text>
+
+  <!-- 플로 핸들러 -->
+  <path class="ln green" d="M256 182 H310 V226 H325" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="330" y="196" width="410" height="62" rx="10"/>
+  <text class="t-mono t-b" x="344" y="220">handle_fasteoi_irq()</text>
+  <text class="t-xs tc-green end" x="728" y="220">순서를 아는 쪽</text>
+  <text class="t-xs" x="344" y="242">칩 콜백과 action 사슬을 어떤 순서로 부를지 정한 함수</text>
+
+  <!-- irqaction 사슬 -->
+  <path class="ln purple" d="M256 228 H298 V314 H325" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="330" y="274" width="190" height="84" rx="10"/>
+  <text class="t-mono t-b" x="342" y="296">struct irqaction</text>
+  <text class="t-code" x="342" y="316">.handler  .dev_id</text>
+  <text class="t-code" x="342" y="334">.thread_fn  .name</text>
+  <text class="t-xs" x="342" y="350">드라이버 A가 등록</text>
+  <path class="ln purple" d="M520 314 H545" marker-end="url(#ah-purple)"/>
+  <text class="t-code mid" x="533" y="306">next</text>
+  <rect class="box purple" x="550" y="274" width="190" height="84" rx="10"/>
+  <text class="t-mono t-b" x="562" y="296">struct irqaction</text>
+  <text class="t-code" x="562" y="316">.handler  .dev_id</text>
+  <text class="t-code" x="562" y="334">.thread_fn  .name</text>
+  <text class="t-xs" x="562" y="350">드라이버 B (선을 나눠 쓸 때)</text>
+
+  <!-- CPU별 횟수 -->
+  <path class="ln" d="M256 274 H286 V394 H325" marker-end="url(#ah)"/>
+  <rect class="box" x="330" y="376" width="100" height="36"/>
+  <text class="t-code mid" x="380" y="399">CPU0  921</text>
+  <rect class="box" x="430" y="376" width="100" height="36"/>
+  <text class="t-code mid" x="480" y="399">CPU1  0</text>
+  <rect class="box" x="530" y="376" width="100" height="36"/>
+  <text class="t-code mid" x="580" y="399">CPU2  14</text>
+  <rect class="box" x="630" y="376" width="110" height="36"/>
+  <text class="t-code mid" x="685" y="399">CPU3  0</text>
+
+  <text class="t-xs tc-red" x="330" y="440">빨간 칸은 한 IRQ를 여러 CPU와 여러 호출자가 동시에 건드릴 때를 위한 것이다</text>
+
+  <text class="t-xs" x="330" y="40">irq_data 안의 chip 포인터</text>
+  <text class="t-xs" x="330" y="58">도메인이 여러 겹이면 겹마다 irq_data와 irq_chip이 따로 있다</text>
+</svg>

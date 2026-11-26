@@ -1,0 +1,70 @@
+<svg viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg">
+  <title>유저 주소 페이지 폴트의 판단 흐름: VMA가 없으면 SEGV_MAPERR, 권한이 맞지 않으면 SEGV_ACCERR, 둘 다 통과하면 handle_mm_fault()가 PTE 상태에 따라 네 가지 처리 함수로 보낸다</title>
+
+  <rect class="box yellow" x="280" y="14" width="200" height="40" rx="10"/>
+  <use href="#i-bolt" x="292" y="20" width="28" height="28" class="ic yellow"/>
+  <text class="t-b" x="328" y="40">유저 주소에서 폴트</text>
+  <path class="ln" d="M380 54 V70" marker-end="url(#ah)"/>
+
+  <!-- 판단 1 -->
+  <rect class="solid" x="250" y="74" width="260" height="36" rx="18"/>
+  <text class="t-b t-on mid" x="380" y="97">주소를 포함하는 VMA가 있는가</text>
+  <path class="ln red" d="M250 92 H204" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red mid" x="228" y="84">없음</text>
+  <rect class="box red" x="20" y="70" width="180" height="44" rx="10"/>
+  <text class="t-mono t-b mid" x="110" y="89">SIGSEGV</text>
+  <text class="t-code mid" x="110" y="106">SEGV_MAPERR</text>
+  <text class="t-xs" x="530" y="88">바로 위 VMA가 스택이면</text>
+  <text class="t-xs" x="530" y="104">먼저 확장을 시도한다</text>
+  <path class="ln" d="M380 110 V134" marker-end="url(#ah)"/>
+  <text class="t-xs" x="388" y="126">있음</text>
+
+  <!-- 판단 2 -->
+  <rect class="solid" x="250" y="138" width="260" height="36" rx="18"/>
+  <text class="t-b t-on mid" x="380" y="161">VMA 권한이 접근을 허용하는가</text>
+  <path class="ln red" d="M250 156 H204" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red mid" x="228" y="148">아니오</text>
+  <rect class="box red" x="20" y="134" width="180" height="44" rx="10"/>
+  <text class="t-mono t-b mid" x="110" y="153">SIGSEGV</text>
+  <text class="t-code mid" x="110" y="170">SEGV_ACCERR</text>
+  <text class="t-xs" x="530" y="152">access_error()가 오류 코드와</text>
+  <text class="t-xs" x="530" y="168">vm_flags를 견준다</text>
+  <path class="ln" d="M380 174 V198" marker-end="url(#ah)"/>
+  <text class="t-xs" x="388" y="190">예</text>
+
+  <!-- handle_mm_fault -->
+  <rect class="box" x="180" y="202" width="400" height="52" rx="10"/>
+  <text class="t-mono t-b mid" x="380" y="224">handle_mm_fault()</text>
+  <text class="t-s mid" x="380" y="244">없는 단계의 표를 만들며 PTE까지 내려간다</text>
+  <path class="ln" d="M380 254 V272" marker-end="url(#ah)"/>
+
+  <!-- 판단 3 -->
+  <rect class="solid" x="280" y="276" width="200" height="36" rx="18"/>
+  <text class="t-b t-on mid" x="380" y="299">PTE는 어떤 상태인가</text>
+  <path class="ln green" d="M380 312 V330 H104 V346" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M380 330 H288 V346" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M380 330 H472 V346" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M380 330 H656 V346" marker-end="url(#ah-green)"/>
+
+  <rect class="box green" x="20" y="350" width="168" height="74" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="104" y="372">비어 있음 · 익명 VMA</text>
+  <text class="t-code mid" x="104" y="392">do_anonymous_page()</text>
+  <text class="t-xs mid" x="104" y="410">0으로 채운 새 페이지</text>
+
+  <rect class="box green" x="204" y="350" width="168" height="74" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="288" y="372">비어 있음 · 파일 VMA</text>
+  <text class="t-code mid" x="288" y="392">do_fault()</text>
+  <text class="t-xs mid" x="288" y="410">페이지 캐시의 페이지</text>
+
+  <rect class="box green" x="388" y="350" width="168" height="74" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="472" y="372">PRESENT가 꺼져 있음</text>
+  <text class="t-code mid" x="472" y="392">do_swap_page()</text>
+  <text class="t-xs mid" x="472" y="410">스왑에서 읽어 온다</text>
+
+  <rect class="box green" x="572" y="350" width="168" height="74" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="656" y="372">쓰기 금지인데 쓰기</text>
+  <text class="t-code mid" x="656" y="392">do_wp_page()</text>
+  <text class="t-xs mid" x="656" y="410">복사하거나 재사용 · COW</text>
+
+  <text class="t-s mid" x="380" y="452">PTE를 채우고 돌아가면 CPU가 폴트 났던 명령어를 다시 실행한다</text>
+</svg>

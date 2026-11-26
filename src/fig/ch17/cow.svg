@@ -1,0 +1,49 @@
+<svg viewBox="0 0 760 290" xmlns="http://www.w3.org/2000/svg">
+  <title>쓰기 시 복사: fork() 직후 부모와 자식의 PTE가 같은 물리 페이지를 쓰기 금지로 가리키고, 자식이 쓰면 자식만 새 페이지를 받는다</title>
+
+  <!-- fork 직후 -->
+  <rect class="panel" x="20" y="16" width="320" height="234" rx="14"/>
+  <text class="t-b" x="34" y="44">fork() 직후</text>
+
+  <rect class="box blue" x="34" y="62" width="150" height="52" rx="8"/>
+  <text class="t-s t-ink t-b" x="46" y="84">부모의 PTE</text>
+  <text class="t-code tc-red" x="46" y="104">RW=0 · 쓰기 금지</text>
+  <rect class="box green" x="34" y="152" width="150" height="52" rx="8"/>
+  <text class="t-s t-ink t-b" x="46" y="174">자식의 PTE</text>
+  <text class="t-code tc-red" x="46" y="194">RW=0 · 쓰기 금지</text>
+
+  <rect class="box" x="226" y="104" width="100" height="60" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="276" y="130">물리 페이지 P</text>
+  <text class="t-xs mid" x="276" y="150">둘이 공유</text>
+  <path class="ln blue" d="M184 88 H204 V120 H222" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M184 178 H204 V148 H222" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="180" y="234">두 VMA는 모두 VM_WRITE 그대로다</text>
+
+  <!-- 전이 -->
+  <text class="t-xs mid" x="380" y="124">자식이 쓰기</text>
+  <path class="ln" d="M346 136 H412" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="380" y="156">쓰기 폴트</text>
+
+  <!-- 자식이 쓴 뒤 -->
+  <rect class="panel" x="420" y="16" width="320" height="234" rx="14"/>
+  <text class="t-b" x="434" y="44">do_wp_page()가 처리한 뒤</text>
+
+  <rect class="box blue" x="434" y="62" width="150" height="52" rx="8"/>
+  <text class="t-s t-ink t-b" x="446" y="84">부모의 PTE</text>
+  <text class="t-code tc-red" x="446" y="104">RW=0 · 쓰기 금지</text>
+  <rect class="box green" x="434" y="152" width="150" height="52" rx="8"/>
+  <text class="t-s t-ink t-b" x="446" y="174">자식의 PTE</text>
+  <text class="t-code tc-green" x="446" y="194">RW=1 · 쓰기 가능</text>
+
+  <rect class="box" x="626" y="58" width="100" height="60" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="676" y="84">물리 페이지 P</text>
+  <text class="t-xs mid" x="676" y="104">부모만 쓴다</text>
+  <rect class="box warm" x="626" y="148" width="100" height="60" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="676" y="174">새 페이지 P′</text>
+  <text class="t-xs mid" x="676" y="194">P의 복사본</text>
+  <path class="ln blue" d="M584 88 H622" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M584 178 H622" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="580" y="234">부모가 나중에 쓰면 복사 없이 RW만 켠다</text>
+
+  <text class="t-s mid" x="380" y="274">VMA는 쓰기 가능, PTE는 쓰기 금지. 두 장부가 어긋나 있는 것이 COW 대기 중이라는 표시다</text>
+</svg>

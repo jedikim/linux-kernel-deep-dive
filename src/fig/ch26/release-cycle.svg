@@ -1,0 +1,56 @@
+<svg viewBox="0 0 760 334" xmlns="http://www.w3.org/2000/svg">
+  <title>v7.3 개발 주기 63일: 머지 윈도 2주와 안정화 7주, 같은 기간의 linux-next와 안정 트리</title>
+
+  <!-- linux-next -->
+  <text class="t-b" x="20" y="51">linux-next</text>
+  <rect class="ghost green dash" x="140" y="30" width="132" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="206" y="51">7.3용 패치</text>
+  <rect class="box green" x="272" y="30" width="462" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="503" y="51">7.4에 낼 패치가 쌓인다 · 날마다 합쳐 빌드</text>
+
+  <path class="ln blue" d="M206 62 V94" marker-end="url(#ah-blue)"/>
+  <text class="t-xs" x="216" y="83">서브시스템 메인테이너의 pull request</text>
+
+  <!-- 메인라인 -->
+  <text class="t-b" x="20" y="120">메인라인</text>
+  <rect class="box blue" x="140" y="98" width="132" height="34" rx="6"/>
+  <text class="t-s t-ink t-b mid" x="206" y="120">머지 윈도 2주</text>
+  <rect class="box yellow" x="272" y="98" width="462" height="34" rx="6"/>
+  <text class="t-s t-ink mid" x="503" y="120">안정화 7주 · 수정만 받는다</text>
+
+  <path class="ln thin" d="M140 132 V140 M272 132 V140 M338 132 V140 M404 132 V140 M470 132 V140 M536 132 V140 M602 132 V140 M668 132 V140 M734 132 V140"/>
+  <text class="t-code t-b t-ink mid" x="140" y="154">7.2</text>
+  <text class="t-code mid" x="272" y="154">rc1</text>
+  <text class="t-code mid" x="338" y="154">rc2</text>
+  <text class="t-code mid" x="404" y="154">rc3</text>
+  <text class="t-code mid" x="470" y="154">rc4</text>
+  <text class="t-code mid" x="536" y="154">rc5</text>
+  <text class="t-code mid" x="602" y="154">rc6</text>
+  <text class="t-code mid" x="668" y="154">rc7</text>
+  <text class="t-code t-b t-ink mid" x="734" y="154">7.3</text>
+  <text class="t-xs mid" x="140" y="172">8/16</text>
+  <text class="t-xs mid" x="272" y="172">8/30</text>
+  <text class="t-xs mid" x="734" y="172">10/18</text>
+
+  <path class="ln muted" d="M503 132 V204" marker-end="url(#ah-muted)"/>
+  <text class="t-xs" x="513" y="192">메인라인에 들어간 수정만 골라 백포트</text>
+
+  <!-- 안정 트리 -->
+  <text class="t-b" x="20" y="230">안정 트리</text>
+  <rect class="box gray" x="140" y="208" width="594" height="34" rx="6"/>
+  <text class="t-s t-ink mid" x="437" y="230">7.2.y · 7.2.1, 7.2.2 … 거의 매주 · 7.3이 나오고 2주 뒤에 끝난다</text>
+
+  <!-- 숫자 -->
+  <rect class="box" x="20" y="266" width="170" height="52" rx="10"/>
+  <text class="t-l mid" x="105" y="289">63일</text>
+  <text class="t-xs mid" x="105" y="308">한 주기</text>
+  <rect class="box" x="203" y="266" width="170" height="52" rx="10"/>
+  <text class="t-l mid" x="288" y="289">18,765</text>
+  <text class="t-xs mid" x="288" y="308">커밋 (병합 제외)</text>
+  <rect class="box" x="386" y="266" width="170" height="52" rx="10"/>
+  <text class="t-l mid" x="471" y="289">3,021명</text>
+  <text class="t-xs mid" x="471" y="308">커밋을 넣은 개발자</text>
+  <rect class="box" x="569" y="266" width="171" height="52" rx="10"/>
+  <text class="t-l mid" x="654" y="289">807명</text>
+  <text class="t-xs mid" x="654" y="308">처음 기여한 사람</text>
+</svg>

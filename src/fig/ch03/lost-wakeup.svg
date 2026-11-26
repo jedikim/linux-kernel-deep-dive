@@ -1,0 +1,41 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>깨움 분실: 조건을 확인한 뒤에 상태를 바꾸면, 그 사이에 온 깨움이 헛되어 태스크가 영영 잠든다. 상태를 먼저 바꾸고 조건을 확인하면 그 사이에 온 깨움이 상태를 TASK_RUNNING으로 되돌려 놓으므로 schedule()을 불러도 잠들지 않는다.</title>
+
+  <rect class="panel" x="20" y="16" width="350" height="360" rx="14"/>
+  <text class="t-b" x="34" y="42">틀린 순서</text>
+  <text class="t-xs" x="120" y="42">조건을 보고 나서 상태를 바꾼다</text>
+  <text class="t-xs tc-blue t-b" x="34" y="70">A · 잠들려는 태스크</text>
+  <text class="t-xs tc-green t-b end" x="356" y="70">B · 깨우는 쪽</text>
+  <rect class="box blue" x="34" y="82" width="200" height="28" rx="6"/>
+  <text class="t-code" x="44" y="100">① 조건 확인: 거짓</text>
+  <rect class="box green" x="156" y="134" width="200" height="28" rx="6"/>
+  <text class="t-code" x="166" y="152">② 조건 = 참</text>
+  <rect class="box green" x="156" y="186" width="200" height="28" rx="6"/>
+  <text class="t-code" x="166" y="204">③ wake_up_process(A)</text>
+  <text class="t-xs" x="158" y="229">A가 RUNNING이라 할 일이 없다</text>
+  <rect class="box blue" x="34" y="238" width="200" height="28" rx="6"/>
+  <text class="t-code" x="44" y="256">④ 상태 = INTERRUPTIBLE</text>
+  <rect class="box red" x="34" y="290" width="200" height="28" rx="6"/>
+  <text class="t-code" x="44" y="308">⑤ schedule()</text>
+  <text class="t-xs" x="36" y="333">런큐에서 빠진다</text>
+  <text class="t-s tc-red t-b" x="34" y="360">깨움은 이미 지나갔다. A는 영영 잠든다</text>
+
+  <rect class="panel" x="390" y="16" width="350" height="360" rx="14"/>
+  <text class="t-b" x="404" y="42">옳은 순서</text>
+  <text class="t-xs" x="490" y="42">상태를 바꾸고 나서 조건을 본다</text>
+  <text class="t-xs tc-blue t-b" x="404" y="70">A · 잠들려는 태스크</text>
+  <text class="t-xs tc-green t-b end" x="726" y="70">B · 깨우는 쪽</text>
+  <rect class="box blue" x="404" y="82" width="200" height="28" rx="6"/>
+  <text class="t-code" x="414" y="100">① 상태 = INTERRUPTIBLE</text>
+  <rect class="box blue" x="404" y="134" width="200" height="28" rx="6"/>
+  <text class="t-code" x="414" y="152">② 조건 확인: 거짓</text>
+  <rect class="box green" x="526" y="186" width="200" height="28" rx="6"/>
+  <text class="t-code" x="536" y="204">③ 조건 = 참</text>
+  <rect class="box green" x="526" y="238" width="200" height="28" rx="6"/>
+  <text class="t-code" x="536" y="256">④ wake_up_process(A)</text>
+  <text class="t-xs" x="528" y="281">A의 상태를 RUNNING으로 되돌린다</text>
+  <rect class="box blue" x="404" y="290" width="200" height="28" rx="6"/>
+  <text class="t-code" x="414" y="308">⑤ schedule()</text>
+  <text class="t-xs" x="406" y="333">상태가 RUNNING이라 런큐에 남는다</text>
+  <text class="t-s tc-green t-b" x="404" y="360">A는 곧 돌아와 조건을 다시 보고 빠져나온다</text>
+</svg>

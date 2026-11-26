@@ -1,0 +1,1411 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>스케줄러의 뼈대 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="런큐, 스케줄링 클래스, __schedule()과 컨텍스트 스위치">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="스케줄러의 뼈대 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="런큐, 스케줄링 클래스, __schedule()과 컨텍스트 스위치">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch04" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html" aria-current="page"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">2부 스케줄러 › <b>4장 스케줄러의 뼈대</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-green">
+<div class="ch-kicker"><span class="ch-no">04</span><span class="part">2부 · 스케줄러</span></div>
+<h1>스케줄러의 뼈대</h1>
+<p class="ch-sub">런큐, 스케줄링 클래스, __schedule()과 컨텍스트 스위치</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 55분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/sched.h" target="_blank" rel="noopener">kernel/sched/sched.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/asm-generic/vmlinux.lds.h" target="_blank" rel="noopener">include/asm-generic/vmlinux.lds.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c" target="_blank" rel="noopener">kernel/sched/core.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/entry_64.S" target="_blank" rel="noopener">arch/x86/entry/entry_64.S</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c" target="_blank" rel="noopener">kernel/sched/fair.c</a></div>
+</header><div class="lead">
+<p>CPU는 한 번에 태스크 하나만 실행합니다. 실행하고 싶은 태스크는 수백 개입니다. 누구를 먼저, 얼마나 오래 돌릴지는 정책의 문제이고, 정책은 용도마다 다릅니다. 오디오 스레드와 컴파일 작업에 같은 규칙을 쓸 수는 없습니다. 그런데 "지금 도는 태스크를 내리고 다른 태스크를 올리는" 절차는 정책이 무엇이든 같습니다. 리눅스 스케줄러는 이 둘을 갈라 놓았습니다. 이 장은 정책이 꽂히는 틀, 곧 스케줄러의 뼈대를 읽습니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>CPU마다 하나씩 있는 런큐에는 무엇이 들어 있는가?</li>
+<li>스케줄링 클래스는 몇 개이고, 클래스 사이의 우선순위는 어디에서 정해지는가?</li>
+<li><code>SCHED_FIFO</code>, nice 값, <code>prio</code> 숫자는 서로 어떤 관계인가?</li>
+<li>틱이 하는 일과 <code>__schedule()</code>이 하는 일은 어떻게 다른가?</li>
+<li>컨텍스트 스위치에서 실제로 저장되고 복원되는 것은 무엇인가?</li>
+<li><code>switch_to()</code>는 왜 인자가 셋인가?</li>
+</ul>
+</div>
+<section class="level2" id="core-and-policy">
+<h2><span class="sec-n">4.1</span>뼈대와 정책<a aria-label="이 절의 링크" class="anchor" href="#core-and-policy">#</a></h2>
+<p>스케줄러가 하는 일은 둘로 나뉩니다.</p>
+<ul>
+<li><strong>고르는 일</strong>: 실행할 수 있는 태스크 가운데 다음에 누구를 돌릴지 정합니다. 정책입니다.</li>
+<li><strong>바꾸는 일</strong>: 지금 도는 태스크의 상태를 저장하고 고른 태스크의 상태를 복원합니다. 메커니즘입니다.</li>
+</ul>
+<p>코드도 이 경계를 따라 나뉘어 있습니다. <code>kernel/sched/core.c</code>가 뼈대입니다. 언제 스케줄러에 들어가는지, 런큐 락을 어떻게 잡는지, 컨텍스트 스위치를 어떻게 하는지가 여기 있습니다. "누구를 고를지"는 <strong>스케줄링 클래스</strong>라는 모듈이 답하고, 뼈대는 정해진 인터페이스로 묻기만 합니다.</p>
+<p>클래스는 파일 하나씩을 차지합니다. <code>fair.c</code>, <code>rt.c</code>, <code>deadline.c</code>, <code>idle.c</code>, <code>stop_task.c</code>와 <code>ext/</code> 디렉터리입니다. 이 장은 뼈대인 <code>core.c</code>와 <code>sched.h</code>를 읽습니다. 자료구조 둘(런큐와 클래스), 정책과 우선순위, 실행 경로 둘(틱과 <code>__schedule()</code>), 컨텍스트 스위치 순서입니다.</p>
+</section>
+<section class="level2" id="rq">
+<h2><span class="sec-n">4.2</span>런큐: CPU마다 하나<a aria-label="이 절의 링크" class="anchor" href="#rq">#</a></h2>
+<p><strong>런큐</strong>(runqueue)는 한 CPU에서 실행을 기다리는 태스크를 모아 둔 자료구조입니다. 타입은 <code>struct rq</code>이고, CPU별 변수 <code>runqueues</code>로 CPU마다 하나씩 있습니다. <code>cpu_rq(cpu)</code>가 특정 CPU의 런큐를, <code>this_rq()</code>가 지금 CPU의 런큐를 돌려줍니다.</p>
+<p>런큐를 CPU마다 두는 이유는 락입니다. 큐가 하나뿐이면 모든 CPU의 모든 스케줄링이 락 하나를 두고 다툽니다. 큐와 락을 CPU마다 따로 두면 각 CPU는 대부분의 시간에 자기 락만 잡습니다. 대가로, 한 CPU에 태스크가 몰리고 옆 CPU는 노는 일이 없도록 큐 사이의 균형을 따로 맞춰야 합니다(<a href="ch07.html">7장</a>).</p>
+<figure class="fig" id="fig-rq-layout"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 412" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>CPU마다 하나씩 있는 런큐 struct rq의 구조: nr_running, 런큐 락, 시계, curr 포인터, 클래스별 하위 큐 dl·rt·cfs·scx, 그리고 stop과 idle 태스크</title>
+
+  <!-- CPU 0의 런큐 -->
+  <rect class="panel yellow" x="20" y="14" width="516" height="384" rx="14"/>
+  <text class="t-b" x="36" y="40">CPU 0의 런큐</text>
+  <text class="t-code end" x="520" y="40">struct rq · cpu_rq(0)</text>
+
+  <rect class="box" x="36" y="52" width="152" height="48" rx="8"/>
+  <text class="t-mono" x="48" y="72">nr_running</text>
+  <text class="t-xs" x="48" y="90">실행 가능한 태스크 수</text>
+
+  <rect class="box" x="198" y="52" width="152" height="48" rx="8"/>
+  <text class="t-mono" x="210" y="72">__lock</text>
+  <text class="t-xs" x="210" y="90">런큐 락 (raw 스핀락)</text>
+
+  <rect class="box" x="360" y="52" width="160" height="48" rx="8"/>
+  <text class="t-mono" x="372" y="72">clock</text>
+  <text class="t-xs" x="372" y="90">런큐가 가진 시계</text>
+
+  <rect class="box" x="36" y="112" width="200" height="52" rx="8"/>
+  <text class="t-mono" x="48" y="134">curr · donor</text>
+  <text class="t-xs" x="48" y="152">지금 실행 중인 태스크</text>
+  <path class="ln green" d="M236 138 H286" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="290" y="112" width="230" height="52" rx="8"/>
+  <text class="t-b" x="304" y="134">태스크 C</text>
+  <text class="t-code" x="304" y="152">on_rq = 1, on_cpu = 1</text>
+
+  <text class="t-s t-ink t-b" x="36" y="190">클래스별 하위 큐</text>
+
+  <rect class="box warm" x="36" y="200" width="114" height="112" rx="8"/>
+  <text class="t-mono t-b mid" x="93" y="222">dl</text>
+  <text class="t-code mid" x="93" y="240">struct dl_rq</text>
+  <text class="t-xs mid" x="93" y="262">데드라인 순</text>
+  <text class="t-xs mid" x="93" y="278">RB 트리</text>
+  <text class="t-xs tc-muted mid" x="93" y="300">비어 있음</text>
+
+  <rect class="box warm" x="158" y="200" width="114" height="112" rx="8"/>
+  <text class="t-mono t-b mid" x="215" y="222">rt</text>
+  <text class="t-code mid" x="215" y="240">struct rt_rq</text>
+  <text class="t-xs mid" x="215" y="262">우선순위별</text>
+  <text class="t-xs mid" x="215" y="278">리스트 100개</text>
+  <rect class="solid warm" x="206" y="290" width="18" height="12" rx="3"/>
+
+  <rect class="box green" x="280" y="200" width="114" height="112" rx="8"/>
+  <text class="t-mono t-b mid" x="337" y="222">cfs</text>
+  <text class="t-code mid" x="337" y="240">struct cfs_rq</text>
+  <text class="t-xs mid" x="337" y="262">fair 클래스의</text>
+  <text class="t-xs mid" x="337" y="278">RB 트리</text>
+  <rect class="solid green" x="304" y="290" width="18" height="12" rx="3"/>
+  <rect class="solid green" x="328" y="290" width="18" height="12" rx="3"/>
+  <rect class="solid green" x="352" y="290" width="18" height="12" rx="3"/>
+
+  <rect class="box teal" x="402" y="200" width="118" height="112" rx="8"/>
+  <text class="t-mono t-b mid" x="461" y="222">scx</text>
+  <text class="t-code mid" x="461" y="240">struct scx_rq</text>
+  <text class="t-xs mid" x="461" y="262">ext 클래스의</text>
+  <text class="t-xs mid" x="461" y="278">로컬 DSQ</text>
+  <text class="t-xs tc-muted mid" x="461" y="300">비어 있음</text>
+
+  <rect class="box gray" x="36" y="328" width="236" height="56" rx="8"/>
+  <text class="t-mono" x="48" y="351">stop</text>
+  <text class="t-xs" x="48" y="370">migration/0 · 가장 높은 클래스</text>
+
+  <rect class="box gray" x="284" y="328" width="236" height="56" rx="8"/>
+  <text class="t-mono" x="296" y="351">idle</text>
+  <text class="t-xs" x="296" y="370">swapper/0 · 돌릴 것이 없을 때</text>
+
+  <!-- 다른 CPU -->
+  <rect class="panel yellow" x="556" y="14" width="184" height="104" rx="14"/>
+  <text class="t-b" x="570" y="40">CPU 1의 런큐</text>
+  <text class="t-code" x="570" y="62">cpu_rq(1)</text>
+  <rect class="box warm" x="570" y="76" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="588" y="94">dl</text>
+  <rect class="box warm" x="610" y="76" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="628" y="94">rt</text>
+  <rect class="box green" x="650" y="76" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="668" y="94">cfs</text>
+  <rect class="box teal" x="690" y="76" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="708" y="94">scx</text>
+
+  <rect class="panel yellow" x="556" y="130" width="184" height="104" rx="14"/>
+  <text class="t-b" x="570" y="156">CPU 2의 런큐</text>
+  <text class="t-code" x="570" y="178">cpu_rq(2)</text>
+  <rect class="box warm" x="570" y="192" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="588" y="210">dl</text>
+  <rect class="box warm" x="610" y="192" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="628" y="210">rt</text>
+  <rect class="box green" x="650" y="192" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="668" y="210">cfs</text>
+  <rect class="box teal" x="690" y="192" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="708" y="210">scx</text>
+
+  <text class="t-l mid" x="648" y="264">⋮</text>
+
+  <text class="t-s t-ink t-b" x="556" y="302">CPU별 변수 runqueues</text>
+  <text class="t-s" x="556" y="324">CPU마다 큐와 락이 따로</text>
+  <text class="t-s" x="556" y="342">있어 서로 기다리지 않는다.</text>
+  <text class="t-s" x="556" y="368">큐 사이의 균형은</text>
+  <text class="t-s" x="556" y="386">부하 분산이 맞춘다 (7장).</text>
+</svg></div><figcaption><b>그림 4-1</b>런큐는 CPU마다 하나씩 있고, 그 안에 스케줄링 클래스마다 하위 큐가 따로 있습니다.</figcaption></figure>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/sched.h#L1158" rel="noopener" target="_blank">kernel/sched/sched.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/sched.h" data-line="1158" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="kw">struct</span> rq <span class="op">{</span></span>
+<span id="cb1-2">    <span class="co">/* ... */</span></span>
+<span id="cb1-3">    <span class="dt">unsigned</span> <span class="dt">int</span>        nr_running<span class="op">;</span></span>
+<span id="cb1-4">    <span class="co">/* ... */</span></span>
+<span id="cb1-5"><span class="pp">#ifdef CONFIG_SCHED_PROXY_EXEC</span></span>
+<span id="cb1-6">    <span class="kw">struct</span> task_struct __rcu    <span class="op">*</span>donor<span class="op">;</span>  <span class="co">/* Scheduling context */</span></span>
+<span id="cb1-7">    <span class="kw">struct</span> task_struct __rcu    <span class="op">*</span>curr<span class="op">;</span>   <span class="co">/* Execution context */</span></span>
+<span id="cb1-8"><span class="pp">#else</span></span>
+<span id="cb1-9">    <span class="kw">union</span> <span class="op">{</span></span>
+<span id="cb1-10">        <span class="kw">struct</span> task_struct __rcu <span class="op">*</span>donor<span class="op">;</span> <span class="co">/* Scheduler context */</span></span>
+<span id="cb1-11">        <span class="kw">struct</span> task_struct __rcu <span class="op">*</span>curr<span class="op">;</span>  <span class="co">/* Execution context */</span></span>
+<span id="cb1-12">    <span class="op">};</span></span>
+<span id="cb1-13"><span class="pp">#endif</span></span>
+<span id="cb1-14">    <span class="kw">struct</span> task_struct  <span class="op">*</span>idle<span class="op">;</span></span>
+<span id="cb1-15">    <span class="co">/* ... */</span></span>
+<span id="cb1-16">    <span class="co">/* runqueue lock: */</span></span>
+<span id="cb1-17">    raw_spinlock_t      __lock<span class="op">;</span></span>
+<span id="cb1-18">    <span class="co">/* ... */</span></span>
+<span id="cb1-19">    <span class="kw">struct</span> cfs_rq       cfs<span class="op">;</span></span>
+<span id="cb1-20">    <span class="kw">struct</span> rt_rq        rt<span class="op">;</span></span>
+<span id="cb1-21">    <span class="kw">struct</span> dl_rq        dl<span class="op">;</span></span>
+<span id="cb1-22"><span class="pp">#ifdef CONFIG_SCHED_CLASS_EXT</span></span>
+<span id="cb1-23">    <span class="kw">struct</span> scx_rq       scx<span class="op">;</span></span>
+<span id="cb1-24">    <span class="kw">struct</span> sched_dl_entity  ext_server<span class="op">;</span></span>
+<span id="cb1-25"><span class="pp">#endif</span></span>
+<span id="cb1-26">    <span class="co">/* ... */</span></span>
+<span id="cb1-27">    <span class="kw">struct</span> sched_dl_entity  fair_server<span class="op">;</span></span>
+<span id="cb1-28">    <span class="co">/* ... */</span></span>
+<span id="cb1-29">    <span class="kw">struct</span> task_struct  <span class="op">*</span>stop<span class="op">;</span></span>
+<span id="cb1-30">    <span class="co">/* ... */</span></span>
+<span id="cb1-31">    u64         clock_task ____cacheline_aligned<span class="op">;</span></span>
+<span id="cb1-32">    <span class="co">/* ... */</span></span>
+<span id="cb1-33">    u64         clock<span class="op">;</span></span>
+<span id="cb1-34">    <span class="co">/* ... */</span></span>
+<span id="cb1-35"><span class="op">}</span> __no_randomize_layout<span class="op">;</span></span></code></pre></div></div>
+<p>읽을 곳은 다섯 군데입니다.</p>
+<ul>
+<li><strong><code>nr_running</code></strong>: 이 CPU에서 실행 가능한 태스크의 수입니다. 모든 클래스를 합친 값입니다.</li>
+<li><strong><code>curr</code>와 <code>donor</code></strong>: <code>curr</code>는 지금 이 CPU에서 실제로 실행 중인 태스크이고, <code>donor</code>는 스케줄러가 돌 차례라고 뽑은 태스크입니다. 보통은 같은 태스크이고, <code>CONFIG_SCHED_PROXY_EXEC</code>를 끄면 <code>union</code>으로 아예 같은 메모리가 됩니다. 둘이 갈라지는 것은 뽑힌 태스크가 뮤텍스를 기다리는 중이어서 그 차례를 빌려 락 주인을 대신 실행할 때입니다(<a href="ch15.html">15장</a>). 이 장에서는 같은 태스크로 봅니다.</li>
+<li><strong><code>idle</code>과 <code>stop</code></strong>: CPU마다 하나씩 있는 특별한 태스크입니다. <code>idle</code>은 돌릴 태스크가 없을 때 도는 <code>swapper/N</code>이고, <code>stop</code>은 다른 모든 것을 제치고 돌아야 하는 <code>migration/N</code>입니다.</li>
+<li><strong><code>cfs</code>, <code>rt</code>, <code>dl</code>, <code>scx</code></strong>: 클래스별 하위 큐입니다. 런큐는 큐 하나가 아니고, 클래스마다 자기에게 맞는 자료구조를 가집니다. fair는 RB 트리, RT는 우선순위별 리스트 배열, deadline은 데드라인 순서의 RB 트리입니다.</li>
+<li><strong><code>__lock</code></strong>: 런큐 락입니다. 런큐를 고치는 코드는 반드시 이 락을 쥡니다. <code>raw_spinlock_t</code>이므로 RT 커널에서도 잠들지 않는 락입니다(<a href="ch06.html">6장</a>). 이름 앞의 밑줄은 직접 쓰지 말고 <code>rq_lock()</code> 같은 함수를 거치라는 뜻입니다. 코어 스케줄링을 켜면 SMT 형제 CPU들이 락 하나를 같이 쓰기 때문입니다.</li>
+</ul>
+<p><code>clock</code>과 <code>clock_task</code>는 런큐가 따로 가진 시계이고 <a href="#accounting">시간 장부 절</a>에서 봅니다. 태스크 쪽에서는 <code>p-&gt;on_rq</code>가 "런큐에 들어 있다"를, <code>p-&gt;on_cpu</code>가 "지금 CPU에서 실행 중이다"를 나타냅니다. 실행 중인 태스크도 런큐에 들어 있는 태스크입니다. 런큐에서 빠지는 것은 잠들 때입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p><code>struct rq</code>의 정의에는 <strong>배치에 대한 주석</strong>이 눈에 띕니다. 맨 앞의 <code>nr_running</code>부터 <code>idle</code>까지는 "부하 분산 코드가 락 없이 한꺼번에 읽으므로 캐시 라인 하나에 모았다"고 적혀 있고, 락과 시계들은 각각 다른 캐시 라인에 있습니다. 필드를 뜻이 가까운 것끼리가 아니라 <strong>같이 읽히는 것끼리</strong> 묶은 것입니다. 여러 CPU가 서로의 런큐를 쉴 새 없이 들여다보는 코드에서는 필드가 어느 캐시 라인에 놓이느냐가 성능을 가릅니다(<a href="ch13.html">13장</a>).</p>
+</div>
+</section>
+<section class="level2" id="sched-class">
+<h2><span class="sec-n">4.3</span>스케줄링 클래스<a aria-label="이 절의 링크" class="anchor" href="#sched-class">#</a></h2>
+<p><strong>스케줄링 클래스</strong>(scheduling class)는 정책 하나를 구현한 모듈입니다. 실체는 함수 포인터 표 <code>struct sched_class</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/sched.h#L2623" rel="noopener" target="_blank">kernel/sched/sched.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/sched.h" data-line="2623" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><span class="kw">struct</span> sched_class <span class="op">{</span></span>
+<span id="cb2-2">    <span class="co">/* ... */</span></span>
+<span id="cb2-3">    <span class="dt">void</span> <span class="op">(*</span>enqueue_task<span class="op">)</span> <span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="dt">int</span> flags<span class="op">);</span></span>
+<span id="cb2-4">    <span class="co">/* ... */</span></span>
+<span id="cb2-5">    <span class="dt">bool</span> <span class="op">(*</span>dequeue_task<span class="op">)</span> <span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="dt">int</span> flags<span class="op">);</span></span>
+<span id="cb2-6">    <span class="co">/* ... */</span></span>
+<span id="cb2-7">    <span class="dt">void</span> <span class="op">(*</span>wakeup_preempt<span class="op">)(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="dt">int</span> flags<span class="op">);</span></span>
+<span id="cb2-8">    <span class="co">/* ... */</span></span>
+<span id="cb2-9">    <span class="kw">struct</span> task_struct <span class="op">*(*</span>pick_task<span class="op">)(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> rq_flags <span class="op">*</span>rf<span class="op">);</span></span>
+<span id="cb2-10">    <span class="co">/* ... */</span></span>
+<span id="cb2-11">    <span class="dt">void</span> <span class="op">(*</span>task_tick<span class="op">)(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="dt">int</span> queued<span class="op">);</span></span>
+<span id="cb2-12">    <span class="co">/* ... */</span></span>
+<span id="cb2-13"><span class="op">};</span></span></code></pre></div></div>
+<p>뼈대는 태스크의 <code>p-&gt;sched_class</code> 포인터를 따라가 이 함수들을 부릅니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>콜백</th>
+<th>뼈대가 부르는 때</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enqueue_task</code> / <code>dequeue_task</code></td>
+<td>태스크가 실행 가능해질 때 / 잠들거나 다른 CPU로 옮겨질 때</td>
+</tr>
+<tr>
+<td><code>pick_task</code></td>
+<td>다음에 돌릴 태스크를 물을 때</td>
+</tr>
+<tr>
+<td><code>wakeup_preempt</code></td>
+<td>깨어난 태스크가 현재 태스크를 밀어내야 하는지 물을 때</td>
+</tr>
+<tr>
+<td><code>task_tick</code></td>
+<td>틱마다</td>
+</tr>
+<tr>
+<td><code>select_task_rq</code></td>
+<td>깨울 태스크를 어느 CPU에 넣을지 물을 때 (<a href="ch07.html">7장</a>)</td>
+</tr>
+</tbody>
+</table></div>
+<p>v7.3에는 클래스가 여섯 개 있습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>클래스</th>
+<th>누가 쓰나</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>stop</td>
+<td>CPU마다 하나인 <code>migration/N</code>. 태스크 강제 이동처럼 무엇보다 먼저 해야 하는 일</td>
+</tr>
+<tr>
+<td>deadline</td>
+<td>기한이 있는 태스크. 기한이 가장 이른 것부터</td>
+</tr>
+<tr>
+<td>rt</td>
+<td>고정 우선순위 실시간 태스크</td>
+</tr>
+<tr>
+<td>fair</td>
+<td>일반 태스크. 대부분이 여기입니다</td>
+</tr>
+<tr>
+<td>ext</td>
+<td>BPF 스케줄러가 맡은 태스크</td>
+</tr>
+<tr>
+<td>idle</td>
+<td>CPU마다 하나인 idle 태스크</td>
+</tr>
+</tbody>
+</table></div>
+<p>클래스 사이에는 엄격한 순서가 있습니다. 위 클래스에 실행 가능한 태스크가 하나라도 있으면 아래 클래스의 태스크는 돌지 못합니다. RT 태스크 하나가 무한 반복문을 돌면 그 CPU의 일반 태스크는 원칙적으로 영원히 기다립니다. 실제로는 이것을 막는 안전장치(<code>fair_server</code>)가 있고 <a href="ch05.html">5장</a>에서 다룹니다.</p>
+<section class="level3" id="순서는-링커가-정한다">
+<h3>순서는 링커가 정한다</h3>
+<p>클래스의 순서는 C 코드가 아니라 링커 스크립트에 적혀 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/asm-generic/vmlinux.lds.h#L153" rel="noopener" target="_blank">include/asm-generic/vmlinux.lds.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/asm-generic/vmlinux.lds.h" data-line="153" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><span class="pp">#define SCHED_DATA              </span><span class="op">\</span></span>
+<span id="cb3-2"><span class="pp">    STRUCT_ALIGN</span><span class="op">();</span><span class="pp">             </span><span class="op">\</span></span>
+<span id="cb3-3"><span class="pp">    __sched_class_highest </span><span class="op">=</span><span class="pp"> </span><span class="op">.;</span><span class="pp">      </span><span class="op">\</span></span>
+<span id="cb3-4"><span class="pp">    </span><span class="op">*(</span><span class="pp">__stop_sched_class</span><span class="op">)</span><span class="pp">           </span><span class="op">\</span></span>
+<span id="cb3-5"><span class="pp">    </span><span class="op">*(</span><span class="pp">__dl_sched_class</span><span class="op">)</span><span class="pp">         </span><span class="op">\</span></span>
+<span id="cb3-6"><span class="pp">    </span><span class="op">*(</span><span class="pp">__rt_sched_class</span><span class="op">)</span><span class="pp">         </span><span class="op">\</span></span>
+<span id="cb3-7"><span class="pp">    </span><span class="op">*(</span><span class="pp">__fair_sched_class</span><span class="op">)</span><span class="pp">           </span><span class="op">\</span></span>
+<span id="cb3-8"><span class="pp">    </span><span class="op">*(</span><span class="pp">__ext_sched_class</span><span class="op">)</span><span class="pp">            </span><span class="op">\</span></span>
+<span id="cb3-9"><span class="pp">    </span><span class="op">*(</span><span class="pp">__idle_sched_class</span><span class="op">)</span><span class="pp">           </span><span class="op">\</span></span>
+<span id="cb3-10"><span class="pp">    __sched_class_lowest </span><span class="op">=</span><span class="pp"> </span><span class="op">.;</span></span></code></pre></div></div>
+<p>각 클래스는 <code>DEFINE_SCHED_CLASS()</code> 매크로로 정의되고, 이 매크로는 인스턴스를 자기 이름의 섹션(<code>__fair_sched_class</code> 등)에 넣습니다. 링커가 그 섹션들을 위 순서대로 이어 붙이면, 여섯 개의 <code>struct sched_class</code>가 메모리에 <strong>우선순위 순서로 나란히</strong> 놓입니다. 사실상 배열입니다.</p>
+<p>그래서 "A 클래스가 B 클래스보다 높은가"를 묻는 <code>sched_class_above(a, b)</code>는 <code>((a) &lt; (b))</code>, 곧 포인터 비교 한 번입니다. "높은 클래스부터 차례로"를 뜻하는 <code>for_each_class()</code>는 <code>__sched_class_highest</code>에서 시작해 포인터를 하나씩 올리는 반복문입니다.</p>
+<figure class="fig" id="fig-class-order"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>링커 스크립트가 스케줄링 클래스 여섯 개를 stop, dl, rt, fair, ext, idle 순서로 메모리에 놓고, 다음 태스크를 고를 때 높은 클래스부터 pick_task를 불러 처음 태스크를 내놓는 클래스에서 멈춘다</title>
+
+  <text class="t-code" x="20" y="26">__sched_class_highest</text>
+  <text class="t-code end" x="732" y="26">__sched_class_lowest</text>
+  <text class="t-s mid" x="360" y="26">주소가 커질수록 낮은 클래스</text>
+  <path class="ln thin muted" d="M20 34 V44"/>
+  <path class="ln thin muted" d="M732 34 V44"/>
+  <path class="ln thin muted" d="M190 22 H262"/>
+  <path class="ln thin muted" d="M458 22 H570" marker-end="url(#ah-muted)"/>
+
+  <rect class="box gray" x="20" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="76" y="71">stop</text>
+  <text class="t-xs mid" x="76" y="92">강제 이동</text>
+
+  <rect class="box warm" x="140" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="196" y="71">dl</text>
+  <text class="t-xs mid" x="196" y="92">기한</text>
+
+  <rect class="box warm" x="260" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="316" y="71">rt</text>
+  <text class="t-xs mid" x="316" y="92">고정 우선순위</text>
+
+  <rect class="box green" x="380" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="436" y="71">fair</text>
+  <text class="t-xs mid" x="436" y="92">일반 태스크</text>
+
+  <rect class="box teal" x="500" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="556" y="71">ext</text>
+  <text class="t-xs mid" x="556" y="92">BPF 스케줄러</text>
+
+  <rect class="box gray" x="620" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="676" y="71">idle</text>
+  <text class="t-xs mid" x="676" y="92">할 일 없을 때</text>
+
+  <!-- pick_task 순회 -->
+  <path class="ln" d="M76 106 V142" marker-end="url(#ah)"/>
+  <text class="t-xs" x="84" y="130">①</text>
+  <path class="ln" d="M196 106 V142" marker-end="url(#ah)"/>
+  <text class="t-xs" x="204" y="130">②</text>
+  <path class="ln" d="M316 106 V142" marker-end="url(#ah)"/>
+  <text class="t-xs" x="324" y="130">③</text>
+  <path class="ln green" d="M436 106 V142" marker-end="url(#ah-green)"/>
+  <text class="t-xs" x="444" y="130">④</text>
+
+  <rect class="ghost dash" x="20" y="146" width="112" height="34" rx="8"/>
+  <text class="t-code mid" x="76" y="168">NULL</text>
+  <rect class="ghost dash" x="140" y="146" width="112" height="34" rx="8"/>
+  <text class="t-code mid" x="196" y="168">NULL</text>
+  <rect class="ghost dash" x="260" y="146" width="112" height="34" rx="8"/>
+  <text class="t-code mid" x="316" y="168">NULL</text>
+  <rect class="solid green" x="380" y="146" width="112" height="34" rx="8"/>
+  <text class="t-s t-b t-on mid" x="436" y="168">태스크 반환</text>
+  <text class="t-xs tc-muted mid" x="556" y="168">묻지 않는다</text>
+  <text class="t-xs tc-muted mid" x="676" y="168">묻지 않는다</text>
+
+  <text class="t-s t-ink mid" x="380" y="214">높은 클래스부터 class->pick_task()를 부르고, 처음으로 태스크를 내놓는 클래스에서 멈춘다</text>
+  <text class="t-s mid" x="380" y="236">끝까지 가더라도 idle 클래스가 반드시 rq->idle을 내놓는다</text>
+  <text class="t-s mid" x="380" y="258">nr_running == cfs.h_nr_queued 이면 순회를 건너뛰고 pick_task_fair()를 바로 부른다</text>
+</svg></div><figcaption><b>그림 4-2</b>링커가 여섯 클래스를 우선순위 순서로 메모리에 나란히 놓습니다. 다음 태스크를 고를 때는 주소가 낮은 클래스부터 <code>pick_task()</code>를 불러 처음으로 태스크를 내놓는 클래스에서 멈춥니다.</figcaption></figure>
+<p>클래스의 크기는 제각각입니다. 가장 단순한 stop 클래스는 119줄짜리 <code>stop_task.c</code>가 전부이고, <code>pick_task_stop()</code>은 <code>rq-&gt;stop</code>이 실행 가능하면 그것을, 아니면 <code>NULL</code>을 돌려줄 뿐입니다. 같은 표를 fair 클래스는 15,000줄이 넘는 <code>fair.c</code>로 채웁니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료는 스케줄링 클래스를 <code>next</code> 포인터로 이어진 연결 리스트로 설명합니다. 각 클래스 정의의 첫 줄이 <code>.next = &amp;rt_sched_class</code> 같은 식이었습니다. v7.3의 <code>struct sched_class</code>에는 <code>next</code>가 없고, 순서는 링커 스크립트가 정합니다. 콜백 이름도 바뀌었습니다. 옛 자료의 <code>pick_next_task</code>는 <code>pick_task</code>로, <code>check_preempt_curr</code>는 <code>wakeup_preempt</code>로 읽으면 됩니다.</p>
+<p><code>DEFINE_SCHED_CLASS()</code> 위의 주석은 아직도 "섹션이 거꾸로 놓이니 조심하라"고 적고 있지만, 위에서 본 대로 v7.3의 링커 스크립트는 높은 클래스부터 놓습니다. 주석과 코드가 어긋날 때는 코드가 맞습니다.</p>
+</div>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p><code>__schedule()</code>은 fair 클래스가 RB 트리를 쓰는지, RT 클래스가 비트맵을 쓰는지 모릅니다. <code>pick_task()</code>를 부를 뿐입니다. 그래서 새 정책을 넣는 일의 대부분이 "표 하나를 더 채우는 일"이 됩니다. deadline 클래스와 ext 클래스가 그렇게 자기 파일을 가진 클래스로 들어왔고, fair 클래스의 알고리즘이 통째로 바뀌었을 때도(<a href="ch05.html">5장</a>) 뼈대의 구조는 그대로였습니다. 함수 포인터 표는 커널이 C로 다형성을 구현하는 표준 방법이고, <a href="ch25.html">25장</a>에서 파일시스템·드라이버의 같은 패턴과 함께 다시 봅니다. 이 인터페이스는 고정된 것도 아닙니다. 콜백은 필요하면 바뀌고, 바꾸는 사람이 모든 구현을 함께 고칩니다(<a href="ch26.html">26장</a>).</p>
+</div>
+</section>
+</section>
+<section class="level2" id="policy-prio">
+<h2><span class="sec-n">4.4</span>정책과 우선순위<a aria-label="이 절의 링크" class="anchor" href="#policy-prio">#</a></h2>
+<p>유저 프로그램은 클래스를 직접 고르지 않습니다. <strong>스케줄링 정책</strong>(scheduling policy)을 고릅니다. 정책은 <code>sched_setattr()</code>나 <code>sched_setscheduler()</code> 시스템 콜로 정하고, 커널이 정책을 클래스로 옮깁니다.</p>
+<figure class="fig" id="fig-policy-class"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 404" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>스케줄링 정책 일곱 개와 스케줄링 클래스 여섯 개의 대응: SCHED_DEADLINE은 deadline, SCHED_FIFO와 SCHED_RR은 rt, SCHED_NORMAL·BATCH·IDLE은 fair, SCHED_EXT는 ext 클래스로 간다. stop과 idle 클래스는 유저 공간에서 고를 수 없다.</title>
+
+  <text class="t-s t-ink t-b" x="20" y="26">유저 공간이 고르는 정책</text>
+  <text class="t-s t-ink t-b end" x="740" y="26">커널 안의 클래스 (높은 순)</text>
+
+  <!-- 클래스 -->
+  <rect class="box gray" x="540" y="38" width="200" height="38" rx="8"/>
+  <text class="t-b" x="554" y="62">stop</text>
+  <text class="t-code end" x="728" y="62">stop_sched_class</text>
+  <text class="t-xs end" x="528" y="62">유저 공간에서 고를 수 없다 · migration/N</text>
+
+  <rect class="box warm" x="540" y="84" width="200" height="38" rx="8"/>
+  <text class="t-b" x="554" y="108">deadline</text>
+  <text class="t-code end" x="728" y="108">dl_sched_class</text>
+
+  <rect class="box warm" x="540" y="141" width="200" height="38" rx="8"/>
+  <text class="t-b" x="554" y="165">rt</text>
+  <text class="t-code end" x="728" y="165">rt_sched_class</text>
+
+  <rect class="box green" x="540" y="236" width="200" height="38" rx="8"/>
+  <text class="t-b" x="554" y="260">fair</text>
+  <text class="t-code end" x="728" y="260">fair_sched_class</text>
+
+  <rect class="box teal" x="540" y="312" width="200" height="38" rx="8"/>
+  <text class="t-b" x="554" y="336">ext</text>
+  <text class="t-code end" x="728" y="336">ext_sched_class</text>
+
+  <rect class="box gray" x="540" y="358" width="200" height="38" rx="8"/>
+  <text class="t-b" x="554" y="382">idle</text>
+  <text class="t-code end" x="728" y="382">idle_sched_class</text>
+  <text class="t-xs end" x="528" y="382">유저 공간에서 고를 수 없다 · swapper/N</text>
+
+  <!-- 정책 -->
+  <rect class="box blue" x="20" y="88" width="200" height="30" rx="6"/>
+  <text class="t-mono" x="32" y="108">SCHED_DEADLINE</text>
+  <text class="t-code tc-muted end" x="210" y="108">6</text>
+
+  <rect class="box blue" x="20" y="126" width="200" height="30" rx="6"/>
+  <text class="t-mono" x="32" y="146">SCHED_FIFO</text>
+  <text class="t-code tc-muted end" x="210" y="146">1</text>
+
+  <rect class="box blue" x="20" y="164" width="200" height="30" rx="6"/>
+  <text class="t-mono" x="32" y="184">SCHED_RR</text>
+  <text class="t-code tc-muted end" x="210" y="184">2</text>
+
+  <rect class="box blue" x="20" y="202" width="200" height="30" rx="6"/>
+  <text class="t-mono" x="32" y="222">SCHED_NORMAL</text>
+  <text class="t-code tc-muted end" x="210" y="222">0</text>
+
+  <rect class="box blue" x="20" y="240" width="200" height="30" rx="6"/>
+  <text class="t-mono" x="32" y="260">SCHED_BATCH</text>
+  <text class="t-code tc-muted end" x="210" y="260">3</text>
+
+  <rect class="box blue" x="20" y="278" width="200" height="30" rx="6"/>
+  <text class="t-mono" x="32" y="298">SCHED_IDLE</text>
+  <text class="t-code tc-muted end" x="210" y="298">5</text>
+
+  <rect class="box blue" x="20" y="316" width="200" height="30" rx="6"/>
+  <text class="t-mono" x="32" y="336">SCHED_EXT</text>
+  <text class="t-code tc-muted end" x="210" y="336">7</text>
+
+  <!-- 대응 -->
+  <path class="ln warm" d="M220 103 H536" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M220 141 H300 V160 H536" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M220 179 H300 V160"/>
+  <path class="ln green" d="M220 217 H300 V255 H536" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M220 255 H300"/>
+  <path class="ln green" d="M220 293 H300 V255"/>
+  <path class="ln teal" d="M220 331 H536" marker-end="url(#ah-teal)"/>
+  <path class="ln thin teal dash" d="M400 331 V268" marker-end="url(#ah-teal)"/>
+  <text class="t-xs" x="408" y="296">BPF 스케줄러가</text>
+  <text class="t-xs" x="408" y="312">없으면 fair로</text>
+
+  <text class="t-code" x="312" y="96">dl_prio(prio)</text>
+  <text class="t-code" x="312" y="153">rt_prio(prio)</text>
+  <text class="t-s t-ink" x="312" y="248">그 밖의 모든 태스크</text>
+</svg></div><figcaption><b>그림 4-3</b>유저 공간이 고르는 정책 일곱 개와 커널 안의 클래스 여섯 개. stop과 idle 클래스는 유저 공간에서 고를 수 없습니다.</figcaption></figure>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+</colgroup>
+<thead>
+<tr>
+<th>정책</th>
+<th>값</th>
+<th>클래스</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SCHED_NORMAL</code></td>
+<td>0</td>
+<td>fair</td>
+<td>기본값. 유저 공간 헤더의 이름은 <code>SCHED_OTHER</code>입니다.</td>
+</tr>
+<tr>
+<td><code>SCHED_FIFO</code></td>
+<td>1</td>
+<td>rt</td>
+<td>고정 우선순위. 양보하거나 더 높은 태스크가 올 때까지 돕니다.</td>
+</tr>
+<tr>
+<td><code>SCHED_RR</code></td>
+<td>2</td>
+<td>rt</td>
+<td>FIFO와 같되, 같은 우선순위끼리는 타임 슬라이스로 돌아가며 돕니다.</td>
+</tr>
+<tr>
+<td><code>SCHED_BATCH</code></td>
+<td>3</td>
+<td>fair</td>
+<td>일반 태스크와 같되, 깨어났을 때 현재 태스크를 밀어내지 않습니다.</td>
+</tr>
+<tr>
+<td><code>SCHED_IDLE</code></td>
+<td>5</td>
+<td>fair</td>
+<td>아주 낮은 가중치의 일반 태스크. idle <strong>클래스</strong>와는 다릅니다.</td>
+</tr>
+<tr>
+<td><code>SCHED_DEADLINE</code></td>
+<td>6</td>
+<td>deadline</td>
+<td>주기마다 정해진 실행 시간을 기한 안에 받습니다.</td>
+</tr>
+<tr>
+<td><code>SCHED_EXT</code></td>
+<td>7</td>
+<td>ext</td>
+<td>BPF 스케줄러가 맡습니다.</td>
+</tr>
+</tbody>
+</table></div>
+<p>대응을 정하는 함수는 짧습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L7622" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="7622" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="dt">const</span> <span class="kw">struct</span> sched_class <span class="op">*</span>__setscheduler_class<span class="op">(</span><span class="dt">int</span> policy<span class="op">,</span> <span class="dt">int</span> prio<span class="op">)</span></span>
+<span id="cb4-2"><span class="op">{</span></span>
+<span id="cb4-3">    <span class="cf">if</span> <span class="op">(</span>dl_prio<span class="op">(</span>prio<span class="op">))</span></span>
+<span id="cb4-4">        <span class="cf">return</span> <span class="op">&amp;</span>dl_sched_class<span class="op">;</span></span>
+<span id="cb4-5"></span>
+<span id="cb4-6">    <span class="cf">if</span> <span class="op">(</span>rt_prio<span class="op">(</span>prio<span class="op">))</span></span>
+<span id="cb4-7">        <span class="cf">return</span> <span class="op">&amp;</span>rt_sched_class<span class="op">;</span></span>
+<span id="cb4-8"></span>
+<span id="cb4-9"><span class="pp">#ifdef CONFIG_SCHED_CLASS_EXT</span></span>
+<span id="cb4-10">    <span class="cf">if</span> <span class="op">(</span>task_should_scx<span class="op">(</span>policy<span class="op">))</span></span>
+<span id="cb4-11">        <span class="cf">return</span> <span class="op">&amp;</span>ext_sched_class<span class="op">;</span></span>
+<span id="cb4-12"><span class="pp">#endif</span></span>
+<span id="cb4-13"></span>
+<span id="cb4-14">    <span class="cf">return</span> <span class="op">&amp;</span>fair_sched_class<span class="op">;</span></span>
+<span id="cb4-15"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 두 군데입니다.</p>
+<ul>
+<li>deadline과 rt는 정책이 아니라 <strong><code>prio</code> 값</strong>으로 판정합니다. 일반 태스크가 RT 태스크가 기다리는 락을 쥐고 있으면 우선순위 상속으로 <code>prio</code>가 잠시 RT 범위로 올라가고, 그동안은 클래스도 rt가 됩니다(<a href="ch15.html">15장</a>).</li>
+<li>ext는 조건부입니다. BPF 스케줄러가 올라와 있지 않으면 <code>task_should_scx()</code>가 거짓이고, <code>SCHED_EXT</code> 태스크는 fair 클래스에서 돕니다. 반대로 BPF 스케줄러가 "전부 맡겠다"고 올라오면 <code>SCHED_NORMAL</code> 태스크까지 ext 클래스로 옮겨집니다.</li>
+</ul>
+<section class="level3" id="prio-숫자">
+<h3>prio 숫자</h3>
+<p><code>task_struct</code>에는 우선순위 필드가 넷 있습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>필드</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>static_prio</code></td>
+<td>nice 값에서 나온 값. <code>120 + nice</code>이므로 100–139</td>
+</tr>
+<tr>
+<td><code>rt_priority</code></td>
+<td>실시간 우선순위. 1–99이고 <strong>클수록 높습니다.</strong> 일반 태스크는 0</td>
+</tr>
+<tr>
+<td><code>normal_prio</code></td>
+<td>정책과 위 두 값으로 계산한 "원래" 우선순위</td>
+</tr>
+<tr>
+<td><code>prio</code></td>
+<td>스케줄러가 실제로 쓰는 값. 보통 <code>normal_prio</code>와 같고, 우선순위 상속 중에만 다릅니다</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>normal_prio</code>를 계산하는 <code>__normal_prio()</code>(<code>kernel/sched/syscalls.c</code>)는 세 갈래입니다. deadline 정책이면 <code>MAX_DL_PRIO - 1</code>, 실시간 정책이면 <code>MAX_RT_PRIO - 1 - rt_priority</code>, 그 밖에는 <code>NICE_TO_PRIO(nice)</code>입니다.</p>
+<p><code>MAX_DL_PRIO</code>는 0, <code>MAX_RT_PRIO</code>는 100입니다. 그래서 커널 안의 <code>prio</code>는 <strong>작을수록 높은</strong> 하나의 축이 됩니다.</p>
+<figure class="fig" id="fig-prio-axis"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 252" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>커널 안의 prio 축: −1은 deadline, 0에서 99는 RT 클래스, 100에서 139는 fair 클래스. rt_priority 99가 prio 0이고 nice −20이 prio 100, nice 19가 prio 139다.</title>
+
+  <text class="t-s t-ink t-b" x="20" y="24">task_struct의 prio</text>
+  <text class="t-s tc-warm" x="170" y="24">← 작을수록 높은 우선순위</text>
+
+  <!-- 눈금 -->
+  <text class="t-code mid" x="45" y="52">−1</text>
+  <text class="t-code" x="78" y="52">0</text>
+  <text class="t-code end" x="548" y="52">99</text>
+  <text class="t-code" x="552" y="52">100</text>
+  <text class="t-code mid" x="646" y="52">120</text>
+  <text class="t-code end" x="740" y="52">139</text>
+  <path class="ln thin muted" d="M646 56 V62"/>
+
+  <!-- 축 -->
+  <rect class="box red" x="20" y="62" width="50" height="46" rx="6"/>
+  <text class="t-b mid" x="45" y="90">DL</text>
+  <rect class="box warm" x="78" y="62" width="470" height="46" rx="6"/>
+  <text class="t-b mid" x="313" y="90">RT 클래스 · SCHED_FIFO, SCHED_RR</text>
+  <rect class="box green" x="552" y="62" width="188" height="46" rx="6"/>
+  <text class="t-b mid" x="646" y="90">fair 클래스</text>
+
+  <!-- 유저 공간의 숫자 -->
+  <text class="t-s t-ink t-b" x="20" y="138">유저 공간에서 쓰는 숫자</text>
+  <path class="ln warm" d="M543 156 H84" marker-end="url(#ah-warm)"/>
+  <text class="t-code" x="78" y="178">99</text>
+  <text class="t-code end" x="543" y="178">1</text>
+  <text class="t-s mid" x="313" y="178">rt_priority · 클수록 높다</text>
+
+  <path class="ln green" d="M556 156 H736"/>
+  <path class="ln thin green" d="M646 150 V162"/>
+  <text class="t-code" x="552" y="178">−20</text>
+  <text class="t-code mid" x="646" y="178">0</text>
+  <text class="t-code end" x="740" y="178">19</text>
+  <text class="t-s end" x="740" y="138">nice</text>
+
+  <!-- 계산식 -->
+  <path class="ln thin muted" d="M20 196 H740"/>
+  <text class="t-code mid" x="45" y="220">고정</text>
+  <text class="t-code mid" x="313" y="220">prio = 99 − rt_priority</text>
+  <text class="t-code mid" x="646" y="220">prio = 120 + nice</text>
+  <text class="t-xs mid" x="45" y="238">기한으로 비교</text>
+  <text class="t-xs mid" x="313" y="238">같은 클래스 안에서 prio가 작은 태스크가 먼저</text>
+  <text class="t-xs mid" x="646" y="238">prio 대신 가중치로 비교 (5장)</text>
+</svg></div><figcaption><b>그림 4-4</b>커널 안의 <code>prio</code> 축. 유저 공간의 <code>rt_priority</code>는 뒤집혀 0–98에, nice는 100–139에 놓입니다. deadline 태스크는 −1입니다.</figcaption></figure>
+<p>유저 공간의 <code>rt_priority</code> 99가 커널의 <code>prio</code> 0이고, nice 0이 <code>prio</code> 120입니다. 커널 코드에서 <code>prio</code>를 비교하는 조건문은 "작은 쪽이 이긴다"로 읽어야 합니다.</p>
+<p>이 축은 <strong>클래스를 가르는 데</strong>와 <strong>RT 클래스 안에서</strong> 쓰입니다. fair 클래스 안에서는 <code>prio</code>를 직접 비교하지 않습니다. nice 값을 가중치로 바꿔 CPU 시간의 비율을 정합니다. <a href="ch05.html">5장</a>의 내용입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>태스크의 정책과 우선순위를 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ ps -eo pid,cls,rtprio,ni,comm | head -4
+    PID CLS RTPRIO  NI COMMAND
+      1  TS      -   0 systemd
+      2  TS      -   0 kthreadd
+     18  FF     99   - migration/0</code></pre></div>
+<p><code>CLS</code> 열의 <code>TS</code>는 <code>SCHED_NORMAL</code>, <code>FF</code>는 <code>SCHED_FIFO</code>입니다. <code>migration/0</code>은 stop 클래스의 태스크지만 유저 공간에는 <code>SCHED_FIFO</code> 99로 보이게 해 두었습니다. 이제 정책을 바꿔 봅니다. 실시간 정책은 root이거나 <code>CAP_SYS_NICE</code>가 있어야 줄 수 있습니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># chrt -f 10 sleep 100 &amp;
+# grep -E '^(policy|prio)' /proc/$!/sched
+policy                                       :                    1
+prio                                         :                   89</code></pre></div>
+<p><code>rt_priority</code> 10이 <code>prio</code> 89(= 100 − 1 − 10)가 되었습니다.</p>
+</div>
+</section>
+</section>
+<section class="level2" id="tick">
+<h2><span class="sec-n">4.5</span>틱: 주기적 스케줄러<a aria-label="이 절의 링크" class="anchor" href="#tick">#</a></h2>
+<p>스케줄러 코드가 실행되는 길은 둘입니다. 타이머 인터럽트가 주기적으로 부르는 <code>sched_tick()</code>과, 태스크를 실제로 바꾸는 <code>__schedule()</code>입니다. 앞의 것을 주기적 스케줄러, 뒤의 것을 주 스케줄러라고 부르기도 합니다.</p>
+<p>틱은 태스크를 바꾸지 않습니다. <strong>장부를 갱신하고, 바꿔야 하면 표시만 합니다.</strong></p>
+<figure class="fig" id="fig-tick-path"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>타이머 인터럽트에서 sched_tick을 거쳐 클래스별 task_tick까지의 경로. 틱은 재스케줄 요청 플래그만 세우고 실제 전환은 인터럽트 복귀 길에 일어난다.</title>
+
+  <rect class="box gray" x="20" y="16" width="280" height="44" rx="10"/>
+  <use href="#i-clock" x="32" y="24" width="28" height="28" class="ic gray"/>
+  <text class="t-b" x="70" y="43">타이머 인터럽트</text>
+  <text class="t-xs end" x="288" y="43">초당 HZ번</text>
+  <path class="ln" d="M160 60 V76" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="20" y="80" width="280" height="58" rx="10"/>
+  <text class="t-code" x="34" y="103">tick_nohz_handler()</text>
+  <text class="t-code" x="34" y="124">→ update_process_times()</text>
+  <text class="t-xs end" x="288" y="103">kernel/time · 8장</text>
+  <path class="ln" d="M160 138 V154" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="20" y="158" width="280" height="134" rx="10"/>
+  <text class="t-mono t-b" x="34" y="182">sched_tick()</text>
+  <text class="t-code" x="34" y="206">rq_lock(rq)</text>
+  <text class="t-code" x="34" y="225">update_rq_clock(rq)</text>
+  <text class="t-code t-b" x="34" y="244">donor->sched_class->task_tick()</text>
+  <text class="t-code" x="34" y="263">sched_balance_trigger(rq)</text>
+  <text class="t-xs" x="34" y="282">인터럽트 컨텍스트 · 인터럽트 꺼짐</text>
+
+  <!-- 클래스로 갈라짐 -->
+  <path class="ln" d="M300 240 H336" marker-end="url(#ah)"/>
+  <path class="ln" d="M320 240 V103 H336" marker-end="url(#ah)"/>
+  <path class="ln" d="M320 173 H336" marker-end="url(#ah)"/>
+  <path class="ln" d="M320 240 V289 H336" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="340" y="72" width="400" height="62" rx="10"/>
+  <text class="t-b" x="354" y="96">fair</text>
+  <text class="t-code end" x="728" y="96">task_tick_fair() → update_curr()</text>
+  <text class="t-s" x="354" y="120">실행 시간을 더하고, 몫을 다 썼으면 플래그를 세운다</text>
+
+  <rect class="box warm" x="340" y="142" width="400" height="62" rx="10"/>
+  <text class="t-b" x="354" y="166">rt</text>
+  <text class="t-code end" x="728" y="166">task_tick_rt()</text>
+  <text class="t-s" x="354" y="190">SCHED_RR만 타임 슬라이스를 깎는다. 0이 되면 플래그</text>
+
+  <rect class="box warm" x="340" y="217" width="400" height="46" rx="10"/>
+  <text class="t-b" x="354" y="245">deadline</text>
+  <text class="t-code end" x="728" y="245">task_tick_dl() → update_curr_dl()</text>
+
+  <rect class="box gray" x="340" y="273" width="400" height="32" rx="10"/>
+  <text class="t-b" x="354" y="294">stop · idle</text>
+  <text class="t-s end" x="728" y="294">장부만 갱신하거나 하는 일이 없다</text>
+
+  <!-- 결과 -->
+  <path class="ln red" d="M160 292 V326" marker-end="url(#ah-red)"/>
+  <rect class="box red" x="20" y="330" width="720" height="34" rx="10"/>
+  <text class="t-s t-ink mid" x="380" y="352">틱은 재스케줄 요청 플래그만 세운다. 전환은 인터럽트에서 돌아가는 길에 __schedule()이 한다 (6장)</text>
+</svg></div><figcaption><b>그림 4-5</b>타이머 인터럽트에서 <code>task_tick()</code>까지. 틱은 인터럽트 컨텍스트에서 플래그만 세우고, 실제 전환은 인터럽트에서 돌아가는 길에 <code>__schedule()</code>이 합니다.</figcaption></figure>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L5782" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="5782" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="dt">void</span> sched_tick<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb7-2"><span class="op">{</span></span>
+<span id="cb7-3">    <span class="co">/* ... */</span></span>
+<span id="cb7-4">    <span class="co">/* scheduler accounting goes to the donor task */</span></span>
+<span id="cb7-5">    <span class="kw">struct</span> task_struct <span class="op">*</span>curr<span class="op">,</span> <span class="op">*</span>donor<span class="op">;</span></span>
+<span id="cb7-6">    <span class="co">/* ... */</span></span>
+<span id="cb7-7">    rq_lock<span class="op">(</span>rq<span class="op">,</span> <span class="op">&amp;</span>rf<span class="op">);</span></span>
+<span id="cb7-8">    curr <span class="op">=</span> rq<span class="op">-&gt;</span>curr<span class="op">;</span></span>
+<span id="cb7-9">    donor <span class="op">=</span> rq<span class="op">-&gt;</span>donor<span class="op">;</span></span>
+<span id="cb7-10">    <span class="co">/* ... */</span></span>
+<span id="cb7-11">    update_rq_clock<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb7-12">    <span class="co">/* ... */</span></span>
+<span id="cb7-13">    donor<span class="op">-&gt;</span>sched_class<span class="op">-&gt;</span>task_tick<span class="op">(</span>rq<span class="op">,</span> donor<span class="op">,</span> <span class="dv">0</span><span class="op">);</span></span>
+<span id="cb7-14">    <span class="co">/* ... */</span></span>
+<span id="cb7-15">    rq_unlock<span class="op">(</span>rq<span class="op">,</span> <span class="op">&amp;</span>rf<span class="op">);</span></span>
+<span id="cb7-16">    <span class="co">/* ... */</span></span>
+<span id="cb7-17">    <span class="cf">if</span> <span class="op">(!</span>scx_switched_all<span class="op">())</span> <span class="op">{</span></span>
+<span id="cb7-18">        rq<span class="op">-&gt;</span>idle_balance <span class="op">=</span> idle_cpu<span class="op">(</span>cpu<span class="op">);</span></span>
+<span id="cb7-19">        sched_balance_trigger<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb7-20">    <span class="op">}</span></span>
+<span id="cb7-21"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 네 군데입니다.</p>
+<ul>
+<li>이 함수는 타이머 인터럽트 핸들러 안에서, 인터럽트가 꺼진 채로 불립니다. 여기서 <code>schedule()</code>을 부를 수는 없습니다(<a href="ch06.html">6장</a>의 <code>preempt_count</code>).</li>
+<li>런큐 락을 잡고 런큐 시계를 갱신합니다.</li>
+<li>현재 태스크의 <strong>클래스에 일을 넘깁니다.</strong> fair 클래스(<code>task_tick_fair()</code>)는 실행 시간을 장부에 더하고, 자기 몫을 다 썼으면 재스케줄 요청 플래그를 세웁니다. RT 클래스(<code>task_tick_rt()</code>)는 <code>SCHED_RR</code> 태스크의 타임 슬라이스를 하나 깎고, 0이 되면 큐 맨 뒤로 보낸 뒤 플래그를 세웁니다. <code>SCHED_FIFO</code> 태스크는 장부만 갱신합니다.</li>
+<li>끝에서 <code>sched_balance_trigger()</code>가 부하 분산을 할 때가 되었는지 확인합니다(<a href="ch07.html">7장</a>).</li>
+</ul>
+<p>플래그가 어디서 확인되는지는 6장이, 틱이 어떻게 만들어지고 놀고 있는 CPU에서 어떻게 멈추는지는 <a href="ch08.html">8장</a>이 다룹니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>이 함수의 이름은 오랫동안 <code>scheduler_tick()</code>이었습니다. <span class="v">v6.10</span>에서 스케줄러 함수 이름을 <code>sched_</code> 접두사로 통일하면서 <code>sched_tick()</code>이 되었습니다.</p>
+<p>옛 교재는 틱의 일을 "현재 태스크의 타임 슬라이스 카운터를 1 줄이고, 0이 되면 <code>need_resched</code>를 세운다"고 설명합니다. v7.3에서 틱마다 카운터를 깎는 것은 <code>SCHED_RR</code> 태스크뿐입니다. 일반 태스크에는 깎을 카운터가 없습니다. fair 클래스는 나노초 시계로 잰 실행 시간으로 판단하고, 틱은 그 판단을 다시 해 보는 계기일 뿐입니다.</p>
+</div>
+<p>틱에만 기대면 선점의 정밀도가 틱 주기(<code>HZ=1000</code>이면 1ms)에 묶입니다. 그래서 태스크의 몫이 끝나는 시각에 고해상도 타이머를 따로 거는 <code>HRTICK</code> 기능이 있고, 이 타이머도 같은 <code>task_tick()</code>을 부릅니다.</p>
+</section>
+<section class="level2" id="schedule">
+<h2><span class="sec-n">4.6</span>__schedule(): 주 스케줄러<a aria-label="이 절의 링크" class="anchor" href="#schedule">#</a></h2>
+<p>태스크를 바꾸는 함수는 <code>__schedule()</code> 하나입니다. 이 함수로 들어오는 계기는 소스의 주석이 세 가지로 정리해 두었습니다.</p>
+<ol type="1">
+<li><strong>명시적으로 잠들 때.</strong> 뮤텍스, 세마포어, 대기 큐에서 기다리는 코드가 <code>schedule()</code>을 부릅니다(<a href="ch03.html">3장</a>).</li>
+<li><strong>재스케줄 요청 플래그가 확인될 때.</strong> 인터럽트에서 돌아가는 길, 유저 모드로 돌아가는 길, <code>preempt_enable()</code>에서입니다(<a href="ch06.html">6장</a>).</li>
+<li>깨우기는 계기가 <strong>아닙니다.</strong> 깨우는 쪽은 태스크를 런큐에 넣고 필요하면 플래그를 세울 뿐이고, 전환은 2번 경로로 일어납니다.</li>
+</ol>
+<figure class="fig" id="fig-schedule-flow"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>__schedule()의 흐름: 인터럽트를 끄고 런큐 락을 잡고, 시계를 갱신하고, 잠드는 태스크를 큐에서 빼고, 다음 태스크를 고르고, 요청 플래그를 지우고, 다르면 컨텍스트 스위치를 한다. 락은 prev가 잡고 next가 푼다.</title>
+
+  <rect class="box yellow" x="20" y="16" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="40">① local_irq_disable() · rq_lock(rq)</text>
+  <text class="t-s end" x="508" y="40">인터럽트를 끄고 런큐 락을 잡는다</text>
+
+  <rect class="box yellow" x="20" y="62" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="86">② update_rq_clock(rq)</text>
+  <text class="t-s end" x="508" y="86">런큐 시계를 맞춘다</text>
+
+  <rect class="box yellow" x="20" y="108" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="132">③ try_to_block_task()</text>
+  <text class="t-s end" x="508" y="132">스스로 잠드는 태스크면 큐에서 뺀다</text>
+
+  <rect class="box yellow" x="20" y="154" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="178">④ pick_next_task()</text>
+  <text class="t-s end" x="508" y="178">클래스에 다음 태스크를 묻는다</text>
+
+  <rect class="box yellow" x="20" y="200" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="224">⑤ clear_tsk_need_resched(prev)</text>
+  <text class="t-s end" x="508" y="224">재스케줄 요청을 지운다</text>
+
+  <rect class="solid" x="20" y="250" width="230" height="38" rx="19"/>
+  <text class="t-b t-on mid" x="135" y="274">⑥ prev와 next가 같은가</text>
+  <path class="ln" d="M250 269 H296" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="272" y="262">같다</text>
+  <rect class="box gray" x="300" y="250" width="220" height="38" rx="8"/>
+  <text class="t-s t-ink mid" x="410" y="274">락을 풀고 그대로 돌아간다</text>
+  <path class="ln" d="M135 288 V314" marker-end="url(#ah)"/>
+  <text class="t-xs" x="145" y="306">다르다</text>
+
+  <rect class="box warm" x="20" y="318" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="342">⑦ context_switch() → switch_to()</text>
+  <text class="t-s end" x="508" y="342">주소 공간과 스택을 바꾼다</text>
+
+  <rect class="box green" x="20" y="366" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="390">⑧ finish_task_switch(prev)</text>
+  <text class="t-s end" x="508" y="390">락을 풀고 인터럽트를 켠다</text>
+
+  <!-- 오른쪽: 락 구간과 스택 -->
+  <rect class="box red" x="544" y="16" width="20" height="388" rx="4"/>
+  <rect x="544" y="16" width="20" height="388" rx="4" fill="url(#hatch-red)"/>
+  <text class="t-s t-ink t-b" x="592" y="36">런큐 락을 쥔 구간</text>
+  <text class="t-xs" x="592" y="54">인터럽트도 꺼져 있다</text>
+
+  <path class="ln thick warm" d="M580 16 V356"/>
+  <text class="t-s t-ink" x="592" y="222">prev의 커널 스택</text>
+  <text class="t-s t-ink" x="592" y="240">위에서 실행된다</text>
+  <text class="t-xs" x="592" y="262">④에서 고른 next는</text>
+  <text class="t-xs" x="592" y="278">아직 잠들어 있다</text>
+
+  <path class="ln thick green" d="M580 366 V404"/>
+  <text class="t-s t-ink" x="592" y="382">next의 커널 스택</text>
+  <text class="t-xs" x="592" y="398">prev가 잡은 락을 푼다</text>
+</svg></div><figcaption><b>그림 4-6</b><code>__schedule()</code>의 흐름. 런큐 락을 잡은 뒤 잠드는 태스크를 큐에서 빼고, 다음 태스크를 고르고, 다르면 컨텍스트 스위치를 합니다.</figcaption></figure>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L7111" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="7111" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="dt">static</span> <span class="dt">void</span> __sched notrace __schedule<span class="op">(</span><span class="dt">int</span> sched_mode<span class="op">)</span></span>
+<span id="cb8-2"><span class="op">{</span></span>
+<span id="cb8-3">    <span class="co">/* ... */</span></span>
+<span id="cb8-4">    rq <span class="op">=</span> cpu_rq<span class="op">(</span>cpu<span class="op">);</span></span>
+<span id="cb8-5">    prev <span class="op">=</span> rq<span class="op">-&gt;</span>curr<span class="op">;</span></span>
+<span id="cb8-6">    <span class="co">/* ... */</span></span>
+<span id="cb8-7">    local_irq_disable<span class="op">();</span></span>
+<span id="cb8-8">    <span class="co">/* ... */</span></span>
+<span id="cb8-9">    rq_lock<span class="op">(</span>rq<span class="op">,</span> <span class="op">&amp;</span>rf<span class="op">);</span></span>
+<span id="cb8-10">    <span class="co">/* ... */</span></span>
+<span id="cb8-11">    update_rq_clock<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb8-12">    <span class="co">/* ... */</span></span>
+<span id="cb8-13">    switch_count <span class="op">=</span> <span class="op">&amp;</span>prev<span class="op">-&gt;</span>nivcsw<span class="op">;</span></span>
+<span id="cb8-14">    <span class="co">/* ... */</span></span>
+<span id="cb8-15">    preempt <span class="op">=</span> sched_mode <span class="op">==</span> SM_PREEMPT<span class="op">;</span></span>
+<span id="cb8-16">    <span class="co">/* ... */</span></span>
+<span id="cb8-17">    prev_state <span class="op">=</span> READ_ONCE<span class="op">(</span>prev<span class="op">-&gt;</span>__state<span class="op">);</span></span>
+<span id="cb8-18">    <span class="cf">if</span> <span class="op">(</span>sched_mode <span class="op">==</span> SM_IDLE<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-19">        <span class="co">/* ... */</span></span>
+<span id="cb8-20">    <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(!</span>preempt <span class="op">&amp;&amp;</span> prev_state<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-21">        <span class="co">/* ... */</span></span>
+<span id="cb8-22">        try_to_block_task<span class="op">(</span>rq<span class="op">,</span> prev<span class="op">,</span> <span class="op">&amp;</span>prev_state<span class="op">,</span></span>
+<span id="cb8-23">                  <span class="op">!</span>task_is_blocked<span class="op">(</span>prev<span class="op">));</span></span>
+<span id="cb8-24">        switch_count <span class="op">=</span> <span class="op">&amp;</span>prev<span class="op">-&gt;</span>nvcsw<span class="op">;</span></span>
+<span id="cb8-25">    <span class="op">}</span></span>
+<span id="cb8-26"></span>
+<span id="cb8-27">pick_again<span class="op">:</span></span>
+<span id="cb8-28">    <span class="co">/* ... */</span></span>
+<span id="cb8-29">    next <span class="op">=</span> pick_next_task<span class="op">(</span>rq<span class="op">,</span> <span class="op">&amp;</span>rf<span class="op">);</span></span>
+<span id="cb8-30">    <span class="co">/* ... */</span></span>
+<span id="cb8-31">picked<span class="op">:</span></span>
+<span id="cb8-32">    clear_tsk_need_resched<span class="op">(</span>prev<span class="op">);</span></span>
+<span id="cb8-33">    clear_preempt_need_resched<span class="op">();</span></span>
+<span id="cb8-34">    <span class="co">/* ... */</span></span></code></pre></div></div>
+<p>앞 절반입니다.</p>
+<ul>
+<li><strong>인터럽트를 끄고 런큐 락을 잡습니다.</strong> 여기부터 컨텍스트 스위치가 끝날 때까지 이 CPU의 런큐는 다른 누구도 고치지 못합니다. 호출하는 쪽이 이미 선점을 꺼 두었으므로(<code>schedule()</code>의 <code>preempt_disable()</code>), 이 시점의 <code>preempt_count</code>는 락까지 합쳐 2입니다.</li>
+<li><strong>잠드는 태스크를 큐에서 뺍니다.</strong> 조건은 두 가지입니다. 선점으로 들어온 것이 아니고(<code>!preempt</code>), 태스크 상태가 <code>TASK_RUNNING</code>(값 0)이 아닐 것(<code>prev_state</code>). 스스로 <code>schedule()</code>을 부른 태스크가 미리 상태를 <code>TASK_INTERRUPTIBLE</code> 등으로 바꿔 두었다면 여기서 런큐를 떠납니다. 선점당한 태스크는 상태가 무엇이든 큐에 남습니다. 그 이유는 6장에서 봤습니다.</li>
+<li><strong>다음 태스크를 고르고</strong>(<code>pick_next_task()</code>, 다음 절), <strong>재스케줄 요청을 지웁니다.</strong></li>
+</ul>
+<p><code>try_to_block_task()</code>에는 예외가 둘 있습니다. 시그널로 깰 수 있는 상태로 잠들려는 태스크에 시그널이 이미 와 있으면, 큐에서 빼지 않고 상태를 <code>TASK_RUNNING</code>으로 되돌립니다. 그리고 클래스가 "지금은 빼지 않겠다"고 할 수 있습니다. <code>dequeue_task()</code>의 반환형이 <code>bool</code>인 이유입니다. fair 클래스는 받은 CPU 시간이 제 몫보다 많은 태스크가 잠들 때, 그 빚이 갚아질 때까지 큐에 남겨 둡니다. <strong>지연 디큐</strong>(delayed dequeue)라고 하고 5장에서 다룹니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L7244" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="7244" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1">    is_switch <span class="op">=</span> prev <span class="op">!=</span> next<span class="op">;</span></span>
+<span id="cb9-2">    <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(</span>is_switch<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb9-3">        rq<span class="op">-&gt;</span>nr_switches<span class="op">++;</span></span>
+<span id="cb9-4">        <span class="co">/* ... */</span></span>
+<span id="cb9-5">        RCU_INIT_POINTER<span class="op">(</span>rq<span class="op">-&gt;</span>curr<span class="op">,</span> next<span class="op">);</span></span>
+<span id="cb9-6">        <span class="co">/* ... */</span></span>
+<span id="cb9-7">        <span class="op">++*</span>switch_count<span class="op">;</span></span>
+<span id="cb9-8">        <span class="co">/* ... */</span></span>
+<span id="cb9-9">        trace_sched_switch<span class="op">(</span>preempt<span class="op">,</span> prev<span class="op">,</span> next<span class="op">,</span> prev_state<span class="op">);</span></span>
+<span id="cb9-10"></span>
+<span id="cb9-11">        <span class="co">/* Also unlocks the rq: */</span></span>
+<span id="cb9-12">        rq <span class="op">=</span> context_switch<span class="op">(</span>rq<span class="op">,</span> prev<span class="op">,</span> next<span class="op">,</span> <span class="op">&amp;</span>rf<span class="op">);</span></span>
+<span id="cb9-13">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb9-14">        <span class="co">/* ... */</span></span>
+<span id="cb9-15">        raw_spin_rq_unlock_irq<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb9-16">    <span class="op">}</span></span>
+<span id="cb9-17">    <span class="co">/* ... */</span></span>
+<span id="cb9-18"><span class="op">}</span></span></code></pre></div></div>
+<p>뒤 절반입니다.</p>
+<ul>
+<li>고른 태스크가 지금 태스크와 같으면 락을 풀고 돌아갑니다. 요청은 왔지만 다시 따져 보니 현재 태스크가 여전히 최선인 경우입니다.</li>
+<li>다르면 <code>rq-&gt;curr</code>를 새 태스크로 바꾸고, 컨텍스트 스위치 횟수를 올리고, <code>sched_switch</code> 트레이스포인트를 찍고, <code>context_switch()</code>를 부릅니다.</li>
+<li><code>switch_count</code>는 앞에서 정해 둔 포인터입니다. 스스로 잠든 경우는 <code>nvcsw</code>(자발적 전환), 그 밖에는 <code>nivcsw</code>(비자발적 전환)를 가리킵니다. <code>/proc/PID/status</code>의 <code>voluntary_ctxt_switches</code>와 <code>nonvoluntary_ctxt_switches</code>가 이 두 값입니다.</li>
+<li>주석대로 <code>context_switch()</code>가 <strong>런큐 락을 풉니다.</strong> 락은 이 함수가 잡았는데 푸는 것은 다른 함수이고, 뒤에서 보듯 다른 태스크입니다.</li>
+</ul>
+<p><code>schedule()</code>은 이 함수를 감싼 래퍼입니다. 잠들러 가는 길이면 먼저 모아 둔 블록 I/O 요청을 내보내고(<code>sched_submit_work()</code>), 선점을 끄고 <code>__schedule(SM_NONE)</code>을 부르고, 돌아온 뒤에도 재스케줄 요청이 남아 있으면 반복합니다.</p>
+</section>
+<section class="level2" id="pick">
+<h2><span class="sec-n">4.7</span>다음 태스크 고르기<a aria-label="이 절의 링크" class="anchor" href="#pick">#</a></h2>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L6152" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="6152" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="kw">struct</span> task_struct <span class="op">*</span></span>
+<span id="cb10-2">__pick_next_task<span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> rq_flags <span class="op">*</span>rf<span class="op">)</span></span>
+<span id="cb10-3">    __must_hold<span class="op">(</span>__rq_lockp<span class="op">(</span>rq<span class="op">))</span></span>
+<span id="cb10-4"><span class="op">{</span></span>
+<span id="cb10-5">    <span class="co">/* ... */</span></span>
+<span id="cb10-6">    <span class="cf">if</span> <span class="op">(</span>scx_enabled<span class="op">())</span></span>
+<span id="cb10-7">        <span class="cf">goto</span> restart<span class="op">;</span></span>
+<span id="cb10-8"></span>
+<span id="cb10-9">    <span class="co">/* ... */</span></span>
+<span id="cb10-10">    <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(!</span>sched_class_above<span class="op">(</span>rq<span class="op">-&gt;</span>donor<span class="op">-&gt;</span>sched_class<span class="op">,</span> <span class="op">&amp;</span>fair_sched_class<span class="op">)</span> <span class="op">&amp;&amp;</span></span>
+<span id="cb10-11">           rq<span class="op">-&gt;</span>nr_running <span class="op">==</span> rq<span class="op">-&gt;</span>cfs<span class="op">.</span>h_nr_queued<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb10-12"></span>
+<span id="cb10-13">        p <span class="op">=</span> pick_task_fair<span class="op">(</span>rq<span class="op">,</span> rf<span class="op">);</span></span>
+<span id="cb10-14">        <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>p <span class="op">==</span> RETRY_TASK<span class="op">))</span></span>
+<span id="cb10-15">            <span class="cf">goto</span> restart<span class="op">;</span></span>
+<span id="cb10-16"></span>
+<span id="cb10-17">        <span class="co">/* Assume the next prioritized class is idle_sched_class */</span></span>
+<span id="cb10-18">        <span class="cf">if</span> <span class="op">(!</span>p<span class="op">)</span></span>
+<span id="cb10-19">            p <span class="op">=</span> pick_task_idle<span class="op">(</span>rq<span class="op">,</span> rf<span class="op">);</span></span>
+<span id="cb10-20"></span>
+<span id="cb10-21">        put_prev_set_next_task<span class="op">(</span>rq<span class="op">,</span> rq<span class="op">-&gt;</span>donor<span class="op">,</span> p<span class="op">);</span></span>
+<span id="cb10-22">        <span class="cf">return</span> p<span class="op">;</span></span>
+<span id="cb10-23">    <span class="op">}</span></span>
+<span id="cb10-24"></span>
+<span id="cb10-25">restart<span class="op">:</span></span>
+<span id="cb10-26">    prev_balance<span class="op">(</span>rq<span class="op">,</span> rf<span class="op">);</span></span>
+<span id="cb10-27"></span>
+<span id="cb10-28">    for_each_active_class<span class="op">(</span>class<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-29">        p <span class="op">=</span> class<span class="op">-&gt;</span>pick_task<span class="op">(</span>rq<span class="op">,</span> rf<span class="op">);</span></span>
+<span id="cb10-30">        <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>p <span class="op">==</span> RETRY_TASK<span class="op">))</span></span>
+<span id="cb10-31">            <span class="cf">goto</span> restart<span class="op">;</span></span>
+<span id="cb10-32">        <span class="cf">if</span> <span class="op">(</span>p<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-33">            put_prev_set_next_task<span class="op">(</span>rq<span class="op">,</span> rq<span class="op">-&gt;</span>donor<span class="op">,</span> p<span class="op">);</span></span>
+<span id="cb10-34">            <span class="cf">return</span> p<span class="op">;</span></span>
+<span id="cb10-35">        <span class="op">}</span></span>
+<span id="cb10-36">    <span class="op">}</span></span>
+<span id="cb10-37"></span>
+<span id="cb10-38">    BUG<span class="op">();</span> <span class="co">/* The idle class should always have a runnable task. */</span></span>
+<span id="cb10-39"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li><strong>빠른 길.</strong> 런큐의 실행 가능한 태스크 수(<code>nr_running</code>)가 fair 클래스의 태스크 수(<code>cfs.h_nr_queued</code>)와 같으면, 다른 클래스에는 태스크가 없다는 뜻입니다. 그러면 클래스를 차례로 돌지 않고 fair 클래스에 바로 묻습니다. 대부분의 시스템이 대부분의 시간에 이 길로 갑니다. 다만 방금까지 돌던 태스크가 fair보다 높은 클래스였다면 이 길을 쓰지 않습니다. 그 클래스가 다른 CPU에서 일거리를 끌어올 기회(<code>prev_balance()</code>)를 줘야 하기 때문입니다.</li>
+<li><strong>일반적인 길.</strong> 높은 클래스부터 <code>pick_task()</code>를 부르고, 처음으로 태스크를 내놓는 클래스에서 멈춥니다. 그림 4-2의 순회입니다. <code>for_each_active_class</code>는 ext 클래스가 꺼져 있으면 건너뛰고, ext가 일반 태스크를 전부 맡았으면 fair를 건너뜁니다.</li>
+<li><strong><code>BUG()</code>.</strong> 반복문이 끝까지 가는 일은 없습니다. idle 클래스의 <code>pick_task_idle()</code>은 언제나 <code>rq-&gt;idle</code>을 돌려주기 때문입니다. "돌릴 태스크가 없다"는 경우를 따로 처리하는 대신, 아무것도 하지 않는 태스크를 하나 둔 것입니다.</li>
+</ul>
+<p>고른 뒤에는 <code>put_prev_set_next_task()</code>가 이전 태스크의 클래스에 <code>put_prev_task()</code>를, 새 태스크의 클래스에 <code>set_next_task()</code>를 불러 각자의 장부를 정리하게 합니다.</p>
+</section>
+<section class="level2" id="context-switch">
+<h2><span class="sec-n">4.8</span>컨텍스트 스위치<a aria-label="이 절의 링크" class="anchor" href="#context-switch">#</a></h2>
+<p><strong>컨텍스트 스위치</strong>(context switch)는 CPU가 실행하는 태스크를 바꾸는 일입니다. 바꿔야 하는 것은 둘입니다. <strong>주소 공간</strong>과 <strong>CPU 상태</strong>(레지스터와 스택)입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L5474" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="5474" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1">context_switch<span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>prev<span class="op">,</span></span>
+<span id="cb11-2">           <span class="kw">struct</span> task_struct <span class="op">*</span>next<span class="op">,</span> <span class="kw">struct</span> rq_flags <span class="op">*</span>rf<span class="op">)</span></span>
+<span id="cb11-3">    __releases<span class="op">(</span>__rq_lockp<span class="op">(</span>rq<span class="op">))</span></span>
+<span id="cb11-4"><span class="op">{</span></span>
+<span id="cb11-5">    <span class="co">/* ... */</span></span>
+<span id="cb11-6">    <span class="cf">if</span> <span class="op">(!</span>next<span class="op">-&gt;</span>mm<span class="op">)</span> <span class="op">{</span>                <span class="co">// to kernel</span></span>
+<span id="cb11-7">        enter_lazy_tlb<span class="op">(</span>prev<span class="op">-&gt;</span>active_mm<span class="op">,</span> next<span class="op">);</span></span>
+<span id="cb11-8"></span>
+<span id="cb11-9">        next<span class="op">-&gt;</span>active_mm <span class="op">=</span> prev<span class="op">-&gt;</span>active_mm<span class="op">;</span></span>
+<span id="cb11-10">        <span class="cf">if</span> <span class="op">(</span>prev<span class="op">-&gt;</span>mm<span class="op">)</span>               <span class="co">// from user</span></span>
+<span id="cb11-11">            mmgrab_lazy_tlb<span class="op">(</span>prev<span class="op">-&gt;</span>active_mm<span class="op">);</span></span>
+<span id="cb11-12">        <span class="cf">else</span></span>
+<span id="cb11-13">            prev<span class="op">-&gt;</span>active_mm <span class="op">=</span> NULL<span class="op">;</span></span>
+<span id="cb11-14">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>                    <span class="co">// to user</span></span>
+<span id="cb11-15">        <span class="co">/* ... */</span></span>
+<span id="cb11-16">        switch_mm_irqs_off<span class="op">(</span>prev<span class="op">-&gt;</span>active_mm<span class="op">,</span> next<span class="op">-&gt;</span>mm<span class="op">,</span> next<span class="op">);</span></span>
+<span id="cb11-17">        <span class="co">/* ... */</span></span>
+<span id="cb11-18">    <span class="op">}</span></span>
+<span id="cb11-19">    <span class="co">/* ... */</span></span>
+<span id="cb11-20">    prepare_lock_switch<span class="op">(</span>rq<span class="op">,</span> next<span class="op">,</span> rf<span class="op">);</span></span>
+<span id="cb11-21"></span>
+<span id="cb11-22">    <span class="co">/* Here we just switch the register state and the stack. */</span></span>
+<span id="cb11-23">    switch_to<span class="op">(</span>prev<span class="op">,</span> next<span class="op">,</span> prev<span class="op">);</span></span>
+<span id="cb11-24">    barrier<span class="op">();</span></span>
+<span id="cb11-25"></span>
+<span id="cb11-26">    <span class="cf">return</span> finish_task_switch<span class="op">(</span>prev<span class="op">);</span></span>
+<span id="cb11-27"><span class="op">}</span></span></code></pre></div></div>
+<section class="level3" id="주소-공간">
+<h3>주소 공간</h3>
+<p><code>next-&gt;mm</code>이 <code>NULL</code>이면 커널 스레드입니다. 커널 스레드는 유저 주소 공간이 없고, 커널 주소 공간은 모든 페이지 테이블에 똑같이 들어 있습니다. 그래서 페이지 테이블을 바꾸지 않고 <strong>직전 태스크의 것을 빌려 씁니다.</strong> <code>active_mm</code>이 빌린 주소 공간을 가리킵니다. TLB도 그대로 남으므로, 유저 태스크 → 커널 스레드 → 같은 유저 태스크로 돌아오는 흔한 경우에 주소 공간 전환이 한 번도 일어나지 않습니다. 이것을 <strong>lazy TLB</strong>라고 합니다.</p>
+<p><code>next</code>가 유저 태스크면 <code>switch_mm_irqs_off()</code>가 페이지 테이블 기준 레지스터(x86의 CR3)를 새 태스크의 것으로 바꿉니다. 페이지 테이블은 <a href="ch17.html">17장</a>에서 봅니다.</p>
+</section>
+<section class="level3" id="레지스터와-스택">
+<h3>레지스터와 스택</h3>
+<p><code>switch_to()</code>는 아키텍처마다 구현이 다릅니다. x86-64에서는 어셈블리 함수 <code>__switch_to_asm</code>을 부릅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/entry_64.S#L177" rel="noopener" target="_blank">arch/x86/entry/entry_64.S</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/entry/entry_64.S" data-line="177" id="cb12"><pre class="sourceCode asm"><code class="sourceCode fasm"><span id="cb12-1">SYM_FUNC_START<span class="op">(</span>__switch_to_asm<span class="op">)</span></span>
+<span id="cb12-2">    /* ... */</span>
+<span id="cb12-3">    pushq   <span class="op">%</span><span class="kw">rbp</span></span>
+<span id="cb12-4">    pushq   <span class="op">%</span><span class="kw">rbx</span></span>
+<span id="cb12-5">    pushq   <span class="op">%</span><span class="kw">r12</span></span>
+<span id="cb12-6">    pushq   <span class="op">%</span><span class="kw">r13</span></span>
+<span id="cb12-7">    pushq   <span class="op">%</span><span class="kw">r14</span></span>
+<span id="cb12-8">    pushq   <span class="op">%</span><span class="kw">r15</span></span>
+<span id="cb12-9"></span>
+<span id="cb12-10">    /* switch stack <span class="op">*/</span></span>
+<span id="cb12-11">    <span class="bu">movq</span>    <span class="op">%</span><span class="kw">rsp</span><span class="op">,</span> TASK_threadsp<span class="op">(%</span><span class="kw">rdi</span><span class="op">)</span></span>
+<span id="cb12-12">    <span class="bu">movq</span>    TASK_threadsp<span class="op">(%</span><span class="kw">rsi</span><span class="op">),</span> <span class="op">%</span><span class="kw">rsp</span></span>
+<span id="cb12-13">    /* ... */</span>
+<span id="cb12-14">    /* <span class="pp">restore</span> callee<span class="op">-</span>saved registers <span class="op">*/</span></span>
+<span id="cb12-15">    popq    <span class="op">%</span><span class="kw">r15</span></span>
+<span id="cb12-16">    popq    <span class="op">%</span><span class="kw">r14</span></span>
+<span id="cb12-17">    popq    <span class="op">%</span><span class="kw">r13</span></span>
+<span id="cb12-18">    popq    <span class="op">%</span><span class="kw">r12</span></span>
+<span id="cb12-19">    popq    <span class="op">%</span><span class="kw">rbx</span></span>
+<span id="cb12-20">    popq    <span class="op">%</span><span class="kw">rbp</span></span>
+<span id="cb12-21"></span>
+<span id="cb12-22">    <span class="cf">jmp</span> __switch_to</span>
+<span id="cb12-23">SYM_FUNC_END<span class="op">(</span>__switch_to_asm<span class="op">)</span></span></code></pre></div></div>
+<p>앞의 <code>pushq</code> 여섯 줄이 저장하는 것은 호출 규약에서 callee-saved로 정한 레지스터입니다. 핵심은 가운데 두 줄입니다. 지금 스택 포인터를 <code>prev-&gt;thread.sp</code>에 저장하고, <code>next-&gt;thread.sp</code>를 스택 포인터에 넣습니다. 이 두 명령어 사이에서 CPU가 딛고 선 커널 스택이 바뀝니다.</p>
+<figure class="fig" id="fig-switch-stacks"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 396" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>x86-64의 __switch_to_asm: callee-saved 레지스터 여섯 개를 prev의 커널 스택에 넣고, 스택 포인터를 prev의 thread.sp에 저장한 뒤 next의 thread.sp를 읽어 오고, next의 스택에서 여섯 개를 꺼낸다.</title>
+
+  <!-- prev의 스택 -->
+  <text class="t-b" x="20" y="28">prev의 커널 스택</text>
+  <rect class="box blue" x="20" y="40" width="240" height="44" rx="6"/>
+  <text class="t-mono" x="32" y="60">pt_regs</text>
+  <text class="t-xs" x="32" y="76">커널에 들어올 때 저장한 유저 레지스터</text>
+  <rect class="box" x="20" y="84" width="240" height="48" rx="6"/>
+  <text class="t-s t-ink" x="32" y="104">함수 호출 프레임들</text>
+  <text class="t-code" x="32" y="122">… → context_switch()</text>
+  <rect class="box yellow" x="20" y="132" width="240" height="30" rx="6"/>
+  <text class="t-s t-ink" x="32" y="152">복귀 주소</text>
+  <text class="t-xs end" x="248" y="152">call이 넣었다</text>
+  <rect class="box warm" x="20" y="162" width="240" height="34" rx="6"/>
+  <text class="t-code mid" x="140" y="184">rbp rbx r12 r13 r14 r15</text>
+  <path class="ln thin muted" d="M140 196 V220" marker-start="url(#ah-muted)"/>
+  <rect class="box code" x="60" y="222" width="160" height="28" rx="6"/>
+  <text class="t-code mid" x="140" y="241">prev->thread.sp</text>
+
+  <!-- next의 스택 -->
+  <text class="t-b end" x="740" y="28">next의 커널 스택</text>
+  <rect class="box blue" x="500" y="40" width="240" height="44" rx="6"/>
+  <text class="t-mono" x="512" y="60">pt_regs</text>
+  <text class="t-xs" x="512" y="76">next가 커널에 들어올 때 저장한 것</text>
+  <rect class="box" x="500" y="84" width="240" height="48" rx="6"/>
+  <text class="t-s t-ink" x="512" y="104">함수 호출 프레임들</text>
+  <text class="t-code" x="512" y="122">… → context_switch()</text>
+  <rect class="box yellow" x="500" y="132" width="240" height="30" rx="6"/>
+  <text class="t-s t-ink" x="512" y="152">복귀 주소</text>
+  <text class="t-xs end" x="728" y="152">⑤가 여기로 돌아간다</text>
+  <rect class="box warm" x="500" y="162" width="240" height="34" rx="6"/>
+  <text class="t-code mid" x="620" y="184">rbp rbx r12 r13 r14 r15</text>
+  <path class="ln thin muted" d="M620 196 V220" marker-start="url(#ah-muted)"/>
+  <rect class="box code" x="540" y="222" width="160" height="28" rx="6"/>
+  <text class="t-code mid" x="620" y="241">next->thread.sp</text>
+
+  <!-- CPU -->
+  <rect class="box gray" x="310" y="150" width="140" height="58" rx="10"/>
+  <use href="#i-chip" x="320" y="163" width="32" height="32" class="ic gray"/>
+  <text class="t-b" x="360" y="174">CPU</text>
+  <text class="t-mono" x="360" y="194">%rsp</text>
+
+  <path class="ln warm" d="M310 179 H266" marker-end="url(#ah-warm)"/>
+  <text class="t-xs mid" x="286" y="170">① push</text>
+  <path class="ln" d="M340 208 V236 H226" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="280" y="254">② 저장</text>
+  <path class="ln green" d="M540 236 H420 V214" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="480" y="254">③ 읽어 옴</text>
+  <path class="ln warm" d="M500 179 H456" marker-end="url(#ah-warm)"/>
+  <text class="t-xs mid" x="476" y="170">④ pop</text>
+
+  <text class="t-xs mid" x="380" y="60">스택은 아래로 자란다.</text>
+  <text class="t-xs mid" x="380" y="78">thread.sp는 마지막에</text>
+  <text class="t-xs mid" x="380" y="96">넣은 r15를 가리킨다.</text>
+
+  <!-- 순서 -->
+  <path class="ln thin muted" d="M20 274 H740"/>
+  <text class="t-code" x="20" y="298">① pushq × 6</text>
+  <text class="t-s" x="250" y="298">callee-saved 레지스터를 prev의 스택에 넣는다</text>
+  <text class="t-code" x="20" y="320">② movq %rsp, prev->thread.sp</text>
+  <text class="t-s" x="250" y="320">prev의 스택 꼭대기 위치를 적어 둔다</text>
+  <text class="t-code t-b" x="20" y="342">③ movq next->thread.sp, %rsp</text>
+  <text class="t-s t-ink t-b" x="250" y="342">이 명령어를 경계로 CPU가 딛는 스택이 바뀐다</text>
+  <text class="t-code" x="20" y="364">④ popq × 6</text>
+  <text class="t-s" x="250" y="364">next가 예전에 CPU를 내줄 때 넣어 둔 값을 꺼낸다</text>
+  <text class="t-code" x="20" y="386">⑤ jmp __switch_to … ret</text>
+  <text class="t-s" x="250" y="386">next의 스택에 있는 복귀 주소로 돌아간다</text>
+</svg></div><figcaption><b>그림 4-7</b><code>__switch_to_asm</code>은 레지스터 여섯 개를 <code>prev</code>의 커널 스택에 밀어 넣고, 스택 포인터를 <code>next</code>의 스택으로 옮긴 뒤, 거기 저장되어 있던 여섯 개를 꺼냅니다. <code>next</code>의 스택에 있는 값은 <code>next</code>가 예전에 CPU를 내줄 때 넣어 둔 것입니다.</figcaption></figure>
+<p>저장하는 레지스터가 여섯 개뿐인 이유가 있습니다.</p>
+<ul>
+<li><code>__switch_to_asm</code>은 C 코드에서 <strong>보통의 함수 호출</strong>로 불립니다. 호출 규약에 따라 나머지 레지스터는 호출한 쪽이 이미 챙겼습니다. 호출된 함수가 보존할 책임이 있는 레지스터(callee-saved)만 저장하면 됩니다.</li>
+<li>유저 모드의 레지스터는 이 태스크가 커널에 들어올 때 커널 스택 맨 위의 <code>pt_regs</code>에 이미 저장되었습니다(<a href="ch19.html">19장</a>).</li>
+<li>복귀 주소도 따로 저장하지 않습니다. <code>call</code> 명령어가 스택에 넣어 두었습니다.</li>
+</ul>
+<p>그래서 전환의 직접 비용은 작습니다. 큰 것은 간접 비용입니다. 새 태스크의 데이터는 캐시에 없고, 주소 공간이 바뀌면 TLB도 다시 채워야 합니다.</p>
+<p>마지막 줄은 <code>call</code>이 아니라 <code>jmp</code>입니다. <code>__switch_to()</code>가 <code>ret</code>을 실행하면 <strong>새 스택에 있는 복귀 주소</strong>로 돌아갑니다. 그 주소는 <code>next</code>가 예전에 <code>__switch_to_asm</code>을 부른 바로 다음 줄입니다. <code>next</code>의 입장에서는 오래전에 부른 함수가 이제야 반환된 것입니다.</p>
+<p><code>__switch_to()</code>(<code>arch/x86/kernel/process_64.c</code>)는 스택에 담기지 않는 CPU 상태를 바꿉니다.</p>
+<ul>
+<li><code>switch_fpu()</code>는 <code>prev</code>의 부동소수점·벡터 레지스터를 메모리에 저장하고 <code>TIF_NEED_FPU_LOAD</code> 플래그를 세웁니다. <code>next</code>의 것은 여기서 복원하지 않고, <code>next</code>가 유저 모드로 돌아가기 직전에야 복원합니다. 커널 안에서만 돌다가 다시 전환되는 태스크는 복원 비용을 치르지 않습니다.</li>
+<li>스레드 로컬 저장소가 쓰는 FS·GS 베이스를 바꿉니다.</li>
+<li>CPU별 변수 <code>current_task</code>에 <code>next</code>를 씁니다. <code>current</code> 매크로가 읽는 변수이므로, 이 줄부터 <code>current</code>가 <code>next</code>를 가리킵니다(<a href="ch02.html">2장</a>).</li>
+<li>끝에서 <code>prev_p</code>를 반환합니다. 이 값이 뒤에서 쓰입니다.</li>
+</ul>
+</section>
+<section class="level3" id="세-번째-태스크">
+<h3>세 번째 태스크</h3>
+<p><code>switch_to(prev, next, prev)</code>는 인자가 셋입니다. x86에서 <code>switch_to(prev, next, last)</code>는 <code>last = __switch_to_asm(prev, next)</code>로 펼쳐지는 매크로입니다(<code>arch/x86/include/asm/switch_to.h</code>). 반환값을 세 번째 인자에 넣는데, <code>context_switch()</code>는 그 자리에 <code>prev</code>를 넘겼습니다. 즉 <strong>스위치에서 돌아오면 지역 변수 <code>prev</code>가 덮어써집니다.</strong> 왜 그래야 할까요.</p>
+<figure class="fig" id="fig-switch-last"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>태스크 A가 B로 전환했다가 나중에 C에서 전환되어 다시 실행된다. A의 스택에 남은 prev는 A지만 방금 CPU를 내준 태스크는 C이고, 그 값은 __switch_to의 반환값으로 전달된다.</title>
+
+  <text class="t-code mid" x="250" y="24">context_switch(rq, A, B)</text>
+  <text class="t-code mid" x="580" y="24">context_switch(rq, C, A)</text>
+  <path class="ln thin muted dash" d="M250 30 V168"/>
+  <path class="ln thin muted dash" d="M580 30 V168"/>
+
+  <text class="t-s t-ink t-b" x="20" y="64">CPU</text>
+  <rect class="box blue" x="80" y="44" width="170" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="165" y="65">A 실행</text>
+  <rect class="box gray" x="250" y="44" width="140" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="320" y="65">B 실행</text>
+  <rect class="box gray" x="390" y="44" width="50" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="415" y="65">⋯</text>
+  <rect class="box purple" x="440" y="44" width="140" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="510" y="65">C 실행</text>
+  <rect class="box blue" x="580" y="44" width="160" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="660" y="65">A 실행</text>
+
+  <text class="t-s t-ink t-b" x="20" y="116">A의 스택</text>
+  <rect class="ghost blue dash" x="250" y="96" width="330" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="415" y="117">얼어 있다: prev = A, next = B</text>
+
+  <!-- 내주기 직전 -->
+  <rect class="box blue" x="80" y="172" width="250" height="124" rx="10"/>
+  <text class="t-b" x="94" y="196">A가 CPU를 내주기 직전</text>
+  <text class="t-code" x="94" y="220">prev = A</text>
+  <text class="t-code" x="94" y="240">next = B</text>
+  <text class="t-code" x="94" y="260">switch_to(prev, next, prev)</text>
+  <text class="t-xs" x="94" y="282">__switch_to_asm 안에서 멈춘다</text>
+
+  <!-- 다시 실행된 직후 -->
+  <rect class="box blue" x="410" y="172" width="330" height="124" rx="10"/>
+  <text class="t-b" x="424" y="196">A가 다시 실행된 직후</text>
+  <text class="t-code" x="424" y="220">스택의 prev = A</text>
+  <text class="t-xs end" x="728" y="220">옛 값. 쓸모가 없다</text>
+  <text class="t-code tc-purple" x="424" y="240">%rax = C</text>
+  <text class="t-xs end" x="728" y="240">__switch_to(C, A)의 반환값</text>
+  <text class="t-code t-b" x="424" y="260">prev = %rax</text>
+  <text class="t-xs end" x="728" y="260">매크로가 덮어쓴다</text>
+  <text class="t-code" x="424" y="282">finish_task_switch(C)</text>
+</svg></div><figcaption><b>그림 4-8</b>태스크 A가 B로 전환하며 잠들었다가, 나중에 C에서 전환되어 깨어납니다. A의 스택에 남아 있던 <code>prev</code>는 A 자신이지만, 방금 CPU를 내준 태스크는 C입니다.</figcaption></figure>
+<p>태스크 A가 <code>context_switch(rq, A, B)</code>를 불러 B로 넘어갔다고 합시다. A의 커널 스택에는 지역 변수 <code>prev = A</code>, <code>next = B</code>가 남은 채로 얼어붙습니다. 나중에 어떤 태스크 C가 <code>context_switch(rq, C, A)</code>를 부르면 A가 다시 실행됩니다. A는 자기 스택에서 깨어나므로 지역 변수는 예전 그대로입니다. 그런데 A가 뒷정리해 줘야 할 직전 태스크는 C이고, A의 스택에는 C에 대한 정보가 없습니다.</p>
+<p>그 정보를 실어 나르는 것이 반환값입니다. C가 부른 <code>__switch_to(C, A)</code>는 C를 반환합니다. 반환값은 레지스터(<code>%rax</code>)에 실리고, 레지스터는 스택이 바뀌어도 그대로입니다. A의 스택 위에서 실행이 재개될 때 <code>%rax</code>에는 C가 들어 있고, 매크로가 그 값을 <code>prev</code>에 넣습니다.</p>
+</section>
+<section class="level3" id="뒷정리">
+<h3>뒷정리</h3>
+<p><code>finish_task_switch(prev)</code>는 <strong>새 태스크의 스택 위에서</strong> 직전 태스크의 뒷정리를 합니다.</p>
+<ul>
+<li><code>prev-&gt;on_cpu</code>를 0으로 내립니다. 이 순간부터 <code>prev</code>는 다른 CPU에서 깨어나 실행될 수 있습니다. 스위치가 끝나기 전에 내리면 한 태스크가 두 CPU에서 같은 스택으로 실행됩니다.</li>
+<li><strong>런큐 락을 풉니다.</strong> 이 락은 <code>prev</code>가 <code>__schedule()</code>에서 잡은 것입니다. 잡은 태스크와 푸는 태스크가 다른, 커널에서 드문 경우입니다.</li>
+<li><code>prev</code>가 <code>TASK_DEAD</code>였다면 여기서 <code>task_struct</code>의 참조를 놓습니다. 죽는 태스크는 자기 스택 위에서 자기 스택을 해제할 수 없으므로, 마지막 정리는 다음 태스크가 대신 해 줍니다(<a href="ch03.html">3장</a>).</li>
+</ul>
+<p>갓 만들어진 태스크는 <code>__switch_to_asm</code>을 부른 적이 없습니다. 그래서 <code>fork</code> 때 커널이 새 태스크의 스택을 "마치 부른 적이 있는 것처럼" 꾸며 둡니다. 복귀 주소 자리에 <code>ret_from_fork_asm</code>을 넣어 두면, 첫 스위치의 <code>ret</code>이 그리로 가고, 거기서 <code>schedule_tail()</code>이 같은 <code>finish_task_switch()</code>를 부릅니다(<a href="ch01.html">1장</a>).</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p><strong>잠든 태스크는 모두 같은 자리에서 멈춰 있습니다.</strong> CPU를 쥐고 있지 않은 태스크는 예외 없이 <code>__switch_to_asm</code>의 스택 교체 지점에 서 있습니다. 시스템 콜에서 잠들었든, 인터럽트 복귀 길에 선점당했든, 방금 <code>fork</code>로 만들어졌든 같습니다. 그래서 스위치 코드는 "이 태스크가 어디서 멈췄나"를 구분하지 않고 20줄 남짓한 어셈블리 하나로 끝납니다. 태스크마다 다른 사정은 그 태스크의 커널 스택에 함수 호출 사슬로 쌓여 있고 <code>ret</code>이 차례로 풀어 줍니다. 경우의 수를 코드로 나열하는 대신 모든 경우를 한 가지 모양으로 만든 것입니다.</p>
+</div>
+</section>
+</section>
+<section class="level2" id="accounting">
+<h2><span class="sec-n">4.9</span>시간 장부<a aria-label="이 절의 링크" class="anchor" href="#accounting">#</a></h2>
+<p>스케줄러의 모든 판단은 "누가 얼마나 돌았나"에서 시작합니다. 그 장부의 바탕은 런큐가 가진 시계입니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>시계</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rq-&gt;clock</code></td>
+<td>이 CPU의 나노초 시계. <code>update_rq_clock()</code>이 갱신합니다.</td>
+</tr>
+<tr>
+<td><code>rq-&gt;clock_task</code></td>
+<td>위에서 인터럽트 처리 시간과 하이퍼바이저에 빼앗긴 시간을 뺀 것(해당 빌드 옵션이 켜져 있을 때). <strong>태스크가 실제로 일한 시간</strong>만 흐릅니다.</td>
+</tr>
+<tr>
+<td><code>rq-&gt;clock_pelt</code></td>
+<td>CPU의 속도에 맞춰 늘이고 줄인 것. 부하 추적(PELT)이 씁니다(<a href="ch07.html">7장</a>).</td>
+</tr>
+</tbody>
+</table></div>
+<p>시계는 저절로 흐르지 않습니다. <code>__schedule()</code>과 <code>sched_tick()</code>의 앞머리에 있던 <code>update_rq_clock()</code>처럼, 런큐 락을 잡은 코드가 명시적으로 갱신합니다. 한 번의 락 구간 안의 모든 계산은 같은 "지금"을 씁니다.</p>
+<p>태스크의 실행 시간은 이 시계의 차이로 잽니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L1406" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="1406" id="cb13"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1"><span class="dt">static</span> s64 update_se<span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> sched_entity <span class="op">*</span>se<span class="op">)</span></span>
+<span id="cb13-2"><span class="op">{</span></span>
+<span id="cb13-3">    u64 now <span class="op">=</span> rq_clock_task<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb13-4">    s64 delta_exec<span class="op">;</span></span>
+<span id="cb13-5"></span>
+<span id="cb13-6">    delta_exec <span class="op">=</span> now <span class="op">-</span> se<span class="op">-&gt;</span>exec_start<span class="op">;</span></span>
+<span id="cb13-7">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>delta_exec <span class="op">&lt;=</span> <span class="dv">0</span><span class="op">))</span></span>
+<span id="cb13-8">        <span class="cf">return</span> delta_exec<span class="op">;</span></span>
+<span id="cb13-9"></span>
+<span id="cb13-10">    se<span class="op">-&gt;</span>exec_start <span class="op">=</span> now<span class="op">;</span></span>
+<span id="cb13-11">    <span class="cf">if</span> <span class="op">(</span>entity_is_task<span class="op">(</span>se<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb13-12">        <span class="kw">struct</span> task_struct <span class="op">*</span>running <span class="op">=</span> rq<span class="op">-&gt;</span>curr<span class="op">;</span></span>
+<span id="cb13-13">        <span class="co">/* ... */</span></span>
+<span id="cb13-14">        running<span class="op">-&gt;</span>se<span class="op">.</span>sum_exec_runtime <span class="op">+=</span> delta_exec<span class="op">;</span></span>
+<span id="cb13-15">        <span class="co">/* ... */</span></span>
+<span id="cb13-16">    <span class="op">}</span></span>
+<span id="cb13-17">    <span class="co">/* ... */</span></span>
+<span id="cb13-18">    <span class="cf">return</span> delta_exec<span class="op">;</span></span>
+<span id="cb13-19"><span class="op">}</span></span></code></pre></div></div>
+<p><code>exec_start</code>는 "마지막으로 장부를 적은 시각"입니다. 지금 시각과의 차이를 <code>sum_exec_runtime</code>에 더합니다. 이 계산은 틱마다, 그리고 태스크가 큐에 들어가고 나갈 때마다 일어나므로, 틱 사이에 태스크가 여러 번 바뀌어도 각자 돈 시간이 나노초 단위로 나뉩니다.</p>
+<p><code>clock_gettime(CLOCK_THREAD_CPUTIME_ID)</code>가 돌려주는 값이 <code>sum_exec_runtime</code>입니다. 각 클래스는 <code>delta_exec</code>을 받아 자기 방식으로 가공합니다. fair 클래스는 가중치로 나눠 <code>vruntime</code>에 더하고, deadline 클래스는 남은 실행 예산에서 뺍니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>태스크 하나의 장부를 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ cat /proc/self/sched
+cat (5321, #threads: 1)
+-------------------------------------------------------------------
+se.vruntime                                  :          1203.456789
+se.sum_exec_runtime                          :             0.812345
+...
+nr_voluntary_switches                        :                    0
+nr_involuntary_switches                      :                    1</code></pre></div>
+<p>단위는 밀리초입니다. <code>/proc/PID/schedstat</code>은 실행 시간을 나노초로, 런큐에서 기다린 시간과 함께 보여 줍니다.</p>
+<p>시스템 전체의 컨텍스트 스위치는 <code>vmstat 1</code>의 <code>cs</code> 열로, 누가 누구로 바뀌는지는 <code>__schedule()</code>에 있던 <code>sched_switch</code> 트레이스포인트로 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># bpftrace -e 'tracepoint:sched:sched_switch { @[args-&gt;prev_comm, args-&gt;next_comm] = count(); }'
+# perf sched record -- sleep 5 &amp;&amp; perf sched latency</code></pre></div>
+<p><code>perf sched latency</code>는 태스크별로 깨어나서 CPU를 받을 때까지 기다린 시간을 보여 줍니다. CPU별 런큐의 현재 상태는 <code>/sys/kernel/debug/sched/debug</code>에 있습니다. CPU마다 <code>.nr_running</code>, <code>.nr_switches</code>, <code>.curr-&gt;pid</code>와 클래스별 하위 큐, 실행 가능한 태스크 목록이 나옵니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.5 · 2002</dt>
+<dd>
+O(1) 스케줄러. 전역 런큐 하나와 락 하나를 CPU별 런큐와 CPU별 락으로 바꿉니다.
+</dd>
+<dt>2.6.23 · 2007</dt>
+<dd>
+CFS와 함께 스케줄링 클래스가 들어옵니다. 뼈대와 정책이 <code>struct sched_class</code>를 경계로 나뉩니다.
+</dd>
+<dt>3.14 · 2014</dt>
+<dd>
+<code>SCHED_DEADLINE</code>과 deadline 클래스.
+</dd>
+<dt>6.10 · 2024</dt>
+<dd>
+<code>scheduler_tick()</code>이 <code>sched_tick()</code>으로, 부하 분산 함수들이 <code>sched_balance_*</code>로 이름이 바뀝니다.
+</dd>
+<dt>6.12 · 2024</dt>
+<dd>
+<code>SCHED_EXT</code>와 ext 클래스(sched_ext). BPF 프로그램이 스케줄링 클래스를 구현합니다.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>스케줄러는 뼈대(<code>core.c</code>)와 정책(스케줄링 클래스)으로 나뉩니다. 뼈대는 언제, 어떻게 바꿀지를 맡고 클래스는 누구를 고를지를 맡습니다.</li>
+<li>런큐 <code>struct rq</code>는 CPU마다 하나이고, 그 안에 클래스별 하위 큐가 따로 있습니다. 런큐를 고치려면 런큐 락을 쥡니다.</li>
+<li>클래스는 stop, deadline, rt, fair, ext, idle 여섯 개입니다. 순서는 링커 스크립트가 정하고, 높은 클래스에 태스크가 있으면 낮은 클래스는 돌지 못합니다.</li>
+<li>유저 공간은 정책(<code>SCHED_*</code>)을 고르고 커널이 클래스로 옮깁니다. 커널 안의 <code>prio</code>는 작을수록 높고, −1은 deadline, 0–99는 RT, 100–139는 nice −20…19입니다.</li>
+<li>틱(<code>sched_tick()</code>)은 장부를 갱신하고 플래그를 세울 뿐입니다. 태스크를 바꾸는 것은 <code>__schedule()</code>입니다.</li>
+<li><code>__schedule()</code>은 런큐 락을 잡고, 잠드는 태스크를 큐에서 빼고, 클래스에 다음 태스크를 묻고, 다르면 컨텍스트 스위치를 합니다.</li>
+<li>컨텍스트 스위치는 주소 공간 전환과 커널 스택 전환입니다. x86-64에서 직접 저장하는 것은 callee-saved 레지스터 여섯 개와 스택 포인터입니다. 잠든 태스크는 모두 <code>__switch_to_asm</code> 안의 같은 자리에 멈춰 있고, 깨어난 태스크가 직전 태스크의 뒷정리를 합니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p><code>SCHED_FIFO</code> 우선순위 50인 태스크 하나가 CPU 0에서 무한 반복문을 돌고 있습니다. 같은 CPU의 nice −20 일반 태스크는 <code>__pick_next_task()</code>에서 왜 선택되지 않습니까? 빠른 길과 일반적인 길 가운데 어느 쪽으로 갑니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>런큐에 RT 태스크가 있으므로 <code>rq-&gt;nr_running</code>이 <code>rq-&gt;cfs.h_nr_queued</code>보다 큽니다. 빠른 길의 조건이 거짓이 되어 일반적인 길로 갑니다. 클래스 순회는 stop, deadline, rt 순서로 <code>pick_task()</code>를 부르고, rt 클래스가 FIFO 태스크를 내놓는 순간 반환합니다. nice 값은 fair 클래스 안에서만 뜻이 있습니다. (실제로는 <code>fair_server</code>가 일반 태스크에 최소한의 시간을 보장합니다. 5장.)</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>태스크가 <code>set_current_state(TASK_INTERRUPTIBLE)</code>을 한 직후 인터럽트가 와서 선점당했습니다. <code>__schedule()</code>은 이 태스크를 런큐에서 뺍니까? 코드의 어느 조건이 그것을 정합니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>빼지 않습니다. 인터럽트 복귀 길의 선점은 <code>__schedule(SM_PREEMPT)</code>로 들어오므로 <code>preempt</code>가 참입니다. 큐에서 빼는 <code>try_to_block_task()</code>는 <code>!preempt &amp;&amp; prev_state</code>일 때만 불립니다. 태스크는 상태가 <code>TASK_INTERRUPTIBLE</code>인 채로 런큐에 남고, 다시 실행되면 하려던 조건 확인과 <code>schedule()</code> 호출을 이어서 합니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>__switch_to_asm</code>이 <code>%rax</code>, <code>%rcx</code>, <code>%rdx</code> 같은 레지스터를 저장하지 않아도 되는 이유는 무엇입니까? 유저 모드에서 쓰던 <code>%rax</code>는 어디에 있습니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>__switch_to_asm</code>은 C 코드에서 보통의 함수로 호출됩니다. 호출 규약에서 <code>%rax</code>, <code>%rcx</code>, <code>%rdx</code> 등은 호출한 쪽이 보존할 책임이 있으므로 컴파일러가 이미 챙겼습니다. 호출된 함수가 책임지는 <code>%rbp</code>, <code>%rbx</code>, <code>%r12</code>–<code>%r15</code>만 저장하면 됩니다. 유저 모드의 <code>%rax</code>는 이 태스크가 커널에 들어올 때 커널 스택 맨 위의 <code>pt_regs</code>에 저장되었습니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>context_switch()</code>의 마지막 줄 <code>finish_task_switch(prev)</code>에서 <code>prev</code>는 이 함수가 인자로 받은 그 <code>prev</code>입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>아닐 수 있습니다. <code>switch_to(prev, next, prev)</code>는 <code>__switch_to_asm</code>의 반환값을 <code>prev</code>에 대입합니다. 이 태스크가 다시 실행될 때 반환값 레지스터에는 방금 이 태스크로 전환해 준 태스크가 들어 있으므로, 스위치 뒤의 <code>prev</code>는 CPU를 넘겨준 상대입니다. <code>finish_task_switch()</code>는 그 태스크의 <code>on_cpu</code>를 내리고, 그 태스크가 잡아 둔 런큐 락을 풉니다.</p>
+</div></details></div></div>
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>런큐<small>runqueue</small></dt>
+<dd>
+한 CPU에서 실행 가능한 태스크를 담는 자료구조. <code>struct rq</code>이고 CPU마다 하나다.
+</dd>
+<dt>스케줄링 클래스<small>scheduling class</small></dt>
+<dd>
+스케줄링 정책 하나를 구현한 함수 포인터 표. <code>struct sched_class</code>.
+</dd>
+<dt>스케줄링 정책<small>scheduling policy</small></dt>
+<dd>
+유저 공간이 태스크에 지정하는 <code>SCHED_NORMAL</code>, <code>SCHED_FIFO</code> 같은 값. 커널이 클래스로 옮긴다.
+</dd>
+<dt>prio</dt>
+<dd>
+스케줄러가 쓰는 태스크의 우선순위. 작을수록 높다. 0–99는 RT, 100–139는 일반 태스크.
+</dd>
+<dt>틱<small>tick</small></dt>
+<dd>
+주기적인 타이머 인터럽트. 스케줄러에서는 <code>sched_tick()</code>을 부른다.
+</dd>
+<dt>컨텍스트 스위치<small>context switch</small></dt>
+<dd>
+CPU가 실행하는 태스크를 바꾸는 일. 주소 공간, 커널 스택, 레지스터를 바꾼다.
+</dd>
+<dt>rq-&gt;curr, rq-&gt;donor</dt>
+<dd>
+이 CPU에서 지금 실행 중인 태스크와, 스케줄러가 돌 차례라고 뽑은 태스크. 프록시 실행이 아니면 같다.
+</dd>
+<dt>lazy TLB</dt>
+<dd>
+커널 스레드로 전환할 때 페이지 테이블을 바꾸지 않고 직전 태스크의 것을 빌려 쓰는 최적화.
+</dd>
+<dt>자발적 전환<small>voluntary context switch</small></dt>
+<dd>
+태스크가 스스로 잠들어 일어난 전환. <code>nvcsw</code>로 센다. 그 밖의 전환은 <code>nivcsw</code>.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/scheduler/sched-design-CFS.html" rel="noopener" target="_blank"><code>Documentation/scheduler/sched-design-CFS.rst</code></a>: 스케줄링 클래스가 처음 들어올 때의 설계 설명. 5절이 클래스 콜백을 다룹니다.</li>
+<li><a href="https://docs.kernel.org/scheduler/sched-debug.html" rel="noopener" target="_blank"><code>Documentation/scheduler/sched-debug.rst</code></a>: <code>/sys/kernel/debug/sched/</code> 아래 파일들.</li>
+<li><a href="https://man7.org/linux/man-pages/man7/sched.7.html" rel="noopener" target="_blank"><code>sched(7)</code></a>: 유저 공간에서 본 정책과 우선순위.</li>
+<li><a href="https://man7.org/linux/man-pages/man2/sched_setattr.2.html" rel="noopener" target="_blank"><code>sched_setattr(2)</code></a>: 정책과 매개변수를 정하는 시스템 콜.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch03.html"><small>← 3장</small><b>태스크의 상태와 대기</b></a><a class="next" href="ch05.html"><small>5장 →</small><b>CFS에서 EEVDF로</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#core-and-policy">뼈대와 정책</a><a href="#rq">런큐: CPU마다 하나</a><a href="#sched-class">스케줄링 클래스</a><a href="#policy-prio">정책과 우선순위</a><a href="#tick">틱: 주기적 스케줄러</a><a href="#schedule">__schedule(): 주 스케줄러</a><a href="#pick">다음 태스크 고르기</a><a href="#context-switch">컨텍스트 스위치</a><a href="#accounting">시간 장부</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

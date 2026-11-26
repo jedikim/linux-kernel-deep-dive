@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 326" xmlns="http://www.w3.org/2000/svg">
+  <title>container_of의 주소 계산: struct kvm_vcpu 안의 preempt_notifier 멤버를 가리키는 포인터에서 그 멤버의 오프셋 8을 빼면 바깥 구조체의 시작 주소가 나온다.</title>
+
+  <text class="t-s t-ink t-b" x="20" y="28">메모리 위의 struct kvm_vcpu 하나</text>
+
+  <!-- 주소 눈금 -->
+  <text class="t-code tc-muted mid" x="60" y="62">…1000</text>
+  <text class="t-code tc-muted mid" x="180" y="62">…1008</text>
+  <path class="ln thin muted" d="M60 68 V78"/>
+  <path class="ln thin muted" d="M180 68 V78"/>
+
+  <!-- 구조체 -->
+  <rect class="box gray" x="60" y="80" width="120" height="52"/>
+  <text class="t-code mid" x="120" y="102">kvm</text>
+  <text class="t-xs mid" x="120" y="120">포인터 8바이트</text>
+  <rect class="box blue" x="180" y="80" width="250" height="52"/>
+  <text class="t-code t-b mid" x="305" y="102">preempt_notifier</text>
+  <text class="t-xs mid" x="305" y="120">안에 넣은 공통 구조체</text>
+  <rect class="box gray" x="430" y="80" width="80" height="52"/>
+  <text class="t-code mid" x="470" y="110">cpu</text>
+  <rect class="box gray" x="510" y="80" width="90" height="52"/>
+  <text class="t-code mid" x="555" y="110">vcpu_id</text>
+  <rect class="box gray" x="600" y="80" width="100" height="52"/>
+  <text class="t-s mid" x="650" y="110">⋯</text>
+
+  <!-- 오프셋 -->
+  <path class="ln thin warm" d="M60 146 H180"/>
+  <path class="ln thin warm" d="M60 140 V152"/>
+  <path class="ln thin warm" d="M180 140 V152"/>
+  <text class="t-xs tc-warm mid" x="120" y="166">offsetof = 8</text>
+
+  <!-- 포인터 둘 -->
+  <path class="ln blue" d="M305 200 V176 H184 V136" marker-end="url(#ah-blue)"/>
+  <rect class="box blue" x="210" y="200" width="250" height="40" rx="8"/>
+  <text class="t-s t-ink" x="222" y="225">스케줄러가 건넨 포인터</text>
+  <text class="t-mono t-b end" x="448" y="225">pn</text>
+
+  <path class="ln green" d="M40 200 V106 H56" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="20" y="200" width="170" height="40" rx="8"/>
+  <text class="t-s t-ink" x="32" y="225">KVM이 원하는 것</text>
+  <text class="t-mono t-b end" x="178" y="225">vcpu</text>
+
+  <rect class="box code" x="20" y="256" width="720" height="56" rx="8"/>
+  <text class="t-code" x="34" y="279">vcpu = (struct kvm_vcpu *)((void *)pn - offsetof(struct kvm_vcpu, preempt_notifier))</text>
+  <text class="t-xs" x="34" y="299">숫자로는 …1008 − 8 = …1000. 오프셋은 컴파일할 때 정해지는 상수라서 실행 비용은 뺄셈 한 번이다</text>
+</svg>

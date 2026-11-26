@@ -1,0 +1,45 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>참조 카운트의 일생: 객체를 만든 코드, 해시 테이블, 잠깐 조회한 스레드가 각각 참조를 쥐었다 놓는 동안 카운트가 1, 2, 3, 2, 1을 거쳐 0이 되고, 0이 되는 순간 release 함수가 객체를 해제한다.</title>
+
+  <!-- 사건 -->
+  <text class="t-code mid" x="150" y="24">kref_init</text>
+  <text class="t-code mid" x="250" y="24">get</text>
+  <text class="t-code mid" x="350" y="24">get</text>
+  <text class="t-code mid" x="450" y="24">put</text>
+  <text class="t-code mid" x="550" y="24">put</text>
+  <text class="t-code mid" x="650" y="24">put</text>
+  <path class="ln thin muted dash" d="M150 30 V236"/>
+  <path class="ln thin muted dash" d="M250 30 V236"/>
+  <path class="ln thin muted dash" d="M350 30 V236"/>
+  <path class="ln thin muted dash" d="M450 30 V236"/>
+  <path class="ln thin muted dash" d="M550 30 V236"/>
+  <path class="ln thin muted dash" d="M650 30 V214"/>
+
+  <!-- 누가 쥐고 있나 -->
+  <text class="t-s t-ink" x="20" y="64">만든 코드</text>
+  <rect class="box blue" x="150" y="46" width="400" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="350" y="65">참조 하나</text>
+
+  <text class="t-s t-ink" x="20" y="104">해시 테이블</text>
+  <rect class="box green" x="250" y="86" width="400" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="450" y="105">테이블에 걸려 있는 동안 참조 하나</text>
+
+  <text class="t-s t-ink" x="20" y="144">조회한 스레드</text>
+  <rect class="box purple" x="350" y="126" width="100" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="400" y="145">쓰는 동안</text>
+
+  <!-- 카운트 -->
+  <text class="t-s t-ink t-b" x="20" y="196">카운트</text>
+  <rect class="box" x="150" y="176" width="100" height="32"/><text class="t-mono t-b mid" x="200" y="197">1</text>
+  <rect class="box" x="250" y="176" width="100" height="32"/><text class="t-mono t-b mid" x="300" y="197">2</text>
+  <rect class="box" x="350" y="176" width="100" height="32"/><text class="t-mono t-b mid" x="400" y="197">3</text>
+  <rect class="box" x="450" y="176" width="100" height="32"/><text class="t-mono t-b mid" x="500" y="197">2</text>
+  <rect class="box" x="550" y="176" width="100" height="32"/><text class="t-mono t-b mid" x="600" y="197">1</text>
+  <rect class="box red" x="650" y="176" width="90" height="32"/>
+  <rect x="650" y="176" width="90" height="32" fill="url(#hatch-red)"/>
+  <text class="t-xs tc-red" x="560" y="230">0 → release() → 해제</text>
+
+  <path class="ln thin muted" d="M20 250 H740"/>
+  <text class="t-s" x="20" y="274">포인터를 보관하는 쪽마다 참조 하나를 쥔다. 어느 put이 마지막이 될지는 미리 알 수 없다</text>
+  <text class="t-s" x="20" y="296">빗금 구간에서는 객체가 없다. 0이 된 카운터를 다시 올리는 코드는 해제된 메모리를 쓰게 된다</text>
+</svg>

@@ -1,0 +1,50 @@
+<svg viewBox="0 0 760 424" xmlns="http://www.w3.org/2000/svg">
+  <title>rt_mutex의 구조: 락은 대기자를 우선순위순 트리로 세우고, 주인 태스크는 자기가 쥔 락마다 가장 급한 대기자를 pi_waiters 트리에 모은다</title>
+
+  <!-- 주인 태스크 -->
+  <rect class="box blue" x="20" y="30" width="200" height="150" rx="10"/>
+  <text class="t-b" x="34" y="54">task_struct · L</text>
+  <text class="t-xs" x="34" y="72">락 주인</text>
+  <text class="t-code" x="34" y="98">normal_prio = 120</text>
+  <text class="t-code" x="34" y="118">prio = 19</text>
+  <text class="t-code" x="34" y="138">pi_top_task = H</text>
+  <text class="t-code" x="34" y="158">pi_waiters</text>
+
+  <!-- 락 -->
+  <rect class="box yellow" x="270" y="30" width="220" height="110" rx="10"/>
+  <text class="t-mono t-b" x="284" y="54">struct rt_mutex_base</text>
+  <text class="t-code" x="284" y="78">owner</text>
+  <text class="t-code" x="284" y="98">waiters</text>
+  <text class="t-code" x="284" y="118">wait_lock</text>
+
+  <!-- 대기자 -->
+  <rect class="box purple" x="270" y="200" width="220" height="100" rx="10"/>
+  <text class="t-b" x="284" y="224">rt_mutex_waiter · H</text>
+  <text class="t-xs" x="284" y="242">H의 커널 스택 위에 있다</text>
+  <text class="t-code" x="284" y="264">tree     prio 19</text>
+  <text class="t-code" x="284" y="284">pi_tree  prio 19</text>
+
+  <rect class="box purple" x="270" y="322" width="220" height="40" rx="10"/>
+  <text class="t-s t-ink t-b" x="284" y="347">rt_mutex_waiter · K</text>
+  <text class="t-code end" x="478" y="347">prio 50</text>
+
+  <!-- 기다리는 태스크 -->
+  <rect class="box warm" x="540" y="200" width="200" height="100" rx="10"/>
+  <text class="t-b" x="554" y="224">task_struct · H</text>
+  <text class="t-xs" x="554" y="242">SCHED_FIFO 80 · 잠들어 있다</text>
+  <text class="t-code" x="554" y="264">prio = 19</text>
+  <text class="t-code" x="554" y="284">pi_blocked_on</text>
+
+  <!-- 화살표 -->
+  <path class="ln yellow" d="M270 74 H224" marker-end="url(#ah-yellow)"/>
+  <path class="ln yellow" d="M380 140 V196" marker-end="url(#ah-yellow)"/>
+  <text class="t-xs" x="390" y="172">맨 왼쪽 = top waiter</text>
+  <path class="ln purple" d="M380 300 V318" marker-end="url(#ah-purple)"/>
+  <path class="ln blue" d="M120 180 V280 H266" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="130" y="216">쥐고 있는 락마다</text>
+  <text class="t-xs tc-blue" x="130" y="234">top waiter 하나씩</text>
+  <path class="ln warm" d="M540 280 H494" marker-end="url(#ah-warm)"/>
+
+  <text class="t-s mid" x="380" y="390">락은 대기자를 우선순위순으로 세운다. 주인은 자기가 쥔 락들의 top waiter를 모아 두고,</text>
+  <text class="t-s mid" x="380" y="410">그중 가장 급한 태스크(pi_top_task)의 우선순위를 자기 prio로 삼는다</text>
+</svg>

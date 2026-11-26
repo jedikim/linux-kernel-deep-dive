@@ -1,0 +1,41 @@
+<svg viewBox="0 0 760 352" xmlns="http://www.w3.org/2000/svg">
+  <title>futex의 두 경로: 경합이 없으면 유저 공간의 원자 연산으로 끝나고, 경합이 있을 때만 시스템 콜로 커널의 해시 버킷에 줄을 선다</title>
+
+  <rect class="panel blue" x="20" y="14" width="720" height="124" rx="14"/>
+  <text class="t-b tc-blue" x="36" y="38">유저 공간</text>
+
+  <rect class="box" x="36" y="52" width="290" height="50" rx="10"/>
+  <text class="t-code" x="50" y="73">lock(): cmpxchg(&amp;word, 0, 1)</text>
+  <text class="t-xs" x="50" y="91">공유 메모리의 32비트 워드에 원자 연산</text>
+
+  <rect class="box green" x="560" y="52" width="164" height="50" rx="10"/>
+  <text class="t-b mid" x="642" y="82">임계 구역</text>
+
+  <path class="ln green" d="M326 77 H556" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-green mid" x="441" y="69">성공: 시스템 콜 없음</text>
+
+  <text class="t-xs tc-red" x="132" y="126">실패: futex(&amp;word, FUTEX_WAIT, 본 값)</text>
+
+  <rect class="panel yellow" x="20" y="162" width="720" height="176" rx="14"/>
+  <text class="t-b tc-yellow" x="36" y="186">커널</text>
+
+  <rect class="box" x="36" y="200" width="200" height="50" rx="10"/>
+  <text class="t-code" x="50" y="221">get_futex_key()</text>
+  <text class="t-xs" x="50" y="239">주소를 키로 바꾼다</text>
+
+  <rect class="box" x="272" y="200" width="200" height="50" rx="10"/>
+  <text class="t-code" x="286" y="221">futex_q_lock()</text>
+  <text class="t-xs" x="286" y="239">키를 해시해 버킷을 잠근다</text>
+
+  <rect class="box" x="508" y="200" width="216" height="50" rx="10"/>
+  <text class="t-code" x="522" y="221">futex_queue() → schedule()</text>
+  <text class="t-xs" x="522" y="239">워드가 그대로면 줄 서고 잠든다</text>
+
+  <path class="ln red" d="M120 102 V196" marker-end="url(#ah-red)"/>
+  <path class="ln" d="M236 225 H268" marker-end="url(#ah)"/>
+  <path class="ln" d="M472 225 H504" marker-end="url(#ah)"/>
+
+  <text class="t-s" x="36" y="282">워드가 그사이 바뀌었으면 잠들지 않고 -EWOULDBLOCK으로 돌아간다. 깨우는 신호를 놓치지 않는다</text>
+  <text class="t-s" x="36" y="308">unlock()은 워드를 0으로 쓰고, 기다리는 스레드가 있을 때만 futex(FUTEX_WAKE)를 부른다.</text>
+  <text class="t-s" x="36" y="326">커널은 같은 키의 버킷에서 대기자를 찾아 깨운다</text>
+</svg>

@@ -1,0 +1,95 @@
+<svg viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg">
+  <title>struct task_struct의 지도: 상태, 스케줄링, 식별, 가족 관계, CPU 상태는 구조체 안에 직접 들어 있고, 주소 공간·파일·시그널·네임스페이스·자격 증명은 포인터로 바깥 구조체를 가리킨다.</title>
+
+  <text class="t-mono t-b" x="20" y="24">struct task_struct</text>
+
+  <!-- 상태 -->
+  <rect class="box gray" x="20" y="36" width="290" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="54">상태</text>
+  <text class="t-xs end" x="298" y="54">3장</text>
+  <text class="t-code" x="32" y="72">__state  flags  exit_state</text>
+
+  <!-- 스케줄링 -->
+  <rect class="box green" x="20" y="84" width="290" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="102">스케줄링</text>
+  <text class="t-xs end" x="298" y="102">4·5장</text>
+  <text class="t-code" x="32" y="120">prio  se  rt  dl  sched_class  cpus_ptr</text>
+
+  <!-- 식별 -->
+  <rect class="box blue" x="20" y="132" width="290" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="150">식별</text>
+  <text class="t-code" x="32" y="168">pid  tgid  thread_pid  comm</text>
+
+  <!-- 가족 -->
+  <rect class="box warm" x="20" y="180" width="290" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="198">가족 관계</text>
+  <text class="t-code" x="32" y="216">real_parent  children  sibling</text>
+
+  <!-- 자원 -->
+  <rect class="box purple" x="20" y="228" width="290" height="224" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="246">자원 (포인터)</text>
+  <rect class="box" x="32" y="254" width="266" height="24" rx="5"/>
+  <text class="t-code" x="44" y="271">mm</text>
+  <rect class="box" x="32" y="282" width="266" height="24" rx="5"/>
+  <text class="t-code" x="44" y="299">fs</text>
+  <rect class="box" x="32" y="310" width="266" height="24" rx="5"/>
+  <text class="t-code" x="44" y="327">files</text>
+  <rect class="box" x="32" y="338" width="266" height="24" rx="5"/>
+  <text class="t-code" x="44" y="355">signal</text>
+  <rect class="box" x="32" y="366" width="266" height="24" rx="5"/>
+  <text class="t-code" x="44" y="383">sighand</text>
+  <rect class="box" x="32" y="394" width="266" height="24" rx="5"/>
+  <text class="t-code" x="44" y="411">nsproxy</text>
+  <rect class="box" x="32" y="422" width="266" height="24" rx="5"/>
+  <text class="t-code" x="44" y="439">cred</text>
+
+  <!-- 스택·CPU -->
+  <rect class="box yellow" x="20" y="456" width="290" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="474">스택과 CPU 상태</text>
+  <text class="t-code" x="32" y="492">thread_info  stack  thread</text>
+
+  <!-- 오른쪽 설명 -->
+  <text class="t-b" x="400" y="54">구조체 안에 직접 들어 있는 것</text>
+  <text class="t-s" x="400" y="76">상태, 스케줄링 정보, 식별자, 레지스터 저장 영역.</text>
+  <text class="t-s" x="400" y="94">태스크마다 반드시 따로 있어야 한다.</text>
+  <text class="t-b" x="400" y="140">포인터로 떼어 둔 것</text>
+  <text class="t-s" x="400" y="162">주소 공간, 파일, 시그널 처리, 네임스페이스.</text>
+  <text class="t-s" x="400" y="180">여러 태스크가 같은 구조체를 가리킬 수 있다.</text>
+  <text class="t-s" x="400" y="198">구조체마다 참조 카운트가 있다.</text>
+
+  <!-- 화살표와 바깥 구조체 -->
+  <path class="ln thin purple" d="M298 266 H394" marker-end="url(#ah-purple)"/>
+  <path class="ln thin purple" d="M298 294 H394" marker-end="url(#ah-purple)"/>
+  <path class="ln thin purple" d="M298 322 H394" marker-end="url(#ah-purple)"/>
+  <path class="ln thin purple" d="M298 350 H394" marker-end="url(#ah-purple)"/>
+  <path class="ln thin purple" d="M298 378 H394" marker-end="url(#ah-purple)"/>
+  <path class="ln thin purple" d="M298 406 H394" marker-end="url(#ah-purple)"/>
+  <path class="ln thin purple" d="M298 434 H394" marker-end="url(#ah-purple)"/>
+
+  <rect class="box" x="400" y="254" width="340" height="24" rx="5"/>
+  <text class="t-code t-b" x="412" y="271">mm_struct</text>
+  <text class="t-xs end" x="730" y="271">주소 공간과 페이지 테이블 · 17장</text>
+  <rect class="box" x="400" y="282" width="340" height="24" rx="5"/>
+  <text class="t-code t-b" x="412" y="299">fs_struct</text>
+  <text class="t-xs end" x="730" y="299">루트 디렉터리와 현재 디렉터리</text>
+  <rect class="box" x="400" y="310" width="340" height="24" rx="5"/>
+  <text class="t-code t-b" x="412" y="327">files_struct</text>
+  <text class="t-xs end" x="730" y="327">열린 파일 디스크립터 표 · 20장</text>
+  <rect class="box" x="400" y="338" width="340" height="24" rx="5"/>
+  <text class="t-code t-b" x="412" y="355">signal_struct</text>
+  <text class="t-xs end" x="730" y="355">스레드 그룹이 함께 쓰는 상태</text>
+  <rect class="box" x="400" y="366" width="340" height="24" rx="5"/>
+  <text class="t-code t-b" x="412" y="383">sighand_struct</text>
+  <text class="t-xs end" x="730" y="383">시그널 핸들러 표</text>
+  <rect class="box" x="400" y="394" width="340" height="24" rx="5"/>
+  <text class="t-code t-b" x="412" y="411">nsproxy</text>
+  <text class="t-xs end" x="730" y="411">네임스페이스 묶음 · 22장</text>
+  <rect class="box" x="400" y="422" width="340" height="24" rx="5"/>
+  <text class="t-code t-b" x="412" y="439">cred</text>
+  <text class="t-xs end" x="730" y="439">UID, GID, 권한</text>
+
+  <path class="ln thin yellow" d="M310 478 H394" marker-end="url(#ah-yellow)"/>
+  <rect class="box yellow" x="400" y="466" width="340" height="24" rx="5"/>
+  <text class="t-s t-ink t-b" x="412" y="483">커널 스택</text>
+  <text class="t-xs end" x="730" y="483">태스크마다 하나. x86-64에서 16KB</text>
+</svg>

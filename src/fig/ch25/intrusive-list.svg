@@ -1,0 +1,61 @@
+<svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg">
+  <title>외부 리스트와 침습형 리스트 비교: 외부 리스트는 따로 할당한 노드가 객체를 가리키고, 침습형 리스트는 객체 안에 든 노드끼리 이어져 한 객체가 tasks 리스트와 sibling 리스트에 동시에 매달린다.</title>
+
+  <!-- 외부 리스트 -->
+  <text class="t-b" x="20" y="28">외부 리스트 · 노드를 따로 할당한다</text>
+  <rect class="box gray" x="120" y="42" width="130" height="32" rx="6"/>
+  <text class="t-code mid" x="185" y="63">next prev data</text>
+  <rect class="box gray" x="320" y="42" width="130" height="32" rx="6"/>
+  <text class="t-code mid" x="385" y="63">next prev data</text>
+  <rect class="box gray" x="520" y="42" width="130" height="32" rx="6"/>
+  <text class="t-code mid" x="585" y="63">next prev data</text>
+  <path class="ln" d="M250 58 H316" marker-end="url(#ah)"/>
+  <path class="ln" d="M450 58 H516" marker-end="url(#ah)"/>
+  <rect class="box blue" x="140" y="96" width="90" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="185" y="116">객체 A</text>
+  <rect class="box blue" x="340" y="96" width="90" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="385" y="116">객체 B</text>
+  <rect class="box blue" x="540" y="96" width="90" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="585" y="116">객체 C</text>
+  <path class="ln thin" d="M185 74 V92" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M385 74 V92" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M585 74 V92" marker-end="url(#ah)"/>
+  <text class="t-xs" x="20" y="63">리스트 노드</text>
+  <text class="t-xs" x="20" y="116">원소</text>
+
+  <path class="ln thin muted dash" d="M20 148 H740"/>
+
+  <!-- 침습형 리스트 -->
+  <text class="t-b" x="20" y="176">침습형 리스트 · 노드가 객체 안에 있다</text>
+
+  <rect class="box blue" x="100" y="192" width="160" height="104" rx="10"/>
+  <text class="t-code t-b" x="112" y="212">task_struct A</text>
+  <rect class="box yellow" x="112" y="222" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="180" y="240">tasks</text>
+  <rect class="box green" x="112" y="258" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="180" y="276">sibling</text>
+
+  <rect class="box blue" x="320" y="192" width="160" height="104" rx="10"/>
+  <text class="t-code t-b" x="332" y="212">task_struct B</text>
+  <rect class="box yellow" x="332" y="222" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="400" y="240">tasks</text>
+  <rect class="box green" x="332" y="258" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="400" y="276">sibling</text>
+
+  <rect class="box blue" x="540" y="192" width="160" height="104" rx="10"/>
+  <text class="t-code t-b" x="552" y="212">task_struct C</text>
+  <rect class="box yellow" x="552" y="222" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="620" y="240">tasks</text>
+  <rect class="box green" x="552" y="258" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="620" y="276">sibling</text>
+
+  <path class="ln yellow" d="M248 235 H328" marker-end="url(#ah-yellow)"/>
+  <path class="ln yellow" d="M468 235 H548" marker-end="url(#ah-yellow)"/>
+  <path class="ln green" d="M180 284 V314 H620 V288" marker-end="url(#ah-green)"/>
+
+  <text class="t-xs tc-yellow" x="20" y="240">모든 태스크</text>
+  <text class="t-xs tc-green" x="20" y="276">같은 부모</text>
+  <text class="t-xs tc-green mid" x="400" y="330">A와 C는 형제다. B는 이 리스트에 없다</text>
+
+  <text class="t-s mid" x="380" y="358">넣고 뺄 때 할당이 없고, 한 객체가 여러 리스트에 동시에 들어간다. 원소는 container_of()로 되찾는다</text>
+</svg>

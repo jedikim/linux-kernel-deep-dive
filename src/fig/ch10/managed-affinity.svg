@@ -1,0 +1,61 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>MSI-X 큐 벡터를 CPU에 하나씩 펼치는 관리형 친화성: CPU마다 자기 vector_irq 표가 있고, CPU가 꺼지면 관리형 IRQ는 끄고 일반 IRQ는 다른 CPU로 옮긴다</title>
+
+  <rect class="box gray" x="20" y="14" width="720" height="44" rx="10"/>
+  <use href="#i-disk" x="30" y="21" width="30" height="30" class="ic gray"/>
+  <text class="t-b" x="70" y="41">NVMe SSD</text>
+  <text class="t-s" x="160" y="41">I/O 큐 4개. 큐마다 MSI-X 벡터 하나, 벡터마다 CPU 하나</text>
+  <path class="ln green" d="M102 58 V85" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M287 58 V85" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M472 58 V85" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M657 58 V85" marker-end="url(#ah-green)"/>
+
+  <!-- CPU 0 -->
+  <rect class="box blue" x="20" y="90" width="165" height="164" rx="10"/>
+  <text class="t-b" x="32" y="112">CPU 0</text>
+  <text class="t-xs end" x="175" y="112">vector_irq[]</text>
+  <rect class="box green" x="30" y="122" width="145" height="46" rx="6"/>
+  <text class="t-code" x="40" y="141">0x41 → IRQ 142</text>
+  <text class="t-xs" x="40" y="159">nvme0q1 · 관리형</text>
+  <rect class="box warm" x="30" y="176" width="145" height="46" rx="6"/>
+  <text class="t-code" x="40" y="195">0x31 → IRQ 1</text>
+  <text class="t-xs" x="40" y="213">i8042 · 일반</text>
+
+  <!-- CPU 1 -->
+  <rect class="box blue" x="205" y="90" width="165" height="164" rx="10"/>
+  <text class="t-b" x="217" y="112">CPU 1</text>
+  <text class="t-xs end" x="360" y="112">vector_irq[]</text>
+  <rect class="box green" x="215" y="122" width="145" height="46" rx="6"/>
+  <text class="t-code" x="225" y="141">0x41 → IRQ 143</text>
+  <text class="t-xs" x="225" y="159">nvme0q2 · 관리형</text>
+
+  <!-- CPU 2 -->
+  <rect class="box blue" x="390" y="90" width="165" height="164" rx="10"/>
+  <text class="t-b" x="402" y="112">CPU 2</text>
+  <text class="t-xs end" x="545" y="112">vector_irq[]</text>
+  <rect class="box green" x="400" y="122" width="145" height="46" rx="6"/>
+  <text class="t-code" x="410" y="141">0x41 → IRQ 144</text>
+  <text class="t-xs" x="410" y="159">nvme0q3 · 관리형</text>
+  <rect class="ghost warm dash" x="400" y="176" width="145" height="46" rx="6"/>
+  <text class="t-code" x="410" y="195">0x35 → IRQ 4</text>
+  <text class="t-xs" x="410" y="213">옮겨 온 뒤</text>
+
+  <!-- CPU 3 -->
+  <rect class="box red" x="575" y="90" width="165" height="164" rx="10"/>
+  <text class="t-b" x="587" y="112">CPU 3</text>
+  <text class="t-xs tc-red end" x="730" y="112">꺼지는 중</text>
+  <rect class="box green" x="585" y="122" width="145" height="46" rx="6"/>
+  <text class="t-code" x="595" y="141">0x42 → IRQ 145</text>
+  <text class="t-xs" x="595" y="159">nvme0q4 · 관리형</text>
+  <rect class="box warm" x="585" y="176" width="145" height="46" rx="6"/>
+  <text class="t-code" x="595" y="195">0x33 → IRQ 4</text>
+  <text class="t-xs" x="595" y="213">ttyS0 · 일반</text>
+  <path class="ln warm dash" d="M585 199 H550" marker-end="url(#ah-warm)"/>
+
+  <text class="t-b" x="20" y="286">CPU 3을 끄면</text>
+  <rect class="box green" x="20" y="300" width="14" height="14" rx="3"/>
+  <text class="t-s" x="44" y="312">관리형(IRQ 145)은 옮기지 않는다. 큐를 멈춘 뒤 인터럽트를 끄고, CPU 3이 돌아오면 다시 켠다.</text>
+  <rect class="box warm" x="20" y="324" width="14" height="14" rx="3"/>
+  <text class="t-s" x="44" y="336">일반(IRQ 4)은 친화성 마스크에 남은 CPU로 옮긴다. 옮겨 간 CPU에서 벡터를 새로 받는다.</text>
+  <text class="t-s" x="20" y="370">벡터 번호는 CPU마다 따로 센다. 큐를 CPU에 하나씩 펼치면 CPU 하나가 쓰는 벡터는 몇 개 되지 않는다.</text>
+</svg>

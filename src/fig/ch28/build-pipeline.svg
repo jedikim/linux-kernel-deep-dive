@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 266" xmlns="http://www.w3.org/2000/svg">
+  <title>커널 빌드의 흐름: .config가 autoconf.h가 되어 모든 컴파일에 들어가고, 목적 파일이 built-in.a, vmlinux, bzImage로 이어지며, 모듈은 따로 .ko가 된다</title>
+
+  <!-- 설정 -->
+  <rect class="box green" x="20" y="16" width="100" height="40" rx="8"/>
+  <text class="t-mono t-b mid" x="70" y="41">.config</text>
+  <path class="ln" d="M120 36 H146" marker-end="url(#ah)"/>
+  <rect class="box gray" x="150" y="16" width="250" height="40" rx="8"/>
+  <text class="t-code mid" x="275" y="41">include/generated/autoconf.h</text>
+  <text class="t-xs" x="412" y="41">Makefile에는 include/config/auto.conf</text>
+  <path class="ln muted dash" d="M158 56 V122" marker-end="url(#ah-muted)"/>
+  <text class="t-xs" x="168" y="84">모든 컴파일에 들어간다</text>
+
+  <!-- 컴파일 -->
+  <rect class="box" x="20" y="104" width="120" height="52" rx="8"/>
+  <text class="t-b mid" x="80" y="126">소스 파일</text>
+  <text class="t-code mid" x="80" y="146">*.c *.S *.rs</text>
+  <path class="ln" d="M140 130 H176" marker-end="url(#ah)"/>
+  <rect class="box" x="180" y="104" width="100" height="52" rx="8"/>
+  <text class="t-b mid" x="230" y="126">목적 파일</text>
+  <text class="t-code mid" x="230" y="146">*.o</text>
+
+  <!-- 내장 -->
+  <path class="ln" d="M280 118 H326" marker-end="url(#ah)"/>
+  <rect class="box yellow" x="330" y="92" width="130" height="52" rx="8"/>
+  <text class="t-mono t-b mid" x="395" y="114">built-in.a</text>
+  <text class="t-xs mid" x="395" y="134">=y로 고른 것</text>
+  <path class="ln" d="M460 118 H486" marker-end="url(#ah)"/>
+  <rect class="box green" x="490" y="92" width="120" height="52" rx="8"/>
+  <text class="t-mono t-b mid" x="550" y="114">vmlinux</text>
+  <text class="t-xs mid" x="550" y="134">링크가 끝난 ELF</text>
+  <path class="ln" d="M610 118 H636" marker-end="url(#ah)"/>
+  <rect class="box green" x="640" y="92" width="100" height="52" rx="8"/>
+  <text class="t-mono t-b mid" x="690" y="114">bzImage</text>
+  <text class="t-xs mid" x="690" y="134">압축 + 부팅 코드</text>
+  <text class="t-xs tc-green mid" x="550" y="162">gdb, perf가 읽는다</text>
+  <text class="t-xs tc-green mid" x="690" y="162">QEMU가 읽는다</text>
+
+  <!-- 모듈 -->
+  <path class="ln purple" d="M280 142 H302 V212 H486" marker-end="url(#ah-purple)"/>
+  <text class="t-xs" x="314" y="204">modpost가 심벌 정보를 붙인다</text>
+  <rect class="box purple" x="490" y="186" width="120" height="52" rx="8"/>
+  <text class="t-mono t-b mid" x="550" y="208">*.ko</text>
+  <text class="t-xs mid" x="550" y="228">=m으로 고른 것</text>
+  <text class="t-xs tc-purple" x="622" y="216">insmod가 읽는다</text>
+</svg>

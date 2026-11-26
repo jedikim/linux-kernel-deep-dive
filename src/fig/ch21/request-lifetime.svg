@@ -1,0 +1,40 @@
+<svg viewBox="0 0 760 296" xmlns="http://www.w3.org/2000/svg">
+  <title>요청 하나의 일생: 태스크 컨텍스트에서 blk_mq_submit_bio와 nvme_queue_rq가 실행되고, 장치가 명령을 처리한 뒤 같은 CPU의 인터럽트 컨텍스트에서 nvme_irq와 bio_endio가 실행되어 기다리던 태스크를 깨운다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="58">태스크</text>
+  <text class="t-xs" x="20" y="76">태스크 컨텍스트</text>
+  <text class="t-s t-ink t-b" x="20" y="137">NVMe 장치</text>
+  <text class="t-s t-ink t-b" x="20" y="198">인터럽트</text>
+  <text class="t-xs" x="20" y="216">같은 CPU · hardirq</text>
+
+  <!-- 태스크 레인 -->
+  <rect class="box yellow" x="140" y="40" width="152" height="44" rx="6"/>
+  <text class="t-code mid" x="216" y="58">blk_mq_submit_bio()</text>
+  <text class="t-xs mid" x="216" y="76">bio → request · 태그</text>
+  <rect class="box yellow" x="292" y="40" width="120" height="44" rx="6"/>
+  <text class="t-code mid" x="352" y="58">nvme_queue_rq()</text>
+  <text class="t-xs mid" x="352" y="76">명령 복사 · 도어벨</text>
+  <rect class="box gray" x="412" y="40" width="252" height="44" rx="6"/>
+  <text class="t-xs t-ink mid" x="538" y="67">다른 일을 하거나 폴리오 락을 기다리며 잠든다</text>
+  <rect class="box green" x="664" y="40" width="76" height="44" rx="6"/>
+  <text class="t-xs t-ink mid" x="702" y="67">이어서 실행</text>
+
+  <!-- 장치 레인 -->
+  <path class="ln blue" d="M412 84 V106" marker-end="url(#ah-blue)"/>
+  <text class="t-xs" x="420" y="100">도어벨 쓰기</text>
+  <rect class="box blue" x="412" y="110" width="100" height="44" rx="6"/>
+  <text class="t-s t-ink mid" x="462" y="137">명령 처리</text>
+  <path class="ln warm" d="M512 154 V176" marker-end="url(#ah-warm)"/>
+  <text class="t-xs" x="520" y="170">MSI-X 인터럽트</text>
+
+  <!-- 인터럽트 레인 -->
+  <rect class="box warm" x="512" y="180" width="152" height="44" rx="6"/>
+  <text class="t-code mid" x="588" y="198">nvme_irq()</text>
+  <text class="t-code mid" x="588" y="216">→ bio_endio()</text>
+  <path class="ln green" d="M664 180 V88" marker-end="url(#ah-green)"/>
+  <text class="t-xs" x="672" y="140">깨움</text>
+
+  <path class="ln thin muted" d="M140 240 H740" marker-end="url(#ah-muted)"/>
+  <text class="t-xs" x="140" y="262">제출 경로는 I/O를 기다리지 않는다. submit_bio()는 도어벨을 쓰고 곧 돌아온다</text>
+  <text class="t-xs" x="140" y="282">완료 인터럽트는 큐에 묶인 CPU로 온다. request와 bio가 그 CPU의 캐시에 남아 있다</text>
+</svg>

@@ -1,0 +1,59 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>스왑 테이블과 스왑 슬롯의 상태: 클러스터마다 항목 배열이 있고, 항목 하나가 빈 슬롯은 0, 메모리에도 있는 슬롯은 PFN, 스왑에만 있는 슬롯은 그림자 값으로 바뀐다</title>
+
+  <!-- 왼쪽: 구조 -->
+  <rect class="box" x="20" y="30" width="220" height="56" rx="10"/>
+  <text class="t-mono t-b" x="32" y="54">swap_cluster_info</text>
+  <text class="t-code" x="32" y="74">table</text>
+  <path class="ln" d="M130 86 V106" marker-end="url(#ah)"/>
+
+  <rect class="box" x="60" y="110" width="140" height="24"/>
+  <text class="t-code mid" x="130" y="127">0</text>
+  <rect class="box blue" x="60" y="134" width="140" height="24"/>
+  <text class="t-code mid" x="130" y="151">PFN … 10</text>
+  <rect class="box yellow" x="60" y="158" width="140" height="24"/>
+  <text class="t-code mid" x="130" y="175">그림자 … 1</text>
+  <rect class="box" x="60" y="182" width="140" height="24"/>
+  <text class="t-code mid" x="130" y="199">⋮</text>
+  <rect class="box" x="60" y="206" width="140" height="24"/>
+  <text class="t-code mid" x="130" y="223">0</text>
+  <text class="t-xs mid" x="130" y="252">슬롯 512개 → 항목 512개</text>
+  <text class="t-xs mid" x="130" y="268">8바이트 × 512 = 한 페이지</text>
+
+  <!-- 오른쪽: 슬롯의 상태 -->
+  <text class="t-s t-ink t-b" x="290" y="24">슬롯 하나가 거치는 상태</text>
+  <text class="t-xs mid" x="437" y="52">스왑 아웃 시작</text>
+  <text class="t-xs mid" x="602" y="52">쓰기 끝</text>
+
+  <rect class="box" x="290" y="62" width="130" height="64" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="355" y="88">빈 슬롯</text>
+  <text class="t-code mid" x="355" y="110">0</text>
+  <path class="ln" d="M420 86 H451" marker-end="url(#ah)"/>
+
+  <rect class="box blue" x="455" y="62" width="130" height="64" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="520" y="88">메모리에도 있다</text>
+  <text class="t-code mid" x="520" y="110">PFN … 10</text>
+  <path class="ln" d="M585 86 H616" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="620" y="62" width="120" height="64" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="680" y="88">스왑에만 있다</text>
+  <text class="t-code mid" x="680" y="110">그림자 … 1</text>
+
+  <path class="ln" d="M680 126 V150 H540 V130" marker-end="url(#ah)"/>
+  <text class="t-xs" x="550" y="166">스왑 인 · 폴리오를 다시 올린다</text>
+  <path class="ln" d="M500 126 V176 H355 V130" marker-end="url(#ah)"/>
+  <text class="t-xs" x="290" y="194">가리키는 PTE가 없어지면 슬롯을 놓는다</text>
+
+  <!-- 항목의 배치 -->
+  <text class="t-s t-ink t-b" x="290" y="234">항목 하나의 배치 · 8바이트</text>
+  <rect class="box warm" x="290" y="244" width="96" height="34"/>
+  <text class="t-s t-ink mid" x="338" y="266">참조 횟수</text>
+  <rect class="box" x="386" y="244" width="34" height="34"/>
+  <text class="t-code mid" x="403" y="265">Z</text>
+  <rect class="box" x="420" y="244" width="240" height="34"/>
+  <text class="t-s t-ink mid" x="540" y="266">PFN 또는 그림자 값</text>
+  <rect class="box gray" x="660" y="244" width="80" height="34"/>
+  <text class="t-s t-ink mid" x="700" y="266">종류 표시</text>
+  <text class="t-xs" x="290" y="298">윗비트</text>
+  <text class="t-xs end" x="740" y="298">아랫비트 · 1이면 그림자, 10이면 PFN</text>
+</svg>

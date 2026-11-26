@@ -1,0 +1,45 @@
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+  <title>KFENCE: 일정 간격마다 할당 하나를 뽑아 보호 페이지 사이에 놓인 객체 페이지에서 내주고, 경계를 넘는 접근은 페이지 폴트로 잡는다</title>
+
+  <!-- 할당의 흐름 -->
+  <text class="t-xs tc-purple mid" x="380" y="22">표본으로 뽑힌 할당 (기본 100ms마다 하나)</text>
+  <rect class="box gray" x="40" y="32" width="680" height="26" rx="6"/>
+  <text class="t-xs t-ink" x="52" y="50">보통의 슬랩에서 나오는 kmalloc()</text>
+  <rect class="solid purple" x="280" y="32" width="14" height="26"/>
+  <rect class="solid purple" x="466" y="32" width="14" height="26"/>
+  <path class="ln purple" d="M287 58 V124" marker-end="url(#ah-purple)"/>
+  <path class="ln purple" d="M473 58 V124" marker-end="url(#ah-purple)"/>
+
+  <!-- 풀 -->
+  <rect class="box red" x="40" y="128" width="136" height="64"/>
+  <rect x="40" y="128" width="136" height="64" fill="url(#hatch-red)"/>
+  <rect class="box yellow" x="176" y="128" width="86" height="64"/>
+  <text class="t-xs t-ink mid" x="219" y="165">레드존</text>
+  <rect class="box blue" x="262" y="128" width="50" height="64"/>
+  <text class="t-xs t-ink t-b mid" x="287" y="165">객체</text>
+  <rect class="box red" x="312" y="128" width="136" height="64"/>
+  <rect x="312" y="128" width="136" height="64" fill="url(#hatch-red)"/>
+  <rect class="box blue" x="448" y="128" width="50" height="64"/>
+  <text class="t-xs t-ink t-b mid" x="473" y="165">객체</text>
+  <rect class="box yellow" x="498" y="128" width="86" height="64"/>
+  <text class="t-xs t-ink mid" x="541" y="165">레드존</text>
+  <rect class="box red" x="584" y="128" width="136" height="64"/>
+  <rect x="584" y="128" width="136" height="64" fill="url(#hatch-red)"/>
+
+  <text class="t-xs mid" x="108" y="210">보호 페이지</text>
+  <text class="t-xs mid" x="244" y="210">객체 페이지</text>
+  <text class="t-xs mid" x="380" y="210">보호 페이지</text>
+  <text class="t-xs mid" x="516" y="210">객체 페이지</text>
+  <text class="t-xs mid" x="652" y="210">보호 페이지</text>
+
+  <!-- 경계를 넘는 접근 -->
+  <path class="ln red" d="M304 122 Q322 96 344 122" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="318" y="88">끝을 넘으면 페이지 폴트</text>
+
+  <!-- 비교 -->
+  <path class="ln thin muted" d="M40 228 H720"/>
+  <text class="t-s t-ink t-b" x="40" y="254">KASAN</text>
+  <text class="t-s" x="112" y="254">모든 접근 앞에 검사 코드 · 메모리의 1/8 · 개발과 시험에</text>
+  <text class="t-s t-ink t-b" x="40" y="278">KFENCE</text>
+  <text class="t-s" x="112" y="278">표본만, 검사는 MMU가 · 객체 255개에 2MiB · 운영 환경에</text>
+</svg>

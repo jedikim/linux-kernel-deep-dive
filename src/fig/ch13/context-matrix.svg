@@ -1,0 +1,62 @@
+<svg viewBox="0 0 760 356" xmlns="http://www.w3.org/2000/svg">
+  <title>실행 컨텍스트가 서로를 끊을 수 있는지 나타낸 행렬: 태스크는 모든 것에 끊기고, softirq는 hardirq와 NMI에, hardirq는 NMI에만 끊기며, NMI는 끊기지 않는다</title>
+
+  <text class="t-xs" x="20" y="34">실행 중인 쪽 ↓</text>
+  <text class="t-xs" x="20" y="52">끼어드는 쪽 →</text>
+  <text class="t-b mid" x="226" y="34">다른 태스크</text>
+  <text class="t-xs mid" x="226" y="52">선점</text>
+  <text class="t-b mid" x="372" y="44">softirq</text>
+  <text class="t-b mid" x="518" y="44">hardirq</text>
+  <text class="t-b mid" x="664" y="44">NMI</text>
+  <rect class="box" x="20" y="66" width="128" height="40" rx="8"/>
+  <text class="t-b mid" x="84" y="91">태스크</text>
+  <rect class="box warm" x="156" y="66" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="226" y="91">끊는다</text>
+  <rect class="box warm" x="302" y="66" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="372" y="91">끊는다</text>
+  <rect class="box warm" x="448" y="66" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="518" y="91">끊는다</text>
+  <rect class="box warm" x="594" y="66" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="664" y="91">끊는다</text>
+  <rect class="box" x="20" y="114" width="128" height="40" rx="8"/>
+  <text class="t-b mid" x="84" y="139">softirq</text>
+  <rect class="box gray" x="156" y="114" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="226" y="139">못 끊는다</text>
+  <rect class="box gray" x="302" y="114" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="372" y="139">못 끊는다</text>
+  <rect class="box warm" x="448" y="114" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="518" y="139">끊는다</text>
+  <rect class="box warm" x="594" y="114" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="664" y="139">끊는다</text>
+  <rect class="box" x="20" y="162" width="128" height="40" rx="8"/>
+  <text class="t-b mid" x="84" y="187">hardirq</text>
+  <rect class="box gray" x="156" y="162" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="226" y="187">못 끊는다</text>
+  <rect class="box gray" x="302" y="162" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="372" y="187">못 끊는다</text>
+  <rect class="box gray" x="448" y="162" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="518" y="187">못 끊는다</text>
+  <rect class="box warm" x="594" y="162" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="664" y="187">끊는다</text>
+  <rect class="box" x="20" y="210" width="128" height="40" rx="8"/>
+  <text class="t-b mid" x="84" y="235">NMI</text>
+  <rect class="box gray" x="156" y="210" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="226" y="235">못 끊는다</text>
+  <rect class="box gray" x="302" y="210" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="372" y="235">못 끊는다</text>
+  <rect class="box gray" x="448" y="210" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="518" y="235">못 끊는다</text>
+  <rect class="box gray" x="594" y="210" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="664" y="235">못 끊는다</text>
+  <path class="ln thin muted dash" d="M20 264 H734"/>
+  <text class="t-s t-ink t-b mid" x="84" y="297">막는 방법</text>
+  <rect class="box code" x="156" y="272" width="140" height="40" rx="8"/>
+  <text class="t-code mid" x="226" y="296">preempt_disable()</text>
+  <rect class="box code" x="302" y="272" width="140" height="40" rx="8"/>
+  <text class="t-code mid" x="372" y="296">local_bh_disable()</text>
+  <rect class="box code" x="448" y="272" width="140" height="40" rx="8"/>
+  <text class="t-code mid" x="518" y="296">local_irq_save()</text>
+  <rect class="ghost dash" x="594" y="272" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="664" y="297">막을 수 없다</text>
+  <text class="t-s mid" x="380" y="338">같은 CPU 안에서의 관계다. 다른 CPU에서 도는 코드는 이 표와 상관없이 언제나 동시에 실행된다.</text>
+</svg>

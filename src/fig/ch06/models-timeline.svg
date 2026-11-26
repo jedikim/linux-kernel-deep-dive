@@ -1,0 +1,83 @@
+<svg viewBox="0 0 760 476" xmlns="http://www.w3.org/2000/svg">
+  <title>선점 모델별로 깨어난 태스크 D가 CPU를 받는 시점: NONE은 유저 모드 복귀, VOLUNTARY는 양보 지점, LAZY는 다음 틱, FULL은 스핀락 해제, RT는 인터럽트 복귀 직후</title>
+
+  <!-- 기준 줄: C가 하던 일 -->
+  <text class="t-s" x="20" y="54">C가 하던 일</text>
+  <text class="t-xs mid" x="280" y="24">스핀락 구간</text>
+  <text class="t-xs mid" x="400" y="24">틱</text>
+  <text class="t-xs mid" x="480" y="24">might_sleep()</text>
+  <rect class="box yellow" x="150" y="34" width="490" height="30" rx="6"/>
+  <rect x="230" y="34" width="100" height="30" fill="url(#hatch)"/>
+  <path class="ln thin" d="M400 28 V34"/>
+  <path class="ln thin" d="M480 28 V34"/>
+  <text class="t-s t-ink mid" x="560" y="54">커널 모드</text>
+  <rect class="box gray" x="640" y="34" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="54">유저 모드</text>
+
+  <!-- 깨어나는 시점 안내선 -->
+  <path class="ln thin muted dash" d="M260 68 V436"/>
+
+  <!-- NONE -->
+  <text class="t-b" x="20" y="120">NONE</text>
+  <rect class="box yellow" x="150" y="100" width="490" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="120">C</text>
+  <rect x="290" y="100" width="350" height="30" fill="url(#hatch-red)"/>
+  <rect class="solid" x="260" y="100" width="30" height="30"/>
+  <text class="t-xs t-on mid" x="275" y="120">ISR</text>
+  <rect class="box green" x="640" y="100" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="120">D 실행</text>
+  <text class="t-xs" x="296" y="148">유저 모드로 돌아갈 때까지 기다린다</text>
+
+  <!-- VOLUNTARY -->
+  <text class="t-b" x="20" y="188">VOLUNTARY</text>
+  <rect class="box yellow" x="150" y="168" width="330" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="188">C</text>
+  <rect x="290" y="168" width="190" height="30" fill="url(#hatch-red)"/>
+  <rect class="solid" x="260" y="168" width="30" height="30"/>
+  <text class="t-xs t-on mid" x="275" y="188">ISR</text>
+  <rect class="box green" x="480" y="168" width="260" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="610" y="188">D 실행</text>
+  <text class="t-xs" x="296" y="216">다음 양보 지점에서 스스로 넘긴다</text>
+
+  <!-- LAZY -->
+  <text class="t-b" x="20" y="256">LAZY</text>
+  <rect class="box yellow" x="150" y="236" width="250" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="256">C</text>
+  <rect x="290" y="236" width="110" height="30" fill="url(#hatch-red)"/>
+  <rect class="solid" x="260" y="236" width="30" height="30"/>
+  <text class="t-xs t-on mid" x="275" y="256">ISR</text>
+  <rect class="box green" x="400" y="236" width="340" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="570" y="256">D 실행</text>
+  <text class="t-xs" x="296" y="284">D가 일반 태스크면 다음 틱까지 미룬다. 실시간 태스크면 FULL과 같다</text>
+
+  <!-- FULL -->
+  <text class="t-b" x="20" y="324">FULL</text>
+  <rect class="box yellow" x="150" y="304" width="180" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="324">C</text>
+  <rect x="290" y="304" width="40" height="30" fill="url(#hatch-red)"/>
+  <rect class="solid" x="260" y="304" width="30" height="30"/>
+  <text class="t-xs t-on mid" x="275" y="324">ISR</text>
+  <rect class="box green" x="330" y="304" width="410" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="324">D 실행</text>
+  <text class="t-xs" x="296" y="352">스핀락을 푸는 preempt_enable()에서 끊긴다</text>
+
+  <!-- RT -->
+  <text class="t-b" x="20" y="392">RT</text>
+  <rect class="box yellow" x="150" y="372" width="140" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="392">C</text>
+  <rect class="solid" x="260" y="372" width="30" height="30"/>
+  <text class="t-xs t-on mid" x="275" y="392">ISR</text>
+  <rect class="box green" x="290" y="372" width="450" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="515" y="392">D 실행</text>
+  <text class="t-xs" x="296" y="420">인터럽트 복귀 길에서 바로 끊긴다. 스핀락 구간이어도 끊는다</text>
+
+  <!-- 범례 -->
+  <path class="ln thin muted dash" d="M150 456 H176"/>
+  <text class="t-xs" x="184" y="460">인터럽트가 와서 D가 깨어난 시점</text>
+  <rect class="box red" x="400" y="448" width="26" height="14" rx="3"/>
+  <rect x="400" y="448" width="26" height="14" rx="3" fill="url(#hatch-red)"/>
+  <text class="t-xs" x="434" y="460">D가 기다리는 시간</text>
+  <rect class="box" x="560" y="448" width="26" height="14" rx="3"/>
+  <rect x="560" y="448" width="26" height="14" rx="3" fill="url(#hatch)"/>
+  <text class="t-xs" x="594" y="460">C가 스핀락을 쥔 구간</text>
+</svg>

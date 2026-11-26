@@ -1,0 +1,76 @@
+<svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg">
+  <title>게스트에 장치를 보여 주는 네 가지 방법의 데이터 경로 비교: 에뮬레이션과 virtio는 VMM을 거치고, vhost는 호스트 커널에서 끝나며, 패스스루는 게스트가 장치에 직접 닿는다.</title>
+
+  <!-- 에뮬레이션 -->
+  <text class="t-l mid" x="105.5" y="34">에뮬레이션</text>
+  <rect class="box blue" x="20" y="48" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-blue" x="30" y="68">게스트</text>
+  <text class="t-s t-ink t-b" x="30" y="89">e1000 등의 드라이버</text>
+  <rect class="box green" x="20" y="126" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-green" x="30" y="146">VMM · 유저 공간</text>
+  <text class="t-s t-ink t-b" x="30" y="167">장치 레지스터 흉내</text>
+  <rect class="box yellow" x="20" y="204" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-yellow" x="30" y="224">호스트 커널</text>
+  <text class="t-s t-ink t-b" x="30" y="245">네트워크 스택 · 드라이버</text>
+  <rect class="box gray" x="20" y="282" width="171" height="40" rx="10"/>
+  <text class="t-s t-ink mid" x="105.5" y="307">물리 NIC</text>
+  <path class="ln red" d="M165 102 V122" marker-end="url(#ah-red)"/>
+  <path class="ln" d="M165 180 V200" marker-end="url(#ah)"/>
+  <path class="ln" d="M165 258 V278" marker-end="url(#ah)"/>
+  <text class="t-xs t-ink mid" x="105.5" y="346">레지스터 접근마다 exit</text>
+  <!-- virtio -->
+  <text class="t-l mid" x="288.5" y="34">virtio</text>
+  <rect class="box blue" x="203" y="48" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-blue" x="213" y="68">게스트</text>
+  <text class="t-s t-ink t-b" x="213" y="89">virtio-net 드라이버</text>
+  <rect class="box green" x="203" y="126" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-green" x="213" y="146">VMM · 유저 공간</text>
+  <text class="t-s t-ink t-b" x="213" y="167">virtqueue의 장치 쪽</text>
+  <rect class="box yellow" x="203" y="204" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-yellow" x="213" y="224">호스트 커널</text>
+  <text class="t-s t-ink t-b" x="213" y="245">네트워크 스택 · 드라이버</text>
+  <rect class="box gray" x="203" y="282" width="171" height="40" rx="10"/>
+  <text class="t-s t-ink mid" x="288.5" y="307">물리 NIC</text>
+  <path class="ln red" d="M348 102 V122" marker-end="url(#ah-red)"/>
+  <path class="ln" d="M348 180 V200" marker-end="url(#ah)"/>
+  <path class="ln" d="M348 258 V278" marker-end="url(#ah)"/>
+  <text class="t-xs t-ink mid" x="288.5" y="346">킥이 필요할 때만 exit</text>
+  <!-- vhost -->
+  <text class="t-l mid" x="471.5" y="34">vhost</text>
+  <rect class="box blue" x="386" y="48" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-blue" x="396" y="68">게스트</text>
+  <text class="t-s t-ink t-b" x="396" y="89">virtio-net 드라이버</text>
+  <rect class="ghost dash" x="386" y="126" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-green" x="396" y="146">VMM · 유저 공간</text>
+  <text class="t-s t-ink" x="396" y="167">설정만 맡는다</text>
+  <rect class="box yellow" x="386" y="204" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-yellow" x="396" y="224">호스트 커널</text>
+  <text class="t-s t-ink t-b" x="396" y="245">vhost + 네트워크 스택</text>
+  <rect class="box gray" x="386" y="282" width="171" height="40" rx="10"/>
+  <text class="t-s t-ink mid" x="471.5" y="307">물리 NIC</text>
+  <path class="ln red" d="M531 102 V200" marker-end="url(#ah-red)"/>
+  <path class="ln" d="M531 258 V278" marker-end="url(#ah)"/>
+  <text class="t-xs t-ink mid" x="471.5" y="346">킥은 커널에서 끝난다</text>
+  <!-- 패스스루 -->
+  <text class="t-l mid" x="654.5" y="34">패스스루</text>
+  <rect class="box blue" x="569" y="48" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-blue" x="579" y="68">게스트</text>
+  <text class="t-s t-ink t-b" x="579" y="89">실제 NIC의 드라이버</text>
+  <rect class="ghost dash" x="569" y="126" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-green" x="579" y="146">VMM · 유저 공간</text>
+  <text class="t-s t-ink" x="579" y="167">설정만 맡는다</text>
+  <rect class="ghost dash" x="569" y="204" width="171" height="54" rx="10"/>
+  <text class="t-xs tc-yellow" x="579" y="224">호스트 커널</text>
+  <text class="t-s t-ink" x="579" y="245">IOMMU 설정만 맡는다</text>
+  <rect class="box gray" x="569" y="282" width="171" height="40" rx="10"/>
+  <text class="t-s t-ink mid" x="654.5" y="307">물리 NIC</text>
+  <path class="ln blue" d="M714 102 V278" marker-end="url(#ah-blue)"/>
+  <text class="t-xs t-ink mid" x="654.5" y="346">데이터 경로에 exit 없음</text>
+
+  <path class="ln thin muted" d="M20 360 H740"/>
+  <path class="ln red" d="M20 380 H46" marker-end="url(#ah-red)"/>
+  <text class="t-xs" x="54" y="384">VM exit을 일으키는 구간</text>
+  <rect class="ghost dash" x="250" y="373" width="26" height="14" rx="3"/>
+  <text class="t-xs" x="284" y="384">데이터 경로에서 빠진 층</text>
+  <text class="t-xs end" x="740" y="384">오른쪽으로 갈수록 exit이 줄고 게스트가 하드웨어에 묶인다</text>
+</svg>

@@ -1,0 +1,1128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CFS에서 EEVDF로 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="공정함을 숫자로 만드는 법과 그 숫자가 바뀐 이유">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="CFS에서 EEVDF로 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="공정함을 숫자로 만드는 법과 그 숫자가 바뀐 이유">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch05" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html" aria-current="page"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">2부 스케줄러 › <b>5장 CFS에서 EEVDF로</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-green">
+<div class="ch-kicker"><span class="ch-no">05</span><span class="part">2부 · 스케줄러</span></div>
+<h1>CFS에서 EEVDF로</h1>
+<p class="ch-sub">공정함을 숫자로 만드는 법과 그 숫자가 바뀐 이유</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 50분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c" target="_blank" rel="noopener">kernel/sched/fair.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c" target="_blank" rel="noopener">kernel/sched/core.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/deadline.c" target="_blank" rel="noopener">kernel/sched/deadline.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/tools/sched_ext/scx_simple.bpf.c" target="_blank" rel="noopener">tools/sched_ext/scx_simple.bpf.c</a></div>
+</header><div class="lead">
+<p>"CPU를 공정하게 나눈다"는 말은 쉽지만, 스케줄러는 그것을 비교할 수 있는 숫자로 바꿔야 합니다. CFS는 그 숫자로 가상 실행 시간 하나를 썼습니다. 가장 적게 돈 태스크를 고른다는 규칙은 16년을 버텼지만, "CPU를 많이 쓰지는 않아도 깨어나면 바로 돌아야 한다"는 요구를 담을 자리가 없었습니다. 그 빈자리를 메우던 휴리스틱을 걷어 내고 숫자를 하나 더 들인 것이 EEVDF입니다. 이 장은 그 숫자들이 <code>kernel/sched/fair.c</code>에서 어떻게 계산되는지 읽고, fair 클래스 위아래에 놓인 클래스들을 훑습니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>nice 값은 CPU 시간의 비율로 어떻게 바뀌는가?</li>
+<li>lag, 자격, 가상 데드라인은 각각 무엇이고 코드에서 어떻게 계산되는가?</li>
+<li>fair 클래스의 RB 트리는 무엇으로 정렬되어 있는가?</li>
+<li>slice를 줄이면 무엇이 달라지고 무엇이 그대로인가?</li>
+<li>cgroup 계층은 태스크를 고르는 데 어떻게 반영되는가?</li>
+<li>RT 태스크가 CPU를 독점해도 일반 태스크가 굶지 않는 까닭은 무엇인가?</li>
+</ul>
+</div>
+<section class="level2" id="vruntime">
+<h2><span class="sec-n">5.1</span>가상 실행 시간<a aria-label="이 절의 링크" class="anchor" href="#vruntime">#</a></h2>
+<p>CFS(Completely Fair Scheduler)의 출발점은 존재하지 않는 CPU입니다. 태스크 n개를 정말로 동시에, 각각 1/n의 속도로 실행하는 CPU입니다. 실제 CPU는 한 번에 하나만 실행하므로, 스케줄러는 <strong>지금까지 가장 덜 받은 태스크</strong>를 골라 이상에 가까이 갑니다.</p>
+<p>태스크마다 받아야 할 몫이 다를 수 있습니다. 몫은 가중치로 정합니다. 가중치가 w인 태스크의 몫은 w를 실행 가능한 모든 태스크의 가중치 합으로 나눈 값입니다. 그러면 "덜 받았다"를 비교하려면 실행 시간을 가중치로 나눠야 합니다. 이 값이 <strong>가상 실행 시간</strong>(virtual runtime), <code>vruntime</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L300" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="300" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="co">/*</span></span>
+<span id="cb1-2"><span class="co"> * delta /= w</span></span>
+<span id="cb1-3"><span class="co"> */</span></span>
+<span id="cb1-4"><span class="dt">static</span> <span class="kw">inline</span> u64 calc_delta_fair<span class="op">(</span>u64 delta<span class="op">,</span> <span class="kw">struct</span> sched_entity <span class="op">*</span>se<span class="op">)</span></span>
+<span id="cb1-5"><span class="op">{</span></span>
+<span id="cb1-6">    <span class="cf">if</span> <span class="op">(</span>se<span class="op">-&gt;</span>h_load<span class="op">.</span>weight <span class="op">!=</span> NICE_0_LOAD<span class="op">)</span></span>
+<span id="cb1-7">        delta <span class="op">=</span> __calc_delta<span class="op">(</span>delta<span class="op">,</span> NICE_0_LOAD<span class="op">,</span> <span class="op">&amp;</span>se<span class="op">-&gt;</span>h_load<span class="op">);</span></span>
+<span id="cb1-8"></span>
+<span id="cb1-9">    <span class="cf">return</span> delta<span class="op">;</span></span>
+<span id="cb1-10"><span class="op">}</span></span></code></pre></div></div>
+<p><a href="ch04.html">4장</a>에서 본 실행 시간 장부가 <code>delta_exec</code>을 내놓으면, fair 클래스는 <code>curr-&gt;vruntime += calc_delta_fair(delta_exec, curr)</code>로 가상 시간을 더합니다. 계산은 <code>delta × NICE_0_LOAD / weight</code>입니다. nice 0 태스크의 <code>vruntime</code>은 실제 시간과 같은 속도로 흐르고, 가중치가 두 배인 태스크는 절반 속도로 흐릅니다. 가중치의 필드 이름이 <code>h_load</code>인 까닭은 <a href="#group">그룹 스케줄링 절</a>에서 나옵니다.</p>
+<p>가중치는 nice 값에서 나옵니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L10673" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="10673" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><span class="dt">const</span> <span class="dt">int</span> sched_prio_to_weight<span class="op">[</span><span class="dv">40</span><span class="op">]</span> <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb2-2"> <span class="co">/* -20 */</span>     <span class="dv">88761</span><span class="op">,</span>     <span class="dv">71755</span><span class="op">,</span>     <span class="dv">56483</span><span class="op">,</span>     <span class="dv">46273</span><span class="op">,</span>     <span class="dv">36291</span><span class="op">,</span></span>
+<span id="cb2-3"> <span class="co">/* -15 */</span>     <span class="dv">29154</span><span class="op">,</span>     <span class="dv">23254</span><span class="op">,</span>     <span class="dv">18705</span><span class="op">,</span>     <span class="dv">14949</span><span class="op">,</span>     <span class="dv">11916</span><span class="op">,</span></span>
+<span id="cb2-4"> <span class="co">/* -10 */</span>      <span class="dv">9548</span><span class="op">,</span>      <span class="dv">7620</span><span class="op">,</span>      <span class="dv">6100</span><span class="op">,</span>      <span class="dv">4904</span><span class="op">,</span>      <span class="dv">3906</span><span class="op">,</span></span>
+<span id="cb2-5"> <span class="co">/*  -5 */</span>      <span class="dv">3121</span><span class="op">,</span>      <span class="dv">2501</span><span class="op">,</span>      <span class="dv">1991</span><span class="op">,</span>      <span class="dv">1586</span><span class="op">,</span>      <span class="dv">1277</span><span class="op">,</span></span>
+<span id="cb2-6"> <span class="co">/*   0 */</span>      <span class="dv">1024</span><span class="op">,</span>       <span class="dv">820</span><span class="op">,</span>       <span class="dv">655</span><span class="op">,</span>       <span class="dv">526</span><span class="op">,</span>       <span class="dv">423</span><span class="op">,</span></span>
+<span id="cb2-7"> <span class="co">/*   5 */</span>       <span class="dv">335</span><span class="op">,</span>       <span class="dv">272</span><span class="op">,</span>       <span class="dv">215</span><span class="op">,</span>       <span class="dv">172</span><span class="op">,</span>       <span class="dv">137</span><span class="op">,</span></span>
+<span id="cb2-8"> <span class="co">/*  10 */</span>       <span class="dv">110</span><span class="op">,</span>        <span class="dv">87</span><span class="op">,</span>        <span class="dv">70</span><span class="op">,</span>        <span class="dv">56</span><span class="op">,</span>        <span class="dv">45</span><span class="op">,</span></span>
+<span id="cb2-9"> <span class="co">/*  15 */</span>        <span class="dv">36</span><span class="op">,</span>        <span class="dv">29</span><span class="op">,</span>        <span class="dv">23</span><span class="op">,</span>        <span class="dv">18</span><span class="op">,</span>        <span class="dv">15</span><span class="op">,</span></span>
+<span id="cb2-10"><span class="op">};</span></span></code></pre></div></div>
+<p>이웃한 값의 비가 약 1.25입니다. nice가 1 차이 나는 두 태스크가 CPU 하나를 두고 다투면 55% 대 45%로 나뉩니다. 어느 nice 값에서 출발하든 한 단계의 효과가 같도록 등비수열로 만든 표입니다. nice 0과 nice 5라면 1024 대 335이므로 약 75% 대 25%입니다.</p>
+<figure class="fig" id="fig-vruntime-two-tasks"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 296" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>가중치가 3 대 1인 두 태스크 P와 Q. 실제 실행 시간은 4ms마다 3ms와 1ms로 나뉘지만 두 태스크의 vruntime은 같은 높이로 올라간다.</title>
+
+  <rect class="box blue" x="100" y="10" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink" x="122" y="22">P · 가중치 3</text>
+  <rect class="box warm" x="230" y="10" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink" x="252" y="22">Q · 가중치 1</text>
+  <text class="t-xs end" x="740" y="22">nice 0과 nice 5의 가중치가 대략 이 비율이다</text>
+
+  <!-- 실행 시간선: 1ms = 40px -->
+  <text class="t-s t-ink t-b" x="20" y="60">CPU</text>
+  <rect class="box blue" x="100" y="40" width="120" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="160" y="60">P 3ms</text>
+  <rect class="box warm" x="220" y="40" width="40" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="240" y="60">Q</text>
+  <rect class="box blue" x="260" y="40" width="120" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="320" y="60">P 3ms</text>
+  <rect class="box warm" x="380" y="40" width="40" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="400" y="60">Q</text>
+  <rect class="box blue" x="420" y="40" width="120" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="480" y="60">P 3ms</text>
+  <rect class="box warm" x="540" y="40" width="40" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="560" y="60">Q</text>
+  <rect class="box blue" x="580" y="40" width="120" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="640" y="60">P 3ms</text>
+  <rect class="box warm" x="700" y="40" width="40" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="720" y="60">Q</text>
+
+  <!-- vruntime 그래프: 세로 1 = 30px, 0은 y=250 -->
+  <text class="t-s t-ink t-b" x="20" y="176">vruntime</text>
+  <path class="ln thin muted" d="M100 250 H740"/>
+  <path class="ln thin muted" d="M100 250 V112"/>
+  <path class="ln thin muted dash" d="M100 220 H740"/>
+  <path class="ln thin muted dash" d="M100 190 H740"/>
+  <path class="ln thin muted dash" d="M100 160 H740"/>
+  <path class="ln thin muted dash" d="M100 130 H740"/>
+  <text class="t-code end" x="92" y="254">0</text>
+  <text class="t-code end" x="92" y="224">1</text>
+  <text class="t-code end" x="92" y="194">2</text>
+  <text class="t-code end" x="92" y="164">3</text>
+  <text class="t-code end" x="92" y="134">4</text>
+
+  <path class="ln thick blue" d="M100 250 L220 220 H260 L380 190 H420 L540 160 H580 L700 130 H740"/>
+  <path class="ln thick warm" d="M100 250 H220 L260 220 H380 L420 190 H540 L580 160 H700 L740 130"/>
+
+  <text class="t-xs tc-blue" x="112" y="212">P: 3ms 돌아야 1 오른다</text>
+  <text class="t-xs tc-warm" x="270" y="244">Q: 1ms 돌면 1 오른다</text>
+
+  <text class="t-code" x="100" y="270">0</text>
+  <text class="t-code mid" x="260" y="270">4</text>
+  <text class="t-code mid" x="420" y="270">8</text>
+  <text class="t-code mid" x="580" y="270">12</text>
+  <text class="t-code end" x="740" y="270">16ms</text>
+  <text class="t-xs mid" x="420" y="290">실제 시간. 4ms마다 두 선이 다시 만난다</text>
+</svg></div><figcaption><b>그림 5-1</b>가중치가 3 대 1인 두 태스크. 실제 실행 시간은 3 대 1로 나뉘지만 <code>vruntime</code>은 나란히 올라갑니다. 스케줄러의 일은 <code>vruntime</code>을 같게 유지하는 것입니다.</figcaption></figure>
+<p>CFS의 규칙은 한 줄이었습니다. <strong><code>vruntime</code>이 가장 작은 태스크를 고른다.</strong> 실행 가능한 태스크를 <code>vruntime</code> 순서의 RB 트리에 넣어 두고 맨 왼쪽 노드를 꺼냈습니다.</p>
+</section>
+<section class="level2" id="cfs-limit">
+<h2><span class="sec-n">5.2</span>CFS가 남긴 문제<a aria-label="이 절의 링크" class="anchor" href="#cfs-limit">#</a></h2>
+<p><code>vruntime</code> 하나는 "얼마나 많이"를 표현합니다. "얼마나 빨리"는 표현하지 못합니다.</p>
+<p>오디오 스레드를 생각해 봅시다. 10ms마다 깨어나 0.2ms 일하고 잠듭니다. CPU는 2%만 씁니다. 이 스레드에 필요한 것은 큰 몫이 아니라 깨어난 직후의 CPU입니다. nice를 낮추면 몫이 커질 뿐입니다. 실시간 정책을 주면 되지만 특권이 필요하고, 버그가 나면 시스템을 멈출 수 있습니다.</p>
+<p>CFS는 이 틈을 휴리스틱으로 메웠습니다. 잠들었다 깬 태스크의 <code>vruntime</code>을 조금 깎아 먼저 돌게 하고, 깨어난 태스크가 현재 태스크를 밀어내려면 <code>vruntime</code> 차이가 어느 문턱을 넘어야 한다는 식입니다. 문턱마다 조정값이 붙었습니다. 한 워크로드에 맞추면 다른 워크로드가 나빠졌고, 값의 뜻은 알고리즘이 아니라 경험에서 나왔습니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>CFS 시절의 자료는 <code>sched_latency_ns</code>, <code>sched_min_granularity_ns</code>, <code>sched_wakeup_granularity_ns</code> 조정으로 응답성을 다듬는 법을 설명합니다. v7.3에는 이 값들이 없습니다. fair 클래스의 조정값은 <code>base_slice_ns</code> 하나이고 <code>/sys/kernel/debug/sched/</code> 아래에 있습니다. "RB 트리의 맨 왼쪽 노드가 다음 태스크"라는 설명도 CFS의 것입니다. v7.3의 트리는 정렬 기준이 다르고, 맨 왼쪽이 뽑힌다는 보장이 없습니다.</p>
+</div>
+</section>
+<section class="level2" id="eevdf">
+<h2><span class="sec-n">5.3</span>EEVDF: lag, 자격, 가상 데드라인<a aria-label="이 절의 링크" class="anchor" href="#eevdf">#</a></h2>
+<p>EEVDF(Earliest Eligible Virtual Deadline First)는 1995년 논문에 나온 알고리즘이고, <span class="v">v6.6</span>에서 CFS의 자리를 이어받았습니다. <code>vruntime</code>과 가중치는 그대로 두고 개념 셋을 더합니다.</p>
+<p><strong>lag</strong>는 받아야 했던 몫과 실제로 받은 몫의 차이입니다. 소스의 주석이 정의를 적어 두었습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L594" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="594" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"> <span class="op">*</span> Fair schedulers conserve lag<span class="op">:</span></span>
+<span id="cb3-2"> <span class="op">*</span></span>
+<span id="cb3-3"> <span class="op">*</span>   \Sum lag_i <span class="op">=</span> <span class="dv">0</span></span>
+<span id="cb3-4"> <span class="op">*</span></span>
+<span id="cb3-5"> <span class="op">*</span> Where lag_i is given by<span class="op">:</span></span>
+<span id="cb3-6"> <span class="op">*</span></span>
+<span id="cb3-7"> <span class="op">*</span>   lag_i <span class="op">=</span> S <span class="op">-</span> s_i <span class="op">=</span> w_i <span class="op">*</span> <span class="op">(</span>V <span class="op">-</span> v_i<span class="op">)</span></span>
+<span id="cb3-8"> <span class="op">*</span></span>
+<span id="cb3-9"> <span class="op">*</span> Where S is the ideal service time and V is it<span class="ch">'s</span><span class="er"> virtual time counterpart.</span></span>
+<span id="cb3-10"> <span class="co">/* ... */</span></span>
+<span id="cb3-11"> <span class="op">*</span>       \Sum v_i <span class="op">*</span> w_i   \Sum v_i <span class="op">*</span> w_i</span>
+<span id="cb3-12"> <span class="op">*</span>   V <span class="op">=</span> <span class="op">--------------</span> <span class="op">=</span> <span class="op">--------------</span></span>
+<span id="cb3-13"> <span class="op">*</span>          \Sum w_i            W</span>
+<span id="cb3-14"> <span class="op">*</span></span>
+<span id="cb3-15"> <span class="op">*</span> Specifically<span class="op">,</span> this is the weighted average of all entity virtual runtimes<span class="op">.</span></span></code></pre></div></div>
+<p><code>v_i</code>는 태스크 i의 <code>vruntime</code>입니다. <code>V</code>는 이상적인 CPU라면 지금 모든 태스크가 도달해 있을 가상 시각이고, 실행 가능한 태스크들의 <code>vruntime</code>을 가중치로 평균한 값입니다. lag가 양수면 덜 받았고, 음수면 더 받았습니다. 모든 태스크의 lag를 더하면 0입니다. 누군가 더 받았다면 누군가는 덜 받은 것입니다.</p>
+<p><strong>자격</strong>(eligibility)은 lag가 0 이상이라는 뜻입니다. <code>v_i ≤ V</code>와 같습니다. 제 몫보다 더 받은 태스크는 다른 태스크들이 따라올 때까지 뽑히지 않습니다.</p>
+<figure class="fig" id="fig-lag-meaning"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>가상 시간 축 위에서 가중 평균 V보다 왼쪽에 있는 태스크는 lag가 양수이고 자격이 있으며, 오른쪽에 있는 태스크는 lag가 음수이고 자격이 없다.</title>
+
+  <rect class="panel green" x="20" y="48" width="380" height="118" rx="12"/>
+  <rect class="panel gray" x="400" y="48" width="340" height="118" rx="12"/>
+  <text class="t-b tc-green" x="36" y="72">자격 있음 · v ≤ V</text>
+  <text class="t-b tc-muted end" x="724" y="72">자격 없음 · v &gt; V</text>
+
+  <!-- 가상 시간 축 -->
+  <path class="ln" d="M36 120 H722" marker-end="url(#ah)"/>
+  <text class="t-xs end" x="724" y="156">가상 시간</text>
+
+  <!-- V -->
+  <path class="ln thick purple" d="M400 34 V182"/>
+  <text class="t-l tc-purple mid" x="400" y="26">V</text>
+  <text class="t-xs" x="414" y="26">실행 가능한 태스크의 vruntime 가중 평균</text>
+
+  <!-- 태스크 -->
+  <circle class="solid blue" cx="180" cy="120" r="17"/>
+  <text class="t-b t-on mid" x="180" y="125">A</text>
+  <circle class="solid" cx="440" cy="120" r="17"/>
+  <text class="t-b t-on mid" x="440" y="125">B</text>
+  <circle class="solid" cx="580" cy="120" r="17"/>
+  <text class="t-b t-on mid" x="580" y="125">C</text>
+
+  <!-- lag -->
+  <path class="ln green" d="M180 94 H394" marker-end="url(#ah-green)"/>
+  <text class="t-s tc-green mid" x="288" y="88">lag &gt; 0 · 덜 받았다</text>
+  <path class="ln red" d="M580 94 H406" marker-end="url(#ah-red)"/>
+  <text class="t-s tc-red mid" x="520" y="88">lag &lt; 0 · 더 받았다</text>
+
+  <text class="t-s t-ink mid" x="380" y="208">lag = 가중치 × (V − vruntime). 이상적인 CPU라면 모든 태스크가 V에 있다</text>
+  <text class="t-s mid" x="380" y="232">세 태스크의 가중치가 같다면 A의 lag는 B와 C의 lag를 더한 것과 크기가 같다. 합은 언제나 0이다</text>
+</svg></div><figcaption><b>그림 5-2</b>가상 시간 축 위의 세 태스크. 평균 <code>V</code>보다 왼쪽에 있으면 덜 받은 것(lag &gt; 0)이고 자격이 있습니다. 오른쪽에 있으면 더 받은 것이고 자격이 없습니다.</figcaption></figure>
+<p><strong>가상 데드라인</strong>(virtual deadline)은 "이 태스크의 다음 요청이 끝나 있어야 할 가상 시각"입니다. 요청의 크기가 <strong>slice</strong>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L1289" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="1289" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="dt">static</span> <span class="dt">bool</span> update_deadline<span class="op">(</span><span class="kw">struct</span> cfs_rq <span class="op">*</span>cfs_rq<span class="op">,</span> <span class="kw">struct</span> sched_entity <span class="op">*</span>se<span class="op">)</span></span>
+<span id="cb4-2"><span class="op">{</span></span>
+<span id="cb4-3">    <span class="cf">if</span> <span class="op">(</span>vruntime_cmp<span class="op">(</span>se<span class="op">-&gt;</span>vruntime<span class="op">,</span> <span class="st">"&lt;"</span><span class="op">,</span> se<span class="op">-&gt;</span>deadline<span class="op">))</span></span>
+<span id="cb4-4">        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb4-5">    <span class="co">/* ... */</span></span>
+<span id="cb4-6">    <span class="cf">if</span> <span class="op">(!</span>se<span class="op">-&gt;</span>custom_slice<span class="op">)</span></span>
+<span id="cb4-7">        se<span class="op">-&gt;</span>slice <span class="op">=</span> sysctl_sched_base_slice<span class="op">;</span></span>
+<span id="cb4-8"></span>
+<span id="cb4-9">    <span class="co">/*</span></span>
+<span id="cb4-10"><span class="co">     * EEVDF: vd_i = ve_i + r_i / w_i</span></span>
+<span id="cb4-11"><span class="co">     */</span></span>
+<span id="cb4-12">    se<span class="op">-&gt;</span>deadline <span class="op">=</span> se<span class="op">-&gt;</span>vruntime <span class="op">+</span> calc_delta_fair<span class="op">(</span>se<span class="op">-&gt;</span>slice<span class="op">,</span> se<span class="op">);</span></span>
+<span id="cb4-13">    avg_vruntime<span class="op">(</span>cfs_rq<span class="op">);</span></span>
+<span id="cb4-14"></span>
+<span id="cb4-15">    <span class="co">/*</span></span>
+<span id="cb4-16"><span class="co">     * The task has consumed its request, reschedule.</span></span>
+<span id="cb4-17"><span class="co">     */</span></span>
+<span id="cb4-18">    <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb4-19"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 두 군데입니다.</p>
+<ul>
+<li>데드라인은 <code>vruntime + slice / weight</code>입니다. slice가 짧을수록, 가중치가 클수록 데드라인이 가깝습니다.</li>
+<li><code>vruntime</code>이 데드라인에 닿으면 요청 하나를 다 쓴 것입니다. 새 데드라인을 받고 <code>true</code>를 반환합니다. 호출한 <code>update_curr()</code>는 이것을 보고 재스케줄을 요청합니다(<a href="ch06.html">6장</a>에서 본 <code>resched_curr_lazy()</code> 호출이 그 자리입니다).</li>
+</ul>
+<p>고르는 규칙은 이름 그대로입니다. <strong>자격 있는 태스크 가운데 가상 데드라인이 가장 이른 것.</strong> 자격이 "얼마나 많이"를 지키고, 데드라인이 "얼마나 빨리"를 정합니다.</p>
+<section class="level3" id="숫자로-따라가기">
+<h3>숫자로 따라가기</h3>
+<p>태스크 셋이 CPU 하나에서 돕니다. 가중치는 A가 2, B와 C가 1입니다. slice는 A 3ms, B 4ms, C 1ms입니다. 모두 <code>vruntime</code> 0에서 시작하고, 뽑힌 태스크는 slice를 다 쓴다고 단순화합니다.</p>
+<div class="table-wrap"><table style="width:100%;">
+<colgroup>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+</colgroup>
+<thead>
+<tr>
+<th>단계</th>
+<th>V</th>
+<th>A (v, 데드라인)</th>
+<th>B (v, 데드라인)</th>
+<th>C (v, 데드라인)</th>
+<th>뽑히는 태스크</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>①</td>
+<td>0</td>
+<td>0, 1.5</td>
+<td>0, 4</td>
+<td>0, 1</td>
+<td>C. 셋 다 자격이 있고 데드라인이 가장 이릅니다.</td>
+</tr>
+<tr>
+<td>②</td>
+<td>0.25</td>
+<td>0, 1.5</td>
+<td>0, 4</td>
+<td><strong>1</strong>, 2</td>
+<td>A. C는 자격이 없습니다.</td>
+</tr>
+<tr>
+<td>③</td>
+<td>1</td>
+<td><strong>1.5</strong>, 3</td>
+<td>0, 4</td>
+<td>1, 2</td>
+<td>C. A는 자격이 없고, C가 B보다 이릅니다.</td>
+</tr>
+<tr>
+<td>④</td>
+<td>1.25</td>
+<td>1.5, 3</td>
+<td>0, 4</td>
+<td><strong>2</strong>, 3</td>
+<td>B. 데드라인은 가장 늦지만 혼자 자격이 있습니다.</td>
+</tr>
+</tbody>
+</table></div>
+<p>A가 3ms 돌면 <code>vruntime</code>은 3/2 = 1.5만큼 오릅니다. ②의 <code>V</code>는 (2×0 + 1×0 + 1×1) / 4 = 0.25입니다. ③이 CFS와 갈리는 자리입니다. <code>vruntime</code>이 가장 작은 것은 B인데 EEVDF는 C를 고릅니다. C는 slice가 짧아 데드라인이 이르기 때문입니다. 그렇다고 C가 더 많이 받는 것은 아닙니다. ④에서 C는 자격을 잃고, 그동안 밀린 B가 4ms를 한 번에 받습니다. 9ms 동안 A는 3ms, B는 4ms, C는 2ms를 받았고 lag는 차례로 +1.5, −1.75, +0.25입니다. 합은 0입니다.</p>
+<figure class="fig" id="fig-eevdf-pick"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 296" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>EEVDF의 선택 예: V가 1일 때 A는 vruntime 1.5로 자격이 없고, B와 C는 자격이 있다. 그 가운데 가상 데드라인이 2로 더 이른 C가 뽑힌다.</title>
+
+  <!-- 축: 0은 x=150, 1 = 140px -->
+  <path class="ln thick purple" d="M290 30 V212"/>
+  <text class="t-b tc-purple" x="298" y="24">V = 1</text>
+  <text class="t-xs" x="352" y="24">이 선의 왼쪽에서 시작하는 태스크만 후보</text>
+
+  <text class="t-b" x="20" y="64">A</text>
+  <text class="t-xs" x="38" y="64">가중치 2 · 3ms</text>
+  <rect class="box gray" x="360" y="44" width="210" height="32" rx="6"/>
+  <rect x="360" y="44" width="210" height="32" rx="6" fill="url(#hatch)"/>
+  <text class="t-s tc-muted" x="580" y="65">자격 없음 (1.5 &gt; V)</text>
+
+  <text class="t-b" x="20" y="116">B</text>
+  <text class="t-xs" x="38" y="116">가중치 1 · 4ms</text>
+  <rect class="box green" x="150" y="96" width="560" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="500" y="117">자격 있음 · 데드라인 4</text>
+
+  <text class="t-b" x="20" y="168">C</text>
+  <text class="t-xs" x="38" y="168">가중치 1 · 1ms</text>
+  <rect class="solid green" x="290" y="148" width="140" height="32" rx="6"/>
+  <text class="t-s t-b t-on mid" x="360" y="169">데드라인 2</text>
+  <path class="ln green" d="M440 164 H470" marker-start="url(#ah-green)"/>
+  <text class="t-s t-ink t-b" x="478" y="169">가장 이르다. C가 뽑힌다</text>
+
+  <!-- 눈금 -->
+  <path class="ln thin muted" d="M150 206 H726" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M150 200 V212"/>
+  <path class="ln thin muted" d="M430 200 V212"/>
+  <path class="ln thin muted" d="M570 200 V212"/>
+  <path class="ln thin muted" d="M710 200 V212"/>
+  <text class="t-code mid" x="150" y="230">0</text>
+  <text class="t-code mid" x="290" y="230">1</text>
+  <text class="t-code mid" x="430" y="230">2</text>
+  <text class="t-code mid" x="570" y="230">3</text>
+  <text class="t-code mid" x="710" y="230">4</text>
+  <text class="t-xs" x="20" y="230">가상 시간</text>
+
+  <text class="t-s t-ink mid" x="380" y="268">막대의 왼쪽 끝은 vruntime, 오른쪽 끝은 가상 데드라인(vruntime + slice ÷ 가중치)이다</text>
+  <text class="t-xs mid" x="380" y="288">CFS라면 vruntime이 가장 작은 B를 골랐을 것이다</text>
+</svg></div><figcaption><b>그림 5-3</b>표의 ③ 단계. 자격선 <code>V</code>의 왼쪽에 있는 B와 C만 후보이고, 그 가운데 데드라인이 이른 C가 뽑힙니다.</figcaption></figure>
+</section>
+</section>
+<section class="level2" id="pick">
+<h2><span class="sec-n">5.4</span>트리에서 고르기<a aria-label="이 절의 링크" class="anchor" href="#pick">#</a></h2>
+<p>"자격 있는 것 중 데드라인이 가장 이른 것"을 빨리 찾으려면 정렬 기준이 둘 필요합니다. 데드라인과 <code>vruntime</code>입니다. 트리 하나로 둘을 처리하는 방법이 <strong>증강 RB 트리</strong>(augmented rbtree)입니다.</p>
+<ul>
+<li>트리(<code>cfs_rq-&gt;tasks_timeline</code>)는 <strong>데드라인</strong>으로 정렬합니다.</li>
+<li>각 노드는 자기 서브트리 안의 가장 작은 <code>vruntime</code>을 <code>min_vruntime</code>에 따로 적어 둡니다. 노드를 넣고 뺄 때 조상들의 값이 함께 갱신됩니다.</li>
+</ul>
+<figure class="fig" id="fig-tree-compare"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>CFS의 RB 트리는 vruntime으로 정렬되어 맨 왼쪽 노드가 다음 태스크였다. EEVDF의 트리는 데드라인으로 정렬하고 노드마다 서브트리의 최소 vruntime을 적어, 자격 없는 서브트리를 건너뛰며 자격 있는 것 중 데드라인이 가장 이른 노드를 찾는다.</title>
+
+  <!-- CFS -->
+  <rect class="panel gray" x="20" y="14" width="280" height="312" rx="14"/>
+  <text class="t-b" x="36" y="40">CFS</text>
+  <text class="t-xs" x="36" y="58">vruntime으로 정렬</text>
+
+  <path class="ln thin" d="M180 110 L128 140"/>
+  <path class="ln thin" d="M180 110 L232 140"/>
+  <path class="ln thin" d="M128 170 L76 200"/>
+  <path class="ln thin" d="M232 170 L204 200"/>
+  <rect class="box" x="148" y="80" width="64" height="30" rx="6"/>
+  <text class="t-code mid" x="180" y="100">v 11</text>
+  <rect class="box" x="96" y="140" width="64" height="30" rx="6"/>
+  <text class="t-code mid" x="128" y="160">v 9</text>
+  <rect class="box" x="200" y="140" width="64" height="30" rx="6"/>
+  <text class="t-code mid" x="232" y="160">v 13</text>
+  <rect class="solid green" x="44" y="200" width="64" height="30" rx="6"/>
+  <text class="t-code t-b t-on mid" x="76" y="220">v 6</text>
+  <rect class="box" x="172" y="200" width="64" height="30" rx="6"/>
+  <text class="t-code mid" x="204" y="220">v 12</text>
+
+  <text class="t-s t-ink" x="36" y="272">맨 왼쪽 노드가 답이다</text>
+  <text class="t-xs" x="36" y="292">vruntime이 가장 작은 태스크.</text>
+  <text class="t-xs" x="36" y="310">트리를 내려갈 필요가 없다.</text>
+
+  <!-- EEVDF -->
+  <rect class="panel green" x="320" y="14" width="420" height="312" rx="14"/>
+  <text class="t-b" x="336" y="40">EEVDF</text>
+  <text class="t-xs" x="336" y="58">데드라인(d)으로 정렬 · 노드마다 서브트리의 min_vruntime</text>
+  <text class="t-code t-b tc-purple end" x="724" y="40">V = 10</text>
+
+  <path class="ln thin muted dash" d="M520 124 L404 150"/>
+  <path class="ln thick green" d="M520 124 L628 150"/>
+  <path class="ln thick green" d="M628 194 L572 220"/>
+  <path class="ln thin" d="M628 194 L684 220"/>
+
+  <rect class="box gray" x="468" y="80" width="104" height="44" rx="6"/>
+  <text class="t-code t-b mid" x="520" y="98">d 14</text>
+  <text class="t-code mid" x="520" y="116">v 13 · min 6</text>
+
+  <rect class="box gray" x="352" y="150" width="104" height="44" rx="6"/>
+  <text class="t-code t-b mid" x="404" y="168">d 12</text>
+  <text class="t-code mid" x="404" y="186">v 11 · min 11</text>
+
+  <rect class="box green" x="576" y="150" width="104" height="44" rx="6"/>
+  <text class="t-code t-b mid" x="628" y="168">d 18</text>
+  <text class="t-code mid" x="628" y="186">v 6 · min 6</text>
+
+  <rect class="solid green" x="520" y="220" width="104" height="44" rx="6"/>
+  <text class="t-code t-b t-on mid" x="572" y="238">d 15</text>
+  <text class="t-code t-on mid" x="572" y="256">v 9 · min 9</text>
+
+  <rect class="box gray" x="632" y="220" width="104" height="44" rx="6"/>
+  <text class="t-code t-b mid" x="684" y="238">d 20</text>
+  <text class="t-code mid" x="684" y="256">v 12 · min 12</text>
+
+  <text class="t-xs tc-red" x="336" y="216">min 11 &gt; V</text>
+  <text class="t-xs tc-red" x="336" y="232">서브트리를 통째로</text>
+  <text class="t-xs tc-red" x="336" y="248">건너뛴다</text>
+
+  <text class="t-s t-ink" x="336" y="290">맨 왼쪽(d 12)은 자격이 없다. 위에서부터 내려간다</text>
+  <text class="t-xs" x="336" y="310">자격 있는 v 6과 v 9 가운데 데드라인이 이른 d 15가 답이다</text>
+</svg></div><figcaption><b>그림 5-4</b>CFS의 트리는 <code>vruntime</code>으로 정렬되어 맨 왼쪽이 답이었습니다. EEVDF의 트리는 데드라인으로 정렬하고, 노드마다 서브트리의 최소 <code>vruntime</code>을 적어 자격 없는 가지를 통째로 건너뜁니다.</figcaption></figure>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L1187" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="1187" id="cb5"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb5-1"><span class="dt">static</span> <span class="kw">struct</span> sched_entity <span class="op">*</span>pick_eevdf<span class="op">(</span><span class="kw">struct</span> cfs_rq <span class="op">*</span>cfs_rq<span class="op">,</span> <span class="dt">bool</span> protect<span class="op">)</span></span>
+<span id="cb5-2"><span class="op">{</span></span>
+<span id="cb5-3">    <span class="co">/* ... */</span></span>
+<span id="cb5-4">    <span class="cf">if</span> <span class="op">(</span>curr <span class="op">&amp;&amp;</span> <span class="op">(!</span>curr<span class="op">-&gt;</span>on_rq <span class="op">||</span> <span class="op">!</span>entity_eligible<span class="op">(</span>cfs_rq<span class="op">,</span> curr<span class="op">)))</span></span>
+<span id="cb5-5">        curr <span class="op">=</span> NULL<span class="op">;</span></span>
+<span id="cb5-6"></span>
+<span id="cb5-7">    <span class="cf">if</span> <span class="op">(</span>curr <span class="op">&amp;&amp;</span> protect <span class="op">&amp;&amp;</span> protect_slice<span class="op">(</span>curr<span class="op">))</span></span>
+<span id="cb5-8">        <span class="cf">return</span> curr<span class="op">;</span></span>
+<span id="cb5-9"></span>
+<span id="cb5-10">    <span class="co">/* Pick the leftmost entity if it's eligible */</span></span>
+<span id="cb5-11">    <span class="cf">if</span> <span class="op">(</span>se <span class="op">&amp;&amp;</span> entity_eligible<span class="op">(</span>cfs_rq<span class="op">,</span> se<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb5-12">        best <span class="op">=</span> se<span class="op">;</span></span>
+<span id="cb5-13">        <span class="cf">goto</span> found<span class="op">;</span></span>
+<span id="cb5-14">    <span class="op">}</span></span>
+<span id="cb5-15"></span>
+<span id="cb5-16">    <span class="co">/* Heap search for the EEVD entity */</span></span>
+<span id="cb5-17">    <span class="cf">while</span> <span class="op">(</span>node<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-18">        <span class="kw">struct</span> rb_node <span class="op">*</span>left <span class="op">=</span> node<span class="op">-&gt;</span>rb_left<span class="op">;</span></span>
+<span id="cb5-19">        <span class="co">/* ... */</span></span>
+<span id="cb5-20">        <span class="cf">if</span> <span class="op">(</span>left <span class="op">&amp;&amp;</span> vruntime_eligible<span class="op">(</span>cfs_rq<span class="op">,</span></span>
+<span id="cb5-21">                    __node_2_se<span class="op">(</span>left<span class="op">)-&gt;</span>min_vruntime<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb5-22">            node <span class="op">=</span> left<span class="op">;</span></span>
+<span id="cb5-23">            <span class="cf">continue</span><span class="op">;</span></span>
+<span id="cb5-24">        <span class="op">}</span></span>
+<span id="cb5-25"></span>
+<span id="cb5-26">        se <span class="op">=</span> __node_2_se<span class="op">(</span>node<span class="op">);</span></span>
+<span id="cb5-27">        <span class="co">/* ... */</span></span>
+<span id="cb5-28">        <span class="cf">if</span> <span class="op">(</span>entity_eligible<span class="op">(</span>cfs_rq<span class="op">,</span> se<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb5-29">            best <span class="op">=</span> se<span class="op">;</span></span>
+<span id="cb5-30">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb5-31">        <span class="op">}</span></span>
+<span id="cb5-32"></span>
+<span id="cb5-33">        node <span class="op">=</span> node<span class="op">-&gt;</span>rb_right<span class="op">;</span></span>
+<span id="cb5-34">    <span class="op">}</span></span>
+<span id="cb5-35">found<span class="op">:</span></span>
+<span id="cb5-36">    <span class="cf">if</span> <span class="op">(!</span>best <span class="op">||</span> <span class="op">(</span>curr <span class="op">&amp;&amp;</span> entity_before<span class="op">(</span>curr<span class="op">,</span> best<span class="op">)))</span></span>
+<span id="cb5-37">        best <span class="op">=</span> curr<span class="op">;</span></span>
+<span id="cb5-38"></span>
+<span id="cb5-39">    <span class="cf">return</span> best<span class="op">;</span></span>
+<span id="cb5-40"><span class="op">}</span></span></code></pre></div></div>
+<p><code>node</code>는 트리의 루트에서, <code>se</code>는 맨 왼쪽 노드에서 시작합니다. 읽을 곳은 네 군데입니다.</p>
+<ul>
+<li><strong>실행 중인 태스크는 트리 밖에 있습니다.</strong> <code>cfs_rq-&gt;curr</code>가 따로 가리킵니다. 그래서 트리에서 찾은 답과 <code>curr</code>를 마지막에 한 번 더 견줍니다.</li>
+<li><strong>맨 왼쪽이 자격 있으면 끝입니다.</strong> 데드라인이 가장 이른 노드이므로 더 볼 것이 없습니다. 흔한 경우입니다.</li>
+<li><strong>아니면 위에서 내려갑니다.</strong> 왼쪽 서브트리의 <code>min_vruntime</code>이 자격선 안이면 그 안에 자격 있는 노드가 있고, 왼쪽은 데드라인이 더 이르므로 왼쪽으로 갑니다. 아니면 자기 자신을 보고, 그것도 아니면 오른쪽으로 갑니다. 높이만큼만 내려가므로 O(log n)입니다.</li>
+<li><strong><code>protect_slice()</code>.</strong> 현재 태스크가 보호받는 구간 안이면 다시 고르지 않고 그대로 둡니다. 다음 절에서 봅니다.</li>
+</ul>
+<p>자격 판정은 <code>V</code>를 구해 비교하지 않습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L922" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="922" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="dt">static</span> <span class="dt">int</span> vruntime_eligible<span class="op">(</span><span class="kw">struct</span> cfs_rq <span class="op">*</span>cfs_rq<span class="op">,</span> u64 vruntime<span class="op">)</span></span>
+<span id="cb6-2"><span class="op">{</span></span>
+<span id="cb6-3">    <span class="kw">struct</span> sched_entity <span class="op">*</span>curr <span class="op">=</span> cfs_rq<span class="op">-&gt;</span>curr<span class="op">;</span></span>
+<span id="cb6-4">    s64 key<span class="op">,</span> avg <span class="op">=</span> cfs_rq<span class="op">-&gt;</span>sum_w_vruntime<span class="op">;</span></span>
+<span id="cb6-5">    <span class="dt">long</span> load <span class="op">=</span> cfs_rq<span class="op">-&gt;</span>sum_weight<span class="op">;</span></span>
+<span id="cb6-6"></span>
+<span id="cb6-7">    <span class="cf">if</span> <span class="op">(</span>curr <span class="op">&amp;&amp;</span> curr<span class="op">-&gt;</span>on_rq<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb6-8">        <span class="dt">unsigned</span> <span class="dt">long</span> weight <span class="op">=</span> avg_vruntime_weight<span class="op">(</span>cfs_rq<span class="op">,</span> curr<span class="op">-&gt;</span>h_load<span class="op">.</span>weight<span class="op">);</span></span>
+<span id="cb6-9"></span>
+<span id="cb6-10">        avg <span class="op">+=</span> entity_key<span class="op">(</span>cfs_rq<span class="op">,</span> curr<span class="op">)</span> <span class="op">*</span> weight<span class="op">;</span></span>
+<span id="cb6-11">        load <span class="op">+=</span> weight<span class="op">;</span></span>
+<span id="cb6-12">    <span class="op">}</span></span>
+<span id="cb6-13"></span>
+<span id="cb6-14">    key <span class="op">=</span> vruntime_op<span class="op">(</span>vruntime<span class="op">,</span> <span class="st">"-"</span><span class="op">,</span> cfs_rq<span class="op">-&gt;</span>zero_vruntime<span class="op">);</span></span>
+<span id="cb6-15">    <span class="co">/* ... */</span></span>
+<span id="cb6-16">    <span class="cf">return</span> avg <span class="op">&gt;=</span> <span class="op">(</span>__int128<span class="op">)</span>key <span class="op">*</span> load<span class="op">;</span></span>
+<span id="cb6-17">    <span class="co">/* ... */</span></span>
+<span id="cb6-18"><span class="op">}</span></span></code></pre></div></div>
+<p><code>V</code>는 나눗셈의 결과라 정밀도를 잃습니다. 그래서 <code>v ≤ V</code>의 양변에 가중치 합을 곱해 <code>Σ(v_i − v0)·w_i ≥ (v − v0)·Σw_i</code>를 곱셈으로 판정합니다. <code>cfs_rq</code>는 좌변의 합(<code>sum_w_vruntime</code>)과 가중치 합(<code>sum_weight</code>)을 태스크가 트리에 드나들 때마다 갱신해 둡니다. 트리 밖에 있는 <code>curr</code>의 몫은 여기서 따로 더합니다. <code>vruntime</code>을 그대로 쓰지 않고 기준점 <code>zero_vruntime</code>과의 차이로 다루는 것은 64비트 곱셈이 넘치지 않게 하려는 것입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>정렬 기준이 둘이라고 자료구조를 둘 두면, 넣고 뺄 때마다 둘을 맞춰야 하고 어긋날 틈이 생깁니다. 증강 트리는 한 기준으로 정렬하고 다른 기준은 <strong>서브트리의 요약값</strong>으로 얹습니다. 요약값만 보고 가지를 버릴 수 있으면 탐색은 여전히 O(log n)입니다. 커널의 <code>rbtree_augmented.h</code>가 이 패턴을 일반화해 두었고, 메모리 관리의 구간 트리도 같은 방식으로 "서브트리 안의 가장 먼 끝점"을 얹습니다.</p>
+</div>
+</section>
+<section class="level2" id="slice">
+<h2><span class="sec-n">5.5</span>slice와 지연 시간<a aria-label="이 절의 링크" class="anchor" href="#slice">#</a></h2>
+<p>slice는 "한 번에 얼마씩 받겠다"는 요청의 크기입니다. 총량에는 영향이 없습니다. 총량은 가중치가 정합니다. slice가 정하는 것은 <strong>잘게 자주 받을지, 크게 드물게 받을지</strong>입니다.</p>
+<figure class="fig" id="fig-slice-latency"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>CPU를 계속 쓰는 태스크 L이 도는 중에 태스크 S가 깨어난다. S의 slice가 L과 같으면 L의 보호 구간이 끝날 때까지 기다리고, slice가 짧으면 깨어나자마자 실행된다. S가 받는 CPU 시간은 같다.</title>
+
+  <text class="t-xs mid" x="250" y="18">S가 깨어난다</text>
+  <path class="ln thin muted dash" d="M250 24 V200"/>
+
+  <text class="t-s t-ink t-b" x="20" y="46">S의 slice가 L과 같을 때</text>
+  <rect class="box blue" x="100" y="56" width="320" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="175" y="76">L 실행</text>
+  <rect class="box warm" x="420" y="56" width="40" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="440" y="76">S</text>
+  <rect class="box blue" x="460" y="56" width="280" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="600" y="76">L 실행</text>
+  <rect class="solid red" x="250" y="90" width="170" height="6" rx="3"/>
+  <text class="t-xs tc-red" x="256" y="112">S가 기다린다. L은 보호 구간이 끝날 때까지 끊기지 않는다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="146">S의 slice가 더 짧을 때</text>
+  <rect class="box blue" x="100" y="156" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="175" y="176">L 실행</text>
+  <rect class="box warm" x="250" y="156" width="40" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="270" y="176">S</text>
+  <rect class="box blue" x="290" y="156" width="450" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="515" y="176">L 실행</text>
+  <text class="t-xs tc-green" x="256" y="208">S의 데드라인이 더 이르다. PREEMPT_SHORT가 L의 보호를 풀고 바로 바꾼다</text>
+
+  <text class="t-s t-ink mid" x="380" y="240">두 경우에 S가 받는 CPU 시간은 같다. 달라지는 것은 기다리는 시간이다</text>
+  <text class="t-xs mid" x="380" y="260">가중치가 받는 총량을 정하고, slice가 받는 시점을 정한다</text>
+</svg></div><figcaption><b>그림 5-5</b>CPU를 계속 쓰는 태스크 L이 도는 중에 S가 깨어납니다. S의 slice가 L과 같으면 L의 보호 구간이 끝날 때까지 기다리고, 더 짧으면 깨어나자마자 뽑힙니다. S가 받는 CPU 시간은 같습니다.</figcaption></figure>
+<p>기본값은 <code>sysctl_sched_base_slice</code>입니다. 소스의 초기값은 0.7ms이고, 부팅 때 CPU 수에 따라 <code>1 + log2(min(CPU 수, 8))</code>배가 됩니다. CPU가 8개 이상이면 2.8ms입니다. 태스크마다 다른 값을 주려면 <code>sched_setattr()</code>의 <code>sched_runtime</code> 필드를 씁니다. 원래 <code>SCHED_DEADLINE</code>용이던 필드를 일반 태스크의 slice 요청으로도 쓰게 한 것입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L6366" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="6366" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="dt">void</span> __setparam_fair<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="dt">const</span> <span class="kw">struct</span> sched_attr <span class="op">*</span>attr<span class="op">)</span></span>
+<span id="cb7-2"><span class="op">{</span></span>
+<span id="cb7-3">    <span class="kw">struct</span> sched_entity <span class="op">*</span>se <span class="op">=</span> <span class="op">&amp;</span>p<span class="op">-&gt;</span>se<span class="op">;</span></span>
+<span id="cb7-4"></span>
+<span id="cb7-5">    p<span class="op">-&gt;</span>static_prio <span class="op">=</span> NICE_TO_PRIO<span class="op">(</span>attr<span class="op">-&gt;</span>sched_nice<span class="op">);</span></span>
+<span id="cb7-6">    <span class="cf">if</span> <span class="op">(</span>attr<span class="op">-&gt;</span>sched_runtime<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb7-7">        se<span class="op">-&gt;</span>custom_slice <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb7-8">        se<span class="op">-&gt;</span>slice <span class="op">=</span> clamp_t<span class="op">(</span>u64<span class="op">,</span> attr<span class="op">-&gt;</span>sched_runtime<span class="op">,</span></span>
+<span id="cb7-9">                      NSEC_PER_MSEC<span class="op">/</span><span class="dv">10</span><span class="op">,</span>   <span class="co">/* HZ=1000 * 10 */</span></span>
+<span id="cb7-10">                      NSEC_PER_MSEC<span class="op">*</span><span class="dv">100</span><span class="op">);</span> <span class="co">/* HZ=100  / 10 */</span></span>
+<span id="cb7-11">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb7-12">        se<span class="op">-&gt;</span>custom_slice <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb7-13">        se<span class="op">-&gt;</span>slice <span class="op">=</span> sysctl_sched_base_slice<span class="op">;</span></span>
+<span id="cb7-14">    <span class="op">}</span></span>
+<span id="cb7-15"><span class="op">}</span></span></code></pre></div></div>
+<p>허용 범위는 0.1ms에서 100ms입니다. 특권이 필요 없습니다. slice를 줄인다고 남의 몫을 빼앗지 않기 때문입니다. 앞 절의 오디오 스레드는 slice를 짧게 요청하면 됩니다.</p>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"nice 값을 낮추면 응답이 빨라진다." nice는 가중치, 곧 받는 <strong>양</strong>을 바꿉니다. 양이 늘면 자격을 잃는 일이 줄어 결과적으로 덜 기다리기는 하지만, 그 대가로 다른 태스크의 몫을 가져옵니다. 응답 시간만 필요하다면 바꿀 것은 slice입니다.</p>
+</div>
+<p>뽑힌 태스크가 얼마나 방해받지 않고 도는지는 <code>kernel/sched/features.h</code>의 기능 플래그가 정합니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>플래그</th>
+<th>기본</th>
+<th>하는 일</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RUN_TO_PARITY</code></td>
+<td>켜짐</td>
+<td>뽑힌 태스크는 lag가 0이 되는 지점이나 slice 끝까지 깨우기 선점을 받지 않습니다.</td>
+</tr>
+<tr>
+<td><code>PREEMPT_SHORT</code></td>
+<td>켜짐</td>
+<td>깨어난 태스크의 slice가 현재 태스크보다 짧으면 위의 보호를 풉니다.</td>
+</tr>
+<tr>
+<td><code>PLACE_LAG</code></td>
+<td>켜짐</td>
+<td>잠들 때의 lag를 깨어날 때 되살립니다.</td>
+</tr>
+<tr>
+<td><code>DELAY_DEQUEUE</code></td>
+<td>켜짐</td>
+<td>자격 없는 태스크가 잠들면 큐에서 바로 빼지 않습니다.</td>
+</tr>
+</tbody>
+</table></div>
+<p>앞의 <code>pick_eevdf()</code>에 있던 <code>protect_slice(curr)</code>가 이 보호 구간을 확인하는 자리입니다. 보호가 없으면 태스크가 깨어날 때마다 현재 태스크가 끊겨 컨텍스트 스위치만 늘어납니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>fair 클래스의 조정값과 태스크의 상태를 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># cat /sys/kernel/debug/sched/base_slice_ns
+2800000
+# cat /sys/kernel/debug/sched/features
+PLACE_LAG PLACE_DEADLINE_INITIAL PLACE_REL_DEADLINE RUN_TO_PARITY PREEMPT_SHORT NO_NEXT_BUDDY ...
+# grep -A12 'runnable tasks' /sys/kernel/debug/sched/debug | cut -c1-110
+runnable tasks:
+ S            task   PID     weight       vruntime   eligible    deadline             slice ...
+-------------------------------------------------------------------------------------------
+&gt;R            bash  4127    1048576    1203.456789   E    1206.256789      2.800000 ...</code></pre></div>
+<p><code>eligible</code> 열은 <code>E</code>(자격 있음)나 <code>N</code>입니다. <code>weight</code> 1048576은 nice 0의 가중치 1024를 64비트 커널이 정밀도를 위해 2^10배 한 값(<code>NICE_0_LOAD</code>)입니다. <code>deadline − vruntime</code>이 slice와 같다면 방금 새 요청을 받은 것입니다.</p>
+<p>slice를 1ms로 줄여 프로그램을 실행합니다. <code>-T</code>가 일반 정책에서 slice를 뜻하는 것은 최근 util-linux부터입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ chrt -o -T 1000000 0 sleep 100 &amp;
+$ grep se.slice /proc/$!/sched
+se.slice                                     :              1000000</code></pre></div>
+</div>
+</section>
+<section class="level2" id="sleep">
+<h2><span class="sec-n">5.6</span>잠드는 태스크와 lag<a aria-label="이 절의 링크" class="anchor" href="#sleep">#</a></h2>
+<p>태스크가 잠들면 lag를 어떻게 할지가 문제입니다. 잊어버리면 악용할 수 있습니다. slice를 다 쓴 직후에는 lag가 음수입니다. 그때 잠깐 잠들었다 깨는 것으로 빚이 지워진다면, 그런 태스크는 제 몫보다 더 받습니다. 영원히 기억하는 것도 답이 아닙니다. 한 시간 전의 lag는 지금의 경쟁과 상관이 없습니다.</p>
+<p>v7.3은 두 장치를 씁니다.</p>
+<p><strong>깨어날 때 lag를 되살립니다.</strong> 큐에서 빠질 때 <code>se-&gt;vlag</code>에 <code>V − v</code>를 적어 두고, 다시 들어올 때 <code>place_entity()</code>가 <code>se-&gt;vruntime = V − lag</code>로 자리를 잡아 줍니다. 덜 받고 잠든 태스크는 <code>V</code>보다 왼쪽에서 시작해 곧바로 자격이 있습니다. 적어 두는 lag에는 상한이 있어서(<code>entity_lag()</code>, 큐에서 가장 긴 slice에 틱 하나를 더한 만큼) 오래 굶었다고 한없이 보상받지는 않습니다. 새로 만들어진 태스크는 lag 0에서, slice의 절반만 남은 데드라인으로 시작합니다.</p>
+<p><strong>빚이 있는 태스크는 바로 빼지 않습니다.</strong> 이것이 <strong>지연 디큐</strong>(delayed dequeue)입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L8346" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="8346" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="dt">static</span> <span class="dt">bool</span> __dequeue_task<span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="dt">int</span> flags<span class="op">)</span></span>
+<span id="cb10-2"><span class="op">{</span></span>
+<span id="cb10-3">    <span class="co">/* ... */</span></span>
+<span id="cb10-4">    update_curr_eevdf<span class="op">(</span>cfs_rq<span class="op">);</span></span>
+<span id="cb10-5">    update_entity_lag<span class="op">(</span>cfs_rq<span class="op">,</span> se<span class="op">);</span></span>
+<span id="cb10-6"></span>
+<span id="cb10-7">    <span class="cf">if</span> <span class="op">(</span>flags <span class="op">&amp;</span> DEQUEUE_DELAYED<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-8">        WARN_ON_ONCE<span class="op">(!</span>se<span class="op">-&gt;</span>sched_delayed<span class="op">);</span></span>
+<span id="cb10-9">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb10-10">        <span class="dt">bool</span> delay <span class="op">=</span> task_sleep<span class="op">;</span></span>
+<span id="cb10-11">        <span class="co">/* ... */</span></span>
+<span id="cb10-12">        <span class="cf">if</span> <span class="op">(</span>sched_feat<span class="op">(</span>DELAY_DEQUEUE<span class="op">)</span> <span class="op">&amp;&amp;</span> delay <span class="op">&amp;&amp;</span></span>
+<span id="cb10-13">            <span class="op">!</span>entity_eligible<span class="op">(</span>cfs_rq<span class="op">,</span> se<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb10-14">            update_load_avg<span class="op">(</span>cfs_rq_of<span class="op">(</span>se<span class="op">),</span> se<span class="op">,</span> UPDATE_UTIL_EST<span class="op">);</span></span>
+<span id="cb10-15">            set_delayed<span class="op">(</span>se<span class="op">);</span></span>
+<span id="cb10-16">            <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb10-17">        <span class="op">}</span></span>
+<span id="cb10-18">    <span class="op">}</span></span>
+<span id="cb10-19"></span>
+<span id="cb10-20">    dequeue_hierarchy<span class="op">(</span>p<span class="op">,</span> flags<span class="op">);</span></span>
+<span id="cb10-21">    <span class="co">/* ... */</span></span>
+<span id="cb10-22"><span class="op">}</span></span></code></pre></div></div>
+<p>잠들려는 태스크에 자격이 없으면(<code>lag &lt; 0</code>) <code>sched_delayed</code> 표시만 하고 <code>false</code>를 반환합니다. 태스크는 잠든 상태지만 트리에는 남아 경쟁에 참여합니다. 다른 태스크들이 실행되어 <code>V</code>가 이 태스크의 <code>vruntime</code>을 따라잡으면 lag가 0이 되고, <code>pick_eevdf()</code>가 이 태스크를 뽑습니다. 그 순간 <code>pick_next_entity()</code>가 표시를 보고 진짜로 큐에서 뺀 뒤 다시 고릅니다. 빚을 다 갚은 뒤에야 떠나는 셈입니다. 그 전에 깨어나면 표시만 지우고 그대로 경쟁을 이어 갑니다. 4장에서 <code>dequeue_task()</code>의 반환형이 <code>bool</code>이었던 이유가 이것입니다.</p>
+</section>
+<section class="level2" id="group">
+<h2><span class="sec-n">5.7</span>그룹 스케줄링<a aria-label="이 절의 링크" class="anchor" href="#group">#</a></h2>
+<p>지금까지는 태스크끼리 나눴습니다. 컨테이너 둘이 있고 한쪽에 스레드가 100개, 다른 쪽에 1개라면 태스크 단위의 공정함은 100 대 1이 됩니다. <strong>그룹 스케줄링</strong>은 먼저 그룹끼리 나누고, 그룹의 몫을 그 안의 태스크들이 나누게 합니다. 그룹은 cgroup이고, 그룹의 가중치는 <code>cpu.weight</code> 파일로 정합니다(<a href="ch22.html">22장</a>).</p>
+<p>커널 안에서는 그룹(<code>struct task_group</code>)이 CPU마다 자기 <code>cfs_rq</code>와, 부모의 큐에서 자기를 대표하는 <code>sched_entity</code>를 하나씩 가집니다. 태스크의 <code>se-&gt;parent</code>를 따라 올라가면 루트에 닿습니다.</p>
+<p>v7.3에서 태스크를 고를 때 이 계층은 <strong>가중치를 계산하는 데만</strong> 쓰입니다. 태스크를 고르는 트리는 CPU마다 하나, 루트 <code>cfs_rq</code>의 것뿐입니다. 태스크가 큐에 들어올 때 계층을 따라 올라가며 각 단계의 비율을 곱해 실효 가중치를 구합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L4985" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="4985" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1"><span class="co">/*</span></span>
+<span id="cb11-2"><span class="co"> * weight = NICE_0_LOAD;</span></span>
+<span id="cb11-3"><span class="co"> * for_each_entity_se(se)</span></span>
+<span id="cb11-4"><span class="co"> *   weight = __calc_prop_weight(cfs_rq_of(se), se, weight);</span></span>
+<span id="cb11-5"><span class="co"> */</span></span>
+<span id="cb11-6"><span class="dt">static</span> __always_inline</span>
+<span id="cb11-7"><span class="dt">unsigned</span> <span class="dt">long</span> __calc_prop_weight<span class="op">(</span><span class="kw">struct</span> cfs_rq <span class="op">*</span>cfs_rq<span class="op">,</span> <span class="kw">struct</span> sched_entity <span class="op">*</span>se<span class="op">,</span></span>
+<span id="cb11-8">                 <span class="dt">unsigned</span> <span class="dt">long</span> weight<span class="op">)</span></span>
+<span id="cb11-9"><span class="op">{</span></span>
+<span id="cb11-10">    weight <span class="op">*=</span> se<span class="op">-&gt;</span>load<span class="op">.</span>weight<span class="op">;</span></span>
+<span id="cb11-11">    <span class="cf">if</span> <span class="op">(</span>parent_entity<span class="op">(</span>se<span class="op">))</span></span>
+<span id="cb11-12">        weight <span class="op">/=</span> cfs_rq<span class="op">-&gt;</span>load<span class="op">.</span>weight<span class="op">;</span></span>
+<span id="cb11-13">    <span class="cf">else</span></span>
+<span id="cb11-14">        weight <span class="op">/=</span> NICE_0_LOAD<span class="op">;</span></span>
+<span id="cb11-15"></span>
+<span id="cb11-16">    <span class="cf">return</span> max<span class="op">(</span>weight<span class="op">,</span> MIN_SHARES<span class="op">);</span></span>
+<span id="cb11-17"><span class="op">}</span></span></code></pre></div></div>
+<p>단계마다 "이 큐의 전체 가중치 가운데 내 가중치의 비율"을 곱합니다. 그 결과가 <code>se-&gt;h_load</code>이고, 앞에서 본 <code>calc_delta_fair()</code>와 lag 계산이 모두 이 값을 씁니다. CPU 하나에서 가중치가 같은 두 그룹에 nice 0 태스크가 각각 4개와 1개 있으면, 앞 그룹의 태스크는 nice 0 가중치의 1/4을, 뒤 그룹의 태스크는 그대로를 실효 가중치로 받아 같은 트리에서 경쟁합니다. 결과는 그룹별로 절반씩입니다.</p>
+<figure class="fig" id="fig-flat-hierarchy"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>cgroup 계층은 태스크의 실효 가중치 h_load를 정하는 데 쓰이고, 태스크는 모두 CPU의 루트 cfs_rq 트리 하나에 들어가 거기서 선택된다.</title>
+
+  <!-- 왼쪽: 계층 -->
+  <text class="t-b" x="20" y="28">cgroup 계층</text>
+  <text class="t-xs" x="112" y="28">가중치를 정한다</text>
+
+  <path class="ln thin" d="M200 78 L120 112"/>
+  <path class="ln thin" d="M200 78 L310 112"/>
+  <rect class="box gray" x="150" y="44" width="100" height="34" rx="8"/>
+  <text class="t-b mid" x="200" y="66">루트</text>
+  <text class="t-xs" x="118" y="98">1/2</text>
+  <text class="t-xs" x="270" y="98">1/2</text>
+
+  <rect class="box blue" x="30" y="112" width="180" height="46" rx="8"/>
+  <text class="t-b" x="44" y="132">그룹 G1</text>
+  <text class="t-code" x="44" y="150">cpu.weight 100</text>
+  <rect class="box warm" x="240" y="112" width="140" height="46" rx="8"/>
+  <text class="t-b" x="254" y="132">그룹 G2</text>
+  <text class="t-code" x="254" y="150">cpu.weight 100</text>
+
+  <path class="ln thin blue" d="M120 158 L52 196"/>
+  <path class="ln thin blue" d="M120 158 L98 196"/>
+  <path class="ln thin blue" d="M120 158 L144 196"/>
+  <path class="ln thin blue" d="M120 158 L190 196"/>
+  <path class="ln thin warm" d="M310 158 V196"/>
+  <rect class="box blue" x="32" y="196" width="40" height="30" rx="6"/>
+  <text class="t-code mid" x="52" y="216">t1</text>
+  <rect class="box blue" x="78" y="196" width="40" height="30" rx="6"/>
+  <text class="t-code mid" x="98" y="216">t2</text>
+  <rect class="box blue" x="124" y="196" width="40" height="30" rx="6"/>
+  <text class="t-code mid" x="144" y="216">t3</text>
+  <rect class="box blue" x="170" y="196" width="40" height="30" rx="6"/>
+  <text class="t-code mid" x="190" y="216">t4</text>
+  <rect class="box warm" x="290" y="196" width="40" height="30" rx="6"/>
+  <text class="t-code mid" x="310" y="216">t5</text>
+  <text class="t-xs mid" x="120" y="244">G1 안에서 각 1/4</text>
+  <text class="t-xs mid" x="310" y="244">G2 안에서 1/1</text>
+
+  <!-- 화살표 -->
+  <path class="ln green" d="M392 150 H436" marker-end="url(#ah-green)"/>
+
+  <!-- 오른쪽: 트리 하나 -->
+  <rect class="panel green" x="440" y="14" width="300" height="236" rx="14"/>
+  <text class="t-b" x="456" y="38">CPU의 트리 하나</text>
+  <text class="t-xs end" x="724" y="38">여기서 고른다</text>
+  <text class="t-code" x="456" y="58">rq->cfs.tasks_timeline</text>
+
+  <rect class="box blue" x="456" y="70" width="40" height="26" rx="6"/>
+  <text class="t-code mid" x="476" y="88">t1</text>
+  <rect class="solid blue" x="506" y="78" width="40" height="10" rx="3"/>
+  <text class="t-xs" x="556" y="88">h_load 1/4 · 몫 1/8</text>
+
+  <rect class="box blue" x="456" y="102" width="40" height="26" rx="6"/>
+  <text class="t-code mid" x="476" y="120">t2</text>
+  <rect class="solid blue" x="506" y="110" width="40" height="10" rx="3"/>
+  <text class="t-xs" x="556" y="120">h_load 1/4 · 몫 1/8</text>
+
+  <rect class="box blue" x="456" y="134" width="40" height="26" rx="6"/>
+  <text class="t-code mid" x="476" y="152">t3</text>
+  <rect class="solid blue" x="506" y="142" width="40" height="10" rx="3"/>
+  <text class="t-xs" x="556" y="152">h_load 1/4 · 몫 1/8</text>
+
+  <rect class="box blue" x="456" y="166" width="40" height="26" rx="6"/>
+  <text class="t-code mid" x="476" y="184">t4</text>
+  <rect class="solid blue" x="506" y="174" width="40" height="10" rx="3"/>
+  <text class="t-xs" x="556" y="184">h_load 1/4 · 몫 1/8</text>
+
+  <rect class="box warm" x="456" y="204" width="40" height="26" rx="6"/>
+  <text class="t-code mid" x="476" y="222">t5</text>
+  <rect class="solid warm" x="506" y="212" width="160" height="10" rx="3"/>
+  <text class="t-xs" x="506" y="242">h_load 1 · 몫 1/2</text>
+
+  <text class="t-s t-ink mid" x="380" y="284">실효 가중치 h_load는 계층을 따라 올라가며 각 단계의 비율을 곱한 값이다</text>
+  <text class="t-s mid" x="380" y="306">G1의 넷과 G2의 하나가 같은 트리에서 경쟁하고, 결과는 그룹별로 절반씩이다</text>
+  <text class="t-xs mid" x="380" y="324">h_load는 nice 0 가중치에 대한 비. CPU 하나만 본 그림이다</text>
+</svg></div><figcaption><b>그림 5-6</b>cgroup 계층은 태스크의 실효 가중치 <code>h_load</code>를 정합니다. 태스크는 모두 루트 <code>cfs_rq</code>의 트리 하나에 들어가고, <code>pick_eevdf()</code>는 그 트리만 봅니다.</figcaption></figure>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>v7.2까지의 fair 클래스는 그룹마다 따로 트리를 두고 <strong>위에서 아래로</strong> 골랐습니다. 루트의 트리에서 엔티티를 고르고, 그것이 그룹이면 그 그룹의 트리에서 다시 고르기를 태스크가 나올 때까지 반복했습니다. 옛 자료의 <code>pick_next_task_fair()</code>에서 <code>group_cfs_rq(se)</code>가 <code>NULL</code>이 될 때까지 도는 <code>do … while</code> 반복문이 그것입니다. 이 방식에서는 그룹 엔티티도 lag와 데드라인을 가져야 했고, 지연 디큐 같은 기능이 계층의 단계마다 따로 얽혔습니다. <span class="v">v7.3</span>의 <code>pick_task_fair()</code>에는 이 반복문이 없습니다. <code>__enqueue_entity()</code>는 트리에 들어오는 것이 루트 큐의 태스크인지 <code>WARN_ON_ONCE</code>로 확인합니다.</p>
+</div>
+<p>상한을 두는 <code>cpu.max</code>는 다른 장치입니다. 주기마다 쿼터를 주고, 다 쓴 그룹의 태스크를 다음 주기까지 세워 둡니다(CFS 대역폭 제어). 비율이 아니라 절대량을 제한합니다.</p>
+</section>
+<section class="level2" id="rt-dl">
+<h2><span class="sec-n">5.8</span>실시간 클래스와 fair_server<a aria-label="이 절의 링크" class="anchor" href="#rt-dl">#</a></h2>
+<p>fair 클래스 위에는 클래스가 둘 있습니다.</p>
+<p><strong>RT 클래스</strong>(<code>rt.c</code>)는 가장 단순합니다. 우선순위 100개에 리스트가 하나씩 있고, 비어 있지 않은 리스트를 표시하는 비트맵이 있습니다. 고르기는 비트맵에서 첫 비트를 찾아 그 리스트의 맨 앞을 꺼내는 것입니다. <code>SCHED_FIFO</code> 태스크는 스스로 놓거나 더 높은 태스크가 올 때까지 돌고, <code>SCHED_RR</code> 태스크는 100ms(<code>RR_TIMESLICE</code>)를 쓰면 같은 우선순위의 맨 뒤로 갑니다.</p>
+<p><strong>deadline 클래스</strong>(<code>deadline.c</code>)는 태스크가 세 값을 선언합니다. 주기(period)마다 실행 시간(runtime)만큼을 기한(deadline) 안에 달라는 것입니다. 스케줄러는 기한이 가장 이른 태스크를 고르고(EDF), 선언한 실행 시간을 넘긴 태스크는 다음 주기까지 세워 둡니다(CBS). 태스크를 받아들일 때 선언의 합이 CPU 용량을 넘는지 검사하고(<code>sched_dl_overflow()</code>), 넘으면 <code>sched_setattr()</code>가 <code>-EBUSY</code>로 실패합니다.</p>
+<p>클래스의 순서는 엄격하므로, RT 태스크가 무한 반복문에 빠지면 그 CPU의 일반 태스크는 영원히 기다립니다. 셸도, 그 태스크를 죽일 <code>kill</code>도 돌지 못합니다. v7.3의 해법은 <strong>deadline 서버</strong>입니다. deadline 클래스 안에 태스크가 아닌 엔티티를 하나 두고, 이 엔티티가 뽑히면 <strong>fair 클래스에 태스크를 대신 고르게</strong> 합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/deadline.c#L2817" rel="noopener" target="_blank">kernel/sched/deadline.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/deadline.c" data-line="2817" id="cb12"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb12-1"><span class="dt">static</span> <span class="kw">struct</span> task_struct <span class="op">*</span>__pick_task_dl<span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> rq_flags <span class="op">*</span>rf<span class="op">)</span></span>
+<span id="cb12-2"><span class="op">{</span></span>
+<span id="cb12-3">    <span class="co">/* ... */</span></span>
+<span id="cb12-4">    dl_se <span class="op">=</span> pick_next_dl_entity<span class="op">(</span>dl_rq<span class="op">);</span></span>
+<span id="cb12-5">    WARN_ON_ONCE<span class="op">(!</span>dl_se<span class="op">);</span></span>
+<span id="cb12-6"></span>
+<span id="cb12-7">    <span class="cf">if</span> <span class="op">(</span>dl_server<span class="op">(</span>dl_se<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb12-8">        p <span class="op">=</span> dl_se<span class="op">-&gt;</span>server_pick_task<span class="op">(</span>dl_se<span class="op">,</span> rf<span class="op">);</span></span>
+<span id="cb12-9">        <span class="cf">if</span> <span class="op">(!</span>p<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-10">            dl_server_stop<span class="op">(</span>dl_se<span class="op">);</span></span>
+<span id="cb12-11">            <span class="cf">goto</span> again<span class="op">;</span></span>
+<span id="cb12-12">        <span class="op">}</span></span>
+<span id="cb12-13">        rq<span class="op">-&gt;</span>dl_server <span class="op">=</span> dl_se<span class="op">;</span></span>
+<span id="cb12-14">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb12-15">        p <span class="op">=</span> dl_task_of<span class="op">(</span>dl_se<span class="op">);</span></span>
+<span id="cb12-16">    <span class="op">}</span></span>
+<span id="cb12-17"></span>
+<span id="cb12-18">    <span class="cf">return</span> p<span class="op">;</span></span>
+<span id="cb12-19"><span class="op">}</span></span></code></pre></div></div>
+<p>런큐마다 있는 <code>rq-&gt;fair_server</code>가 그 엔티티이고, <code>server_pick_task</code>는 <code>pick_task_fair()</code>를 부릅니다. 기본 설정은 주기 1초에 실행 시간 50ms입니다. deadline 클래스는 RT보다 높으므로, RT 태스크가 CPU를 붙잡고 있어도 일반 태스크는 1초마다 50ms를 받습니다.</p>
+<figure class="fig" id="fig-fair-server"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>RT 태스크가 CPU를 독점할 때 deadline 클래스의 엔티티인 fair_server가 뽑히면 pick_task_fair를 불러 일반 태스크를 실행한다. 주기 1초마다 50ms가 일반 태스크에 돌아간다.</title>
+
+  <!-- 클래스 -->
+  <rect class="box gray" x="20" y="28" width="80" height="76" rx="8"/>
+  <text class="t-b mid" x="60" y="70">stop</text>
+
+  <rect class="box warm" x="110" y="28" width="220" height="76" rx="8"/>
+  <text class="t-b" x="124" y="50">deadline</text>
+  <rect class="solid green" x="124" y="60" width="192" height="34" rx="6"/>
+  <text class="t-mono t-b t-on" x="136" y="82">rq->fair_server</text>
+  <text class="t-xs t-on end" x="306" y="82">50ms/1s</text>
+
+  <rect class="box warm" x="340" y="28" width="160" height="76" rx="8"/>
+  <text class="t-b" x="354" y="50">rt</text>
+  <text class="t-xs" x="354" y="72">SCHED_FIFO 태스크가</text>
+  <text class="t-xs" x="354" y="90">무한 반복 중</text>
+
+  <rect class="box green" x="510" y="28" width="150" height="76" rx="8"/>
+  <text class="t-b" x="524" y="50">fair</text>
+  <text class="t-xs" x="524" y="72">일반 태스크들이</text>
+  <text class="t-xs" x="524" y="90">기다린다</text>
+
+  <rect class="box gray" x="670" y="28" width="70" height="76" rx="8"/>
+  <text class="t-b mid" x="705" y="70">idle</text>
+
+  <text class="t-xs" x="20" y="18">높은 클래스</text>
+  <text class="t-xs end" x="740" y="18">낮은 클래스</text>
+
+  <path class="ln green" d="M220 94 V126 H585 V110" marker-end="url(#ah-green)"/>
+  <text class="t-s t-ink mid" x="402" y="146">서버가 뽑히면 server_pick_task()가 pick_task_fair()를 부른다</text>
+
+  <!-- 시간선: 1초 = 320px -->
+  <text class="t-s t-ink t-b" x="20" y="198">CPU</text>
+  <path class="ln thin muted" d="M100 170 V224"/>
+  <path class="ln thin muted" d="M420 170 V224"/>
+  <path class="ln thin muted" d="M740 170 V224"/>
+  <text class="t-xs mid" x="260" y="172">주기 1초</text>
+  <text class="t-xs mid" x="580" y="172">주기 1초</text>
+
+  <rect class="box warm" x="100" y="180" width="304" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="252" y="200">RT 태스크</text>
+  <rect class="solid green" x="404" y="180" width="16" height="30"/>
+  <rect class="box warm" x="420" y="180" width="304" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="572" y="200">RT 태스크</text>
+  <rect class="solid green" x="724" y="180" width="16" height="30"/>
+
+  <path class="ln thin green" d="M412 214 V230"/>
+  <path class="ln thin green" d="M732 214 V230"/>
+  <text class="t-xs tc-green mid" x="412" y="244">일반 태스크 50ms</text>
+  <text class="t-xs tc-green end" x="740" y="244">일반 태스크 50ms</text>
+
+  <text class="t-s t-ink mid" x="380" y="272">deadline 클래스는 rt보다 높다. 서버가 받은 시간은 fair 클래스의 태스크가 쓴다</text>
+  <text class="t-xs mid" x="380" y="292">일반 태스크가 스스로 50ms를 받은 주기에는 서버가 실행되지 않는다. 주기 안의 위치는 개략이다</text>
+</svg></div><figcaption><b>그림 5-7</b>RT 태스크가 CPU를 독점할 때. <code>fair_server</code>는 deadline 클래스의 엔티티로서 RT 태스크를 밀어내고, 받은 50ms를 fair 클래스의 태스크에 넘깁니다.</figcaption></figure>
+<p>서버는 평소에는 나서지 않습니다. 일반 태스크가 제 힘으로 돈 시간도 서버의 예산에서 빼기 때문입니다(<code>update_curr()</code>의 <code>dl_server_update()</code> 호출). 주기 안에 스스로 50ms를 받았다면 서버는 실행되지 않고, 받지 못한 채 주기의 끝이 다가올 때에만 서버가 실행 가능한 deadline 엔티티가 됩니다. ext 클래스를 위한 <code>rq-&gt;ext_server</code>도 같은 방식으로 있습니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료는 이 문제의 해법으로 <strong>RT 스로틀링</strong>을 설명합니다. <code>sched_rt_runtime_us</code>의 기본값 950000은 RT 태스크가 1초 중 0.95초만 쓰게 하고, 나머지 0.05초 동안 RT 클래스 전체를 세워 두었습니다. v7.3의 <code>kernel/sched/rt.c</code>에서 이 값의 초기값은 1000000, 곧 제한 없음이고, 스로틀링 코드는 RT 그룹 스케줄링(<code>CONFIG_RT_GROUP_SCHED</code>)에만 남아 있습니다. 일반 태스크의 보호는 <code>fair_server</code>가 맡습니다. 스로틀링은 일반 태스크가 없어도 CPU를 놀렸지만, 서버는 굶는 태스크가 있을 때만 끼어듭니다.</p>
+</div>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p><code>fair_server</code>의 설정은 CPU별로 debugfs에 있습니다. 단위는 나노초입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># cat /sys/kernel/debug/sched/fair_server/cpu0/runtime
+50000000
+# cat /sys/kernel/debug/sched/fair_server/cpu0/period
+1000000000</code></pre></div>
+<p>시험해 보려면 CPU 하나에 <code>SCHED_FIFO</code> 무한 반복문을 묶어 두고, 같은 CPU에 묶은 일반 태스크의 CPU 사용률을 봅니다. 5% 근처가 나옵니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># taskset -c 3 chrt -f 50 sh -c 'while :; do :; done' &amp;
+# taskset -c 3 sh -c 'while :; do :; done' &amp;
+# top -b -n 2 -d 3 | grep ' sh$'</code></pre></div>
+</div>
+</section>
+<section class="level2" id="scx">
+<h2><span class="sec-n">5.9</span>sched_ext: BPF로 쓰는 클래스<a aria-label="이 절의 링크" class="anchor" href="#scx">#</a></h2>
+<p>fair 클래스 바로 아래의 ext 클래스(<code>kernel/sched/ext/</code>)는 정책이 비어 있습니다. 정책은 BPF 프로그램이 채웁니다. 커널을 다시 빌드하거나 재부팅하지 않고 스케줄러를 바꿔 끼울 수 있습니다.</p>
+<p>구조는 4장에서 본 것의 반복입니다. 뼈대가 <code>struct sched_class</code>의 콜백으로 클래스에 묻듯이, ext 클래스는 <code>struct sched_ext_ops</code>의 콜백으로 BPF 스케줄러에 묻습니다. 둘 사이의 완충이 <strong>DSQ</strong>(dispatch queue)입니다. CPU는 자기 로컬 DSQ에서만 태스크를 꺼내 실행하고, BPF 스케줄러의 일은 태스크를 알맞은 DSQ에 넣는 것입니다.</p>
+<figure class="fig" id="fig-scx-arch"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 352" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>sched_ext의 구조: 커널의 ext 클래스가 sched_ext_ops 콜백으로 BPF 스케줄러를 부르고, BPF 스케줄러는 태스크를 DSQ에 넣는다. CPU는 자기 로컬 DSQ에서만 태스크를 꺼낸다. 문제가 생기면 모든 태스크가 fair 클래스로 돌아간다.</title>
+
+  <!-- 커널 -->
+  <rect class="panel yellow" x="20" y="14" width="330" height="248" rx="14"/>
+  <text class="t-b" x="36" y="38">커널</text>
+  <text class="t-code end" x="334" y="38">kernel/sched/ext/</text>
+
+  <rect class="box" x="36" y="50" width="298" height="40" rx="8"/>
+  <text class="t-s t-ink" x="48" y="75">① 태스크가 실행 가능해진다</text>
+
+  <rect class="box teal" x="36" y="104" width="298" height="40" rx="8"/>
+  <text class="t-mono t-b" x="48" y="129">ext_sched_class</text>
+  <text class="t-xs end" x="322" y="129">뼈대와 BPF 사이의 중개</text>
+
+  <text class="t-xs" x="36" y="170">CPU별 로컬 DSQ. CPU는 여기서만 꺼내 실행한다</text>
+  <rect class="box green" x="36" y="180" width="92" height="40" rx="8"/>
+  <text class="t-s t-ink mid" x="82" y="205">CPU 0</text>
+  <rect class="box green" x="139" y="180" width="92" height="40" rx="8"/>
+  <text class="t-s t-ink mid" x="185" y="205">CPU 1</text>
+  <rect class="box green" x="242" y="180" width="92" height="40" rx="8"/>
+  <text class="t-s t-ink mid" x="288" y="205">CPU 2</text>
+  <text class="t-xs" x="36" y="244">③ CPU가 할 일을 찾는다</text>
+
+  <!-- BPF -->
+  <rect class="panel teal" x="410" y="14" width="330" height="248" rx="14"/>
+  <text class="t-b" x="426" y="38">BPF 스케줄러</text>
+  <text class="t-code end" x="724" y="38">struct sched_ext_ops</text>
+
+  <rect class="box" x="426" y="50" width="298" height="40" rx="8"/>
+  <text class="t-code t-b" x="438" y="75">ops.enqueue()</text>
+  <text class="t-xs end" x="712" y="75">② 어느 DSQ에 넣을지 정한다</text>
+
+  <rect class="box purple" x="426" y="104" width="298" height="62" rx="8"/>
+  <text class="t-s t-ink t-b" x="438" y="128">사용자 DSQ, BPF 맵</text>
+  <text class="t-xs" x="438" y="148">정책이 사는 곳. FIFO로도, 가상 시간</text>
+  <text class="t-xs" x="438" y="162">순서의 우선순위 큐로도 쓴다</text>
+
+  <rect class="box" x="426" y="180" width="298" height="40" rx="8"/>
+  <text class="t-code t-b" x="438" y="205">ops.dispatch()</text>
+  <text class="t-xs end" x="712" y="205">④ 로컬 DSQ로 옮긴다</text>
+
+  <!-- 화살표 -->
+  <path class="ln teal" d="M334 70 H422" marker-end="url(#ah-teal)"/>
+  <path class="ln" d="M575 90 V100" marker-end="url(#ah)"/>
+  <path class="ln" d="M575 166 V176" marker-end="url(#ah)"/>
+  <path class="ln teal" d="M334 192 H422" marker-end="url(#ah-teal)"/>
+  <path class="ln green" d="M426 208 H338" marker-end="url(#ah-green)"/>
+
+  <!-- 안전장치 -->
+  <rect class="box red" x="20" y="278" width="720" height="60" rx="12"/>
+  <use href="#i-shield" x="34" y="290" width="36" height="36" class="ic red"/>
+  <text class="t-b" x="82" y="302">안전장치</text>
+  <text class="t-s" x="82" y="324">BPF 스케줄러의 오류, 오래 돌지 못한 태스크, SysRq-S → 스케줄러를 떼고 모두 fair 클래스로 되돌린다</text>
+</svg></div><figcaption><b>그림 5-8</b>sched_ext의 구조. 깨어난 태스크는 <code>ops.enqueue()</code>로 BPF 스케줄러에 넘어가고, CPU가 할 일을 찾을 때 <code>ops.dispatch()</code>가 태스크를 그 CPU의 로컬 DSQ로 옮깁니다.</figcaption></figure>
+<p>커널 트리에 든 예제 <code>scx_simple</code>의 핵심은 두 함수입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/tools/sched_ext/scx_simple.bpf.c#L69" rel="noopener" target="_blank">tools/sched_ext/scx_simple.bpf.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="tools/sched_ext/scx_simple.bpf.c" data-line="69" id="cb15"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb15-1"><span class="dt">void</span> BPF_STRUCT_OPS<span class="op">(</span>simple_enqueue<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> u64 enq_flags<span class="op">)</span></span>
+<span id="cb15-2"><span class="op">{</span></span>
+<span id="cb15-3">    stat_inc<span class="op">(</span><span class="dv">1</span><span class="op">);</span>    <span class="co">/* count global queueing */</span></span>
+<span id="cb15-4"></span>
+<span id="cb15-5">    <span class="cf">if</span> <span class="op">(</span>fifo_sched<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb15-6">        scx_bpf_dsq_insert<span class="op">(</span>p<span class="op">,</span> SHARED_DSQ<span class="op">,</span> SCX_SLICE_DFL<span class="op">,</span> enq_flags<span class="op">);</span></span>
+<span id="cb15-7">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb15-8">        u64 vtime <span class="op">=</span> p<span class="op">-&gt;</span>scx<span class="op">.</span>dsq_vtime<span class="op">;</span></span>
+<span id="cb15-9">        <span class="co">/* ... */</span></span>
+<span id="cb15-10">        scx_bpf_dsq_insert_vtime<span class="op">(</span>p<span class="op">,</span> SHARED_DSQ<span class="op">,</span> SCX_SLICE_DFL<span class="op">,</span> vtime<span class="op">,</span></span>
+<span id="cb15-11">                     enq_flags<span class="op">);</span></span>
+<span id="cb15-12">    <span class="op">}</span></span>
+<span id="cb15-13"><span class="op">}</span></span>
+<span id="cb15-14"></span>
+<span id="cb15-15"><span class="dt">void</span> BPF_STRUCT_OPS<span class="op">(</span>simple_dispatch<span class="op">,</span> s32 cpu<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>prev<span class="op">)</span></span>
+<span id="cb15-16"><span class="op">{</span></span>
+<span id="cb15-17">    scx_bpf_dsq_move_to_local<span class="op">(</span>SHARED_DSQ<span class="op">,</span> <span class="dv">0</span><span class="op">);</span></span>
+<span id="cb15-18"><span class="op">}</span></span></code></pre></div></div>
+<p>실행 가능해진 태스크를 모든 CPU가 같이 쓰는 DSQ 하나에 가상 시간 순서로 넣고, CPU가 일을 찾으면 그 DSQ의 맨 앞을 가져갑니다. 이 장 앞부분에서 본 CFS의 생각을 전역 큐 하나로 구현한 셈이고, 파일 전체가 160줄 남짓입니다.</p>
+<p>BPF 프로그램이 틀릴 수 있으므로 안전장치가 있습니다. BPF 스케줄러가 오류를 내거나, 실행 가능한 태스크를 오래(기본 30초) 돌리지 않거나, 관리자가 <code>SysRq-S</code>를 누르면 커널은 BPF 스케줄러를 떼어 내고 모든 태스크를 fair 클래스로 되돌립니다. v7.3에서는 cgroup 하위 트리마다 다른 BPF 스케줄러를 붙이는 하위 스케줄러(<code>ext/sub.c</code>)도 지원합니다. BPF 검증기와 <code>struct_ops</code>는 <a href="ch24.html">24장</a>에서 다룹니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># cat /sys/kernel/sched_ext/state
+enabled
+# cat /sys/kernel/sched_ext/root/ops
+simple</code></pre></div>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>CFS에서 EEVDF로 가는 데 16년이 걸린 데에는 스케줄러를 바꾸는 비용이 큰 탓도 있습니다. 모든 워크로드가 한 알고리즘을 쓰므로, 어느 하나를 낫게 하는 변경이 다른 것을 나쁘게 하지 않는다는 것을 보여야 합니다. sched_ext는 그 비용 구조를 바꿉니다. 정책을 커널 밖에서 만들고, 특정 워크로드에만 적용하고, 틀리면 자동으로 원래 스케줄러로 돌아옵니다. 핵심 경로를 직접 고치는 대신 <strong>안전하게 실패하는 확장 지점</strong>을 여는 방식입니다. 대가도 문서에 적혀 있습니다. BPF 스케줄러에 주는 인터페이스는 안정성을 보장하지 않습니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.6.23 · 2007</dt>
+<dd>
+CFS. <code>vruntime</code>과 RB 트리.
+</dd>
+<dt>3.14 · 2014</dt>
+<dd>
+<code>SCHED_DEADLINE</code>. EDF와 CBS.
+</dd>
+<dt>6.6 · 2023</dt>
+<dd>
+EEVDF가 CFS를 대신합니다. lag, 자격, 가상 데드라인.
+</dd>
+<dt>6.12 · 2024</dt>
+<dd>
+EEVDF 전환이 마무리됩니다. 지연 디큐, <code>sched_runtime</code>으로 slice 지정, <code>PREEMPT_SHORT</code>. deadline 서버와 sched_ext도 이때 들어옵니다.
+</dd>
+<dt>7.1 · 2026</dt>
+<dd>
+sched_ext의 cgroup 하위 스케줄러가 처음 병합됩니다.
+</dd>
+<dt>7.3 · 2026</dt>
+<dd>
+fair 클래스가 그룹 계층을 내려가며 고르는 대신 런큐 하나에서 고릅니다.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>fair 클래스는 실행 시간을 가중치로 나눈 <code>vruntime</code>으로 "얼마나 받았나"를 잽니다. 가중치는 nice 값에서 나오고 한 단계에 약 1.25배입니다.</li>
+<li>EEVDF는 lag(받아야 할 몫 − 받은 몫), 자격(lag ≥ 0), 가상 데드라인(<code>vruntime + slice/weight</code>)을 더해 "자격 있는 것 중 데드라인이 가장 이른 것"을 고릅니다.</li>
+<li>트리는 데드라인으로 정렬하고 서브트리의 최소 <code>vruntime</code>을 얹은 증강 RB 트리입니다. 실행 중인 태스크는 트리 밖에 있습니다.</li>
+<li>slice는 총량이 아니라 받는 주기를 정합니다. 짧은 slice는 더 빨리, 더 잘게 받습니다. <code>sched_setattr()</code>의 <code>sched_runtime</code>으로 태스크마다 정할 수 있습니다.</li>
+<li>잠드는 태스크의 lag는 보존됩니다. 빚이 있는 태스크는 빚이 갚아질 때까지 큐에 남습니다(지연 디큐).</li>
+<li>v7.3에서 cgroup 계층은 태스크의 실효 가중치만 정하고, 고르기는 CPU마다 트리 하나에서 합니다.</li>
+<li>RT 태스크가 독점해도 <code>fair_server</code>가 일반 태스크에 1초마다 50ms를 보장합니다. 옛 RT 스로틀링을 대신합니다.</li>
+<li>sched_ext는 정책을 BPF 프로그램에 맡기는 클래스이고, 문제가 생기면 fair 클래스로 되돌아갑니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p>nice 0 태스크 둘과 nice 5 태스크 하나가 CPU 하나에서 계속 돕니다. 각자의 CPU 몫은 대략 얼마입니까? nice 5 태스크의 <code>vruntime</code>은 실제 시간보다 몇 배 빨리 흐릅니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>가중치는 1024, 1024, 335이고 합은 2383입니다. 몫은 약 43%, 43%, 14%입니다. <code>vruntime</code>은 <code>delta × 1024 / weight</code>만큼 오르므로 nice 5 태스크는 1024/335, 약 3.06배 빨리 흐릅니다. 같은 실제 시간을 돌아도 가상 시간이 빨리 가서 곧 자격을 잃고, 그래서 덜 받게 됩니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>가중치가 같은 두 태스크 X(slice 3ms)와 Y(slice 0.5ms)가 있습니다. 오래 지켜보면 누가 CPU를 더 받습니까? Y가 깨어난 직후에는 누가 먼저 뽑힐 가능성이 큽니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>받는 양은 같습니다. 양은 가중치가 정하고, 더 받은 쪽은 <code>vruntime</code>이 <code>V</code>를 넘어 자격을 잃기 때문입니다. 깨어난 직후에는 Y가 먼저 뽑힐 가능성이 큽니다. 데드라인이 <code>vruntime + slice/weight</code>이므로 Y의 데드라인이 훨씬 가깝고, 자격이 있는 한 데드라인이 이른 쪽이 뽑힙니다. <code>PREEMPT_SHORT</code>가 켜져 있으면 X가 slice 보호를 받는 중이어도 Y가 선점할 수 있습니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>pick_eevdf()</code>가 트리의 맨 왼쪽 노드를 그냥 돌려주지 않는 까닭은 무엇입니까? 왼쪽 서브트리를 건너뛰어도 되는지는 무엇으로 압니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>트리는 데드라인 순서이므로 맨 왼쪽은 데드라인이 가장 이른 태스크지만, 그 태스크에 자격이 없을 수 있습니다. 그때는 자격 있는 것 가운데 데드라인이 가장 이른 것을 찾아야 합니다. 각 노드에는 자기 서브트리의 최소 <code>vruntime</code>인 <code>min_vruntime</code>이 있습니다. 왼쪽 자식의 <code>min_vruntime</code>이 자격선을 넘으면 그 서브트리에는 자격 있는 태스크가 하나도 없으므로 통째로 건너뜁니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>slice를 막 다 쓴 태스크가 1ms 동안 잠들었다 깨기를 반복합니다. 지연 디큐가 없다면 이 태스크는 어떤 이득을 봅니까? v7.3은 이것을 어떻게 막습니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>slice를 다 쓴 직후에는 lag가 음수입니다. 잠드는 순간 큐에서 빠지면서 그 빚이 사라진다면, 깨어날 때마다 새 태스크처럼 <code>V</code> 근처에서 다시 시작해 제 몫보다 더 받습니다. v7.3은 자격 없는 태스크가 잠들 때 <code>sched_delayed</code>만 표시하고 트리에 남깁니다. 다른 태스크들이 돌아 <code>V</code>가 따라잡을 때까지 이 태스크의 lag는 그대로 계산되고, 그 전에 깨어나면 음수 lag를 그대로 지고 경쟁합니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>SCHED_FIFO</code> 태스크가 CPU 2에서 무한 반복문을 돌고 있습니다. 같은 CPU의 일반 태스크는 <code>__pick_next_task()</code>의 클래스 순회에서 어느 클래스의 <code>pick_task()</code>를 통해 선택됩니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>deadline 클래스입니다. 일반 태스크가 굶으면 <code>rq-&gt;fair_server</code>가 deadline 엔티티로 큐에 올라옵니다. 클래스 순회는 stop 다음에 deadline 클래스의 <code>pick_task_dl()</code>을 부르고, 뽑힌 엔티티가 서버이므로 <code>server_pick_task</code>, 곧 <code>pick_task_fair()</code>가 불려 일반 태스크를 돌려줍니다. rt 클래스에는 차례가 가지 않습니다. 서버의 예산 50ms를 다 쓰면 서버는 다음 주기까지 물러나고 RT 태스크가 다시 돕니다.</p>
+</div></details></div></div>
+
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>가상 실행 시간<small>virtual runtime</small></dt>
+<dd>
+실제 실행 시간을 가중치로 나눈 값. <code>se-&gt;vruntime</code>.
+</dd>
+<dt>가중치<small>weight</small></dt>
+<dd>
+태스크가 받을 CPU 몫의 상대적 크기. nice 값에서 나온다.
+</dd>
+<dt>lag</dt>
+<dd>
+이상적인 스케줄러에서 받았을 시간과 실제로 받은 시간의 차이. 양수면 덜 받았다.
+</dd>
+<dt>자격<small>eligibility</small></dt>
+<dd>
+lag가 0 이상인 상태. <code>vruntime</code>이 가중 평균 <code>V</code> 이하라는 것과 같다.
+</dd>
+<dt>가상 데드라인<small>virtual deadline</small></dt>
+<dd>
+<code>vruntime + slice / weight</code>. 자격 있는 태스크 가운데 이 값이 가장 이른 것이 뽑힌다.
+</dd>
+<dt>slice</dt>
+<dd>
+태스크가 한 번에 받겠다고 요청하는 실행 시간. 지연 시간을 정하고 총량에는 영향이 없다.
+</dd>
+<dt>증강 RB 트리<small>augmented rbtree</small></dt>
+<dd>
+노드마다 서브트리의 요약값을 함께 유지하는 RB 트리.
+</dd>
+<dt>지연 디큐<small>delayed dequeue</small></dt>
+<dd>
+lag가 음수인 태스크가 잠들 때 큐에서 바로 빼지 않고 lag가 0이 될 때까지 남겨 두는 것.
+</dd>
+<dt>그룹 스케줄링<small>group scheduling</small></dt>
+<dd>
+CPU 시간을 먼저 cgroup 사이에 나누고, 그룹의 몫을 그 안의 태스크가 나누게 하는 것.
+</dd>
+<dt>deadline 서버<small>deadline server</small></dt>
+<dd>
+deadline 클래스의 엔티티로 등록되어, 뽑히면 다른 클래스의 태스크를 대신 실행시키는 장치. <code>fair_server</code>가 그 예다.
+</dd>
+<dt>DSQ<small>dispatch queue</small></dt>
+<dd>
+sched_ext에서 커널과 BPF 스케줄러 사이에 놓이는 태스크 큐.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/scheduler/sched-eevdf.html" rel="noopener" target="_blank"><code>Documentation/scheduler/sched-eevdf.rst</code></a>: EEVDF의 짧은 소개와 원 논문 링크.</li>
+<li><a href="https://docs.kernel.org/scheduler/sched-design-CFS.html" rel="noopener" target="_blank"><code>Documentation/scheduler/sched-design-CFS.rst</code></a>: CFS의 설계 설명.</li>
+<li><a href="https://docs.kernel.org/scheduler/sched-deadline.html" rel="noopener" target="_blank"><code>Documentation/scheduler/sched-deadline.rst</code></a>: EDF와 CBS, 승인 제어.</li>
+<li><a href="https://docs.kernel.org/scheduler/sched-ext.html" rel="noopener" target="_blank"><code>Documentation/scheduler/sched-ext.rst</code></a>: sched_ext의 콜백, DSQ, 예제 스케줄러.</li>
+<li>LWN, <a href="https://lwn.net/Articles/925371/" rel="noopener" target="_blank">An EEVDF CPU scheduler for Linux</a>: EEVDF를 들이게 된 배경.</li>
+<li>LWN, <a href="https://lwn.net/Articles/969062/" rel="noopener" target="_blank">Completing the EEVDF scheduler</a>: 잠드는 태스크의 lag와 slice 지정.</li>
+<li>LWN, <a href="https://lwn.net/Articles/934415/" rel="noopener" target="_blank">Deadline servers as a realtime throttling replacement</a>: RT 스로틀링을 서버로 바꾸는 논의.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch04.html"><small>← 4장</small><b>스케줄러의 뼈대</b></a><a class="next" href="ch06.html"><small>6장 →</small><b>커널 선점</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#vruntime">가상 실행 시간</a><a href="#cfs-limit">CFS가 남긴 문제</a><a href="#eevdf">EEVDF: lag, 자격, 가상 데드라인</a><a href="#pick">트리에서 고르기</a><a href="#slice">slice와 지연 시간</a><a href="#sleep">잠드는 태스크와 lag</a><a href="#group">그룹 스케줄링</a><a href="#rt-dl">실시간 클래스와 fair_server</a><a href="#scx">sched_ext: BPF로 쓰는 클래스</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

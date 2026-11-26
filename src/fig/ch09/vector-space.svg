@@ -1,0 +1,67 @@
+<svg viewBox="0 0 760 338" xmlns="http://www.w3.org/2000/svg">
+  <title>x86-64 v7.3의 벡터 공간 0–255: 0–31은 예외, 32–234는 장치 인터럽트(128은 int 0x80), 235–255는 시스템 벡터</title>
+
+  <text class="t-code" x="20" y="38">0</text>
+  <text class="t-code" x="110" y="38">32 (0x20)</text>
+  <text class="t-code mid" x="382" y="38">128</text>
+  <text class="t-code end" x="676" y="38">235 (0xeb)</text>
+  <text class="t-code end" x="740" y="38">255</text>
+
+  <rect class="box red" x="20" y="46" width="90" height="38"/>
+  <text class="t-b mid" x="65" y="70">예외</text>
+  <rect class="box blue" x="110" y="46" width="270" height="38"/>
+  <text class="t-b mid" x="245" y="70">장치 인터럽트</text>
+  <rect class="solid" x="380" y="46" width="4" height="38"/>
+  <rect class="box blue" x="384" y="46" width="297" height="38"/>
+  <text class="t-b mid" x="532" y="70">장치 인터럽트</text>
+  <rect class="box warm" x="681" y="46" width="59" height="38"/>
+  <text class="t-b mid" x="710" y="70">시스템</text>
+
+  <path class="ln thin" d="M382 84 V98"/>
+  <text class="t-xs mid" x="382" y="113">int 0x80 (32비트 시스템 콜)</text>
+
+  <!-- 예외 -->
+  <rect class="panel red" x="20" y="130" width="230" height="192" rx="12"/>
+  <text class="t-b tc-red" x="34" y="154">0–31 예외</text>
+  <text class="t-code" x="34" y="178">0  #DE</text>
+  <text class="t-xs" x="92" y="178">0으로 나누기</text>
+  <text class="t-code" x="34" y="198">2  NMI</text>
+  <text class="t-xs" x="92" y="198">마스크할 수 없는 인터럽트</text>
+  <text class="t-code" x="34" y="218">3  #BP</text>
+  <text class="t-xs" x="92" y="218">브레이크포인트 (int3)</text>
+  <text class="t-code" x="34" y="238">8  #DF</text>
+  <text class="t-xs" x="92" y="238">이중 폴트</text>
+  <text class="t-code" x="34" y="258">13 #GP</text>
+  <text class="t-xs" x="92" y="258">일반 보호 오류</text>
+  <text class="t-code" x="34" y="278">14 #PF</text>
+  <text class="t-xs" x="92" y="278">페이지 폴트</text>
+  <text class="t-code" x="34" y="298">18 #MC</text>
+  <text class="t-xs" x="92" y="298">머신 체크</text>
+
+  <!-- 장치 -->
+  <rect class="panel blue" x="262" y="130" width="238" height="192" rx="12"/>
+  <text class="t-b tc-blue" x="276" y="154">32–234 장치 인터럽트</text>
+  <text class="t-s" x="276" y="180">IO-APIC 핀과 MSI에 배정한다.</text>
+  <text class="t-s" x="276" y="200">배정은 CPU마다 따로 한다.</text>
+  <text class="t-s" x="276" y="226">같은 벡터 번호가 CPU마다</text>
+  <text class="t-s" x="276" y="246">다른 IRQ를 가리킬 수 있다.</text>
+  <text class="t-code" x="276" y="278">ISA_IRQ_VECTOR(n) = 0x30 + n</text>
+  <text class="t-xs" x="276" y="298">옛 ISA IRQ 0–15의 자리</text>
+
+  <!-- 시스템 -->
+  <rect class="panel warm" x="512" y="130" width="228" height="192" rx="12"/>
+  <text class="t-b tc-warm" x="526" y="154">235–255 시스템 벡터</text>
+  <text class="t-code" x="526" y="178">0xec</text>
+  <text class="t-xs" x="606" y="178">Local APIC 타이머</text>
+  <text class="t-code" x="526" y="198">0xf6</text>
+  <text class="t-xs" x="606" y="198">IRQ work</text>
+  <text class="t-code" x="526" y="218">0xfb 0xfc</text>
+  <text class="t-xs" x="606" y="218">함수 호출 IPI</text>
+  <text class="t-code" x="526" y="238">0xfd</text>
+  <text class="t-xs" x="606" y="238">재스케줄 IPI</text>
+  <text class="t-code" x="526" y="258">0xfe</text>
+  <text class="t-xs" x="606" y="258">APIC 오류</text>
+  <text class="t-code" x="526" y="278">0xff</text>
+  <text class="t-xs" x="606" y="278">가짜 인터럽트</text>
+  <text class="t-xs" x="526" y="304">장치가 아니라 커널과 APIC이 쓴다</text>
+</svg>

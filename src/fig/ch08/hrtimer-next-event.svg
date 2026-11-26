@@ -1,0 +1,76 @@
+<svg viewBox="0 0 760 404" xmlns="http://www.w3.org/2000/svg">
+  <title>hrtimer의 한 바퀴: CPU별 클록 베이스에서 가장 이른 만료 시각을 clockevent 장치에 예약하고, 인터럽트가 오면 hrtimer_interrupt가 콜백을 실행한 뒤 다음 만료를 다시 예약한다</title>
+
+  <!-- 베이스 -->
+  <rect class="panel warm" x="20" y="14" width="450" height="212" rx="12"/>
+  <text class="t-mono t-b" x="34" y="38">hrtimer_cpu_base</text>
+  <text class="t-s" x="178" y="38">CPU마다 하나</text>
+  <text class="t-xs end" x="458" y="38">베이스마다 만료 시각순 트리</text>
+
+  <text class="t-code" x="34" y="71">MONOTONIC</text>
+  <rect class="solid warm" x="120" y="52" width="96" height="28" rx="6"/>
+  <text class="t-xs t-on t-b mid" x="168" y="71">틱 +1 ms</text>
+  <rect class="box" x="222" y="52" width="124" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="284" y="71">nanosleep +3 ms</text>
+  <rect class="box" x="352" y="52" width="106" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="405" y="71">워치독 +4 s</text>
+
+  <text class="t-code" x="34" y="107">REALTIME</text>
+  <rect class="box" x="120" y="88" width="124" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="182" y="107">timerfd +20 ms</text>
+
+  <text class="t-code" x="34" y="143">BOOTTIME</text>
+  <text class="t-xs" x="120" y="143">비어 있음</text>
+
+  <text class="t-code" x="34" y="179">TAI</text>
+  <text class="t-xs" x="120" y="179">비어 있음</text>
+
+  <text class="t-xs" x="34" y="210">softirq에서 콜백을 부르는 타이머용 베이스가 넷 더 있다</text>
+
+  <!-- 가장 이른 만료 -->
+  <path class="ln warm" d="M470 44 H495" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="500" y="14" width="240" height="60" rx="10"/>
+  <text class="t-mono t-b" x="514" y="38">expires_next</text>
+  <text class="t-s" x="514" y="60">모든 베이스에서 가장 이른 만료</text>
+
+  <path class="ln warm" d="M690 74 V115" marker-end="url(#ah-warm)"/>
+  <text class="t-code end" x="680" y="100">tick_program_event()</text>
+
+  <rect class="box gray" x="500" y="120" width="240" height="60" rx="10"/>
+  <use href="#i-clock" x="510" y="136" width="28" height="28" class="ic gray"/>
+  <text class="t-b" x="548" y="144">clockevent 장치</text>
+  <text class="t-xs" x="548" y="164">예약한 시각에 인터럽트를 건다</text>
+
+  <path class="ln red" d="M580 180 V245" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="590" y="218">인터럽트</text>
+
+  <!-- 핸들러 -->
+  <rect class="panel" x="20" y="250" width="720" height="140" rx="12"/>
+  <text class="t-mono t-b" x="34" y="274">hrtimer_interrupt()</text>
+
+  <rect class="box purple" x="34" y="288" width="153" height="88" rx="8"/>
+  <text class="t-b" x="46" y="312">① soft는 넘긴다</text>
+  <text class="t-xs" x="46" y="336">soft 타이머가 만료됐으면</text>
+  <text class="t-code" x="46" y="356">HRTIMER_SOFTIRQ</text>
+  <path class="ln" d="M187 332 H204" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="209" y="288" width="153" height="88" rx="8"/>
+  <text class="t-b" x="221" y="312">② 콜백 실행</text>
+  <text class="t-xs" x="221" y="336">만료된 hard 타이머를</text>
+  <text class="t-xs" x="221" y="356">꺼내 function을 부른다</text>
+  <path class="ln" d="M362 332 H379" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="384" y="288" width="153" height="88" rx="8"/>
+  <text class="t-b" x="396" y="312">③ 다음 만료 찾기</text>
+  <text class="t-xs" x="396" y="336">남은 타이머 가운데</text>
+  <text class="t-xs" x="396" y="356">가장 이른 만료 시각</text>
+  <path class="ln" d="M537 332 H554" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="559" y="288" width="153" height="88" rx="8"/>
+  <text class="t-b" x="571" y="312">④ 재설정을 미룬다</text>
+  <text class="t-code" x="571" y="336">TIF_HRTIMER_REARM</text>
+  <text class="t-xs" x="571" y="356">복귀 길에서 장치를 맞춘다</text>
+
+  <path class="ln warm dash" d="M700 288 V185" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm end" x="692" y="238">다시 예약</text>
+</svg>

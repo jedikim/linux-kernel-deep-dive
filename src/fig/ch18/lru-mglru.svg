@@ -1,0 +1,63 @@
+<svg viewBox="0 0 760 366" xmlns="http://www.w3.org/2000/svg">
+  <title>고전 LRU와 MGLRU의 비교: 고전 LRU는 inactive와 active 두 리스트 사이를 승격과 강등으로 오가고, MGLRU는 가장 젊은 세대에서 가장 늙은 세대로 한 방향으로 흐른다</title>
+
+  <!-- 고전 LRU -->
+  <text class="t-b" x="20" y="28">고전 LRU</text>
+  <text class="t-xs" x="20" y="46">익명·파일 각각 리스트 둘</text>
+
+  <text class="t-xs end" x="402" y="36">새 페이지</text>
+  <path class="ln thin" d="M410 26 V46" marker-end="url(#ah)"/>
+
+  <rect class="box red" x="40" y="54" width="80" height="36" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="80" y="77">회수</text>
+  <path class="ln red" d="M200 72 H124" marker-end="url(#ah-red)"/>
+
+  <rect class="box gray" x="200" y="50" width="220" height="44" rx="8"/>
+  <text class="t-mono t-b mid" x="310" y="70">inactive</text>
+  <text class="t-xs mid" x="310" y="87">꼬리부터 살핀다</text>
+
+  <rect class="box blue" x="520" y="50" width="220" height="44" rx="8"/>
+  <text class="t-mono t-b mid" x="630" y="70">active</text>
+  <text class="t-xs mid" x="630" y="87">보호된다</text>
+
+  <path class="ln" d="M520 66 H424" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="470" y="58">커지면 강등</text>
+  <path class="ln blue" d="M310 94 V122 H630 V98" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue mid" x="470" y="116">다시 접근되면 승격</text>
+
+  <text class="t-xs" x="200" y="148">접근 여부를 알려면 페이지마다 rmap을 걸어 ACCESSED 비트를 읽는다</text>
+
+  <path class="ln thin muted dash" d="M20 168 H740"/>
+
+  <!-- MGLRU -->
+  <text class="t-b" x="20" y="196">MGLRU</text>
+  <text class="t-xs" x="20" y="214">세대 번호가 한 방향으로 흐른다</text>
+
+  <rect class="box red" x="40" y="226" width="80" height="36" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="80" y="249">축출</text>
+  <path class="ln red" d="M200 244 H124" marker-end="url(#ah-red)"/>
+
+  <rect class="box gray" x="200" y="222" width="115" height="44" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="257" y="241">가장 늙은 세대</text>
+  <text class="t-code mid" x="257" y="258">min_seq</text>
+  <path class="ln thin" d="M335 244 H319" marker-end="url(#ah)"/>
+  <rect class="box" x="335" y="222" width="115" height="44" rx="8"/>
+  <text class="t-s mid" x="392" y="249">세대</text>
+  <path class="ln thin" d="M470 244 H454" marker-end="url(#ah)"/>
+  <rect class="box" x="470" y="222" width="115" height="44" rx="8"/>
+  <text class="t-s mid" x="527" y="249">세대</text>
+  <path class="ln thin" d="M605 244 H589" marker-end="url(#ah)"/>
+  <rect class="box blue" x="605" y="222" width="115" height="44" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="662" y="241">가장 젊은 세대</text>
+  <text class="t-code mid" x="662" y="258">max_seq</text>
+
+  <text class="t-xs mid" x="392" y="284">max_seq가 오를 때마다 한 칸씩 늙는다</text>
+
+  <rect class="box yellow" x="250" y="302" width="300" height="48" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="400" y="322">에이징 · 페이지 테이블을 통째로 훑는다</text>
+  <text class="t-xs mid" x="400" y="340">ACCESSED가 선 PTE를 한꺼번에 모은다</text>
+  <path class="ln blue" d="M550 326 H662 V270" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="670" y="300">접근된</text>
+  <text class="t-xs tc-blue" x="670" y="316">페이지를</text>
+  <text class="t-xs tc-blue" x="670" y="332">여기로</text>
+</svg>

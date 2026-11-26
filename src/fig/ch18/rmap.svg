@@ -1,0 +1,61 @@
+<svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg">
+  <title>역매핑의 길: 파일 폴리오는 mapping이 가리키는 address_space의 i_mmap 트리로, 익명 폴리오는 anon_vma의 트리로 VMA들을 찾고, VMA마다 페이지 테이블을 내려가 PTE에 닿는다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="24">물리 페이지</text>
+  <text class="t-s t-ink t-b" x="210" y="24">mapping이 가리키는 것</text>
+  <text class="t-s t-ink t-b" x="460" y="24">매핑한 VMA들</text>
+  <text class="t-s t-ink t-b" x="660" y="24">PTE</text>
+
+  <!-- 파일 -->
+  <rect class="box blue" x="20" y="48" width="130" height="64" rx="10"/>
+  <text class="t-b mid" x="85" y="76">파일 폴리오</text>
+  <text class="t-code mid" x="85" y="98">mapping</text>
+  <path class="ln blue" d="M150 80 H206" marker-end="url(#ah-blue)"/>
+
+  <rect class="box yellow" x="210" y="40" width="200" height="80" rx="10"/>
+  <text class="t-mono t-b" x="224" y="64">address_space</text>
+  <text class="t-code" x="224" y="86">i_mmap</text>
+  <text class="t-xs" x="224" y="106">이 파일을 매핑한 VMA의 트리</text>
+  <path class="ln" d="M410 66 H436 V59 H456" marker-end="url(#ah)"/>
+  <path class="ln" d="M410 94 H436 V101 H456" marker-end="url(#ah)"/>
+
+  <rect class="box" x="460" y="44" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="64">VMA · 프로세스 A</text>
+  <rect class="box" x="460" y="86" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="106">VMA · 프로세스 B</text>
+  <path class="ln" d="M610 59 H656" marker-end="url(#ah)"/>
+  <path class="ln" d="M610 101 H656" marker-end="url(#ah)"/>
+  <rect class="box green" x="660" y="44" width="80" height="30" rx="6"/>
+  <text class="t-code mid" x="700" y="64">PTE</text>
+  <rect class="box green" x="660" y="86" width="80" height="30" rx="6"/>
+  <text class="t-code mid" x="700" y="106">PTE</text>
+
+  <path class="ln thin muted dash" d="M20 140 H740"/>
+
+  <!-- 익명 -->
+  <rect class="box blue" x="20" y="168" width="130" height="64" rx="10"/>
+  <text class="t-b mid" x="85" y="196">익명 폴리오</text>
+  <text class="t-code mid" x="85" y="218">mapping | 1</text>
+  <path class="ln blue" d="M150 200 H206" marker-end="url(#ah-blue)"/>
+
+  <rect class="box yellow" x="210" y="160" width="200" height="80" rx="10"/>
+  <text class="t-mono t-b" x="224" y="184">anon_vma</text>
+  <text class="t-code" x="224" y="206">rb_root</text>
+  <text class="t-xs" x="224" y="226">fork()로 갈라진 VMA의 트리</text>
+  <path class="ln" d="M410 186 H436 V179 H456" marker-end="url(#ah)"/>
+  <path class="ln" d="M410 214 H436 V221 H456" marker-end="url(#ah)"/>
+
+  <rect class="box" x="460" y="164" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="184">VMA · 부모</text>
+  <rect class="box" x="460" y="206" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="226">VMA · 자식</text>
+  <path class="ln" d="M610 179 H656" marker-end="url(#ah)"/>
+  <path class="ln" d="M610 221 H656" marker-end="url(#ah)"/>
+  <rect class="box green" x="660" y="164" width="80" height="30" rx="6"/>
+  <text class="t-code mid" x="700" y="184">PTE</text>
+  <rect class="box green" x="660" y="206" width="80" height="30" rx="6"/>
+  <text class="t-code mid" x="700" y="226">PTE</text>
+
+  <text class="t-s mid" x="380" y="276">rmap_walk()가 이 길을 걸으며 VMA마다 콜백을 부른다</text>
+  <text class="t-s mid" x="380" y="298">folio_referenced()는 ACCESSED 비트를 모으고, try_to_unmap()은 PTE를 지운다</text>
+</svg>

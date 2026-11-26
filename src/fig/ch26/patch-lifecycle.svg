@@ -1,0 +1,58 @@
+<svg viewBox="0 0 760 282" xmlns="http://www.w3.org/2000/svg">
+  <title>패치의 일생: 커밋 작성, 검사, 메일로 게시, 리뷰를 여러 번 돈 뒤 메인테이너 트리, linux-next, 메인라인, 안정 트리로 올라간다</title>
+
+  <!-- 되돌아가는 길 -->
+  <path class="ln warm" d="M575 52 V28 H90 V48" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm mid" x="332" y="20">지적을 반영해 v2, v3 … 으로 다시 보낸다</text>
+
+  <!-- 윗줄: 작성자와 리뷰어 -->
+  <rect class="box blue" x="20" y="52" width="140" height="56" rx="10"/>
+  <text class="t-b" x="34" y="76">① 커밋 작성</text>
+  <text class="t-code" x="34" y="96">git commit -s</text>
+  <path class="ln" d="M160 80 H176" marker-end="url(#ah)"/>
+
+  <rect class="box blue" x="180" y="52" width="140" height="56" rx="10"/>
+  <text class="t-b" x="194" y="76">② 검사</text>
+  <text class="t-code" x="194" y="96">checkpatch.pl</text>
+  <path class="ln" d="M320 80 H336" marker-end="url(#ah)"/>
+
+  <rect class="box blue" x="340" y="52" width="150" height="56" rx="10"/>
+  <text class="t-b" x="354" y="76">③ 메일로 게시</text>
+  <text class="t-code" x="354" y="96">git send-email</text>
+  <path class="ln" d="M490 80 H506" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="510" y="52" width="130" height="56" rx="10"/>
+  <text class="t-b" x="524" y="76">④ 리뷰</text>
+  <text class="t-xs" x="524" y="96">줄마다 인라인 답장</text>
+  <path class="ln thin muted dash" d="M640 80 H656" marker-end="url(#ah-muted)"/>
+
+  <rect class="ghost dash" x="660" y="52" width="80" height="56" rx="10"/>
+  <text class="t-s t-ink mid" x="700" y="76">거절</text>
+  <text class="t-code mid" x="700" y="96">NAK</text>
+
+  <!-- 받아들여지는 길 -->
+  <path class="ln green" d="M575 108 V142 H100 V172" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-green" x="112" y="135">Reviewed-by · Acked-by가 붙고 메인테이너가 받아들인다</text>
+
+  <!-- 아랫줄: 저장소 -->
+  <rect class="box yellow" x="20" y="176" width="160" height="56" rx="10"/>
+  <text class="t-b" x="34" y="200">⑤ 메인테이너 트리</text>
+  <text class="t-xs" x="34" y="220">Signed-off-by를 덧붙임</text>
+  <path class="ln" d="M180 204 H196" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="200" y="176" width="150" height="56" rx="10"/>
+  <text class="t-b" x="214" y="200">⑥ linux-next</text>
+  <text class="t-xs" x="214" y="220">통합 빌드, 봇 시험</text>
+  <path class="ln" d="M350 204 H366" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="370" y="176" width="170" height="56" rx="10"/>
+  <text class="t-b" x="384" y="200">⑦ 메인라인</text>
+  <text class="t-xs" x="384" y="220">새 기능은 머지 윈도에만</text>
+  <path class="ln thin muted dash" d="M540 204 H556" marker-end="url(#ah-muted)"/>
+
+  <rect class="box gray" x="560" y="176" width="180" height="56" rx="10"/>
+  <text class="t-b" x="574" y="200">⑧ 안정 트리</text>
+  <text class="t-xs" x="574" y="220">Cc: stable 태그가 있으면</text>
+
+  <text class="t-s mid" x="380" y="264">작은 수정은 며칠, 크고 논쟁적인 변경은 여러 해가 걸린다</text>
+</svg>

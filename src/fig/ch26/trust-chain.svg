@@ -1,0 +1,62 @@
+<svg viewBox="0 0 760 352" xmlns="http://www.w3.org/2000/svg">
+  <title>패치가 흐르는 저장소: 개발자, 메일링 리스트, 서브시스템 메인테이너의 트리, linux-next, 메인라인, 안정 트리</title>
+
+  <!-- 개발자 -->
+  <rect class="box blue" x="20" y="92" width="130" height="96" rx="10"/>
+  <use href="#i-users" x="67" y="102" width="36" height="36" class="ic blue"/>
+  <text class="t-b mid" x="85" y="158">개발자</text>
+  <text class="t-xs mid" x="85" y="176">패치 시리즈</text>
+  <path class="ln blue" d="M150 140 H186" marker-end="url(#ah-blue)"/>
+
+  <!-- 메일링 리스트 -->
+  <rect class="box" x="190" y="72" width="150" height="136" rx="10"/>
+  <use href="#i-mail" x="247" y="84" width="36" height="36" class="ic"/>
+  <text class="t-b mid" x="265" y="140">메일링 리스트</text>
+  <text class="t-code mid" x="265" y="160">lore.kernel.org</text>
+  <text class="t-xs mid" x="265" y="180">공개 리뷰와 보관</text>
+
+  <path class="ln" d="M340 140 H358 M358 60 V204"/>
+  <path class="ln" d="M358 60 H376" marker-end="url(#ah)"/>
+  <path class="ln" d="M358 108 H376" marker-end="url(#ah)"/>
+  <path class="ln" d="M358 156 H376" marker-end="url(#ah)"/>
+  <path class="ln" d="M358 204 H376" marker-end="url(#ah)"/>
+
+  <!-- 서브시스템 트리 -->
+  <text class="t-s t-ink t-b mid" x="465" y="24">서브시스템 메인테이너의 트리</text>
+  <rect class="box yellow" x="380" y="40" width="170" height="40" rx="8"/>
+  <text class="t-mono mid" x="465" y="65">tip · sched/core</text>
+  <rect class="box yellow" x="380" y="88" width="170" height="40" rx="8"/>
+  <text class="t-mono mid" x="465" y="113">net-next</text>
+  <rect class="box yellow" x="380" y="136" width="170" height="40" rx="8"/>
+  <text class="t-mono mid" x="465" y="161">mm</text>
+  <rect class="box yellow" x="380" y="184" width="170" height="40" rx="8"/>
+  <text class="t-s t-ink mid" x="465" y="209">그 밖의 수백 개</text>
+
+  <path class="ln green" d="M550 60 H572 M550 108 H572 M550 156 H572 M550 204 H572 M572 60 V204"/>
+  <path class="ln green" d="M572 140 H596" marker-end="url(#ah-green)"/>
+
+  <!-- 메인라인 -->
+  <text class="t-xs tc-green mid" x="670" y="60">서명된 태그로 pull</text>
+  <rect class="box green" x="600" y="72" width="140" height="136" rx="10"/>
+  <use href="#i-branch" x="652" y="84" width="36" height="36" class="ic green"/>
+  <text class="t-b mid" x="670" y="140">메인라인</text>
+  <text class="t-code mid" x="670" y="160">linux.git</text>
+  <text class="t-xs mid" x="670" y="180">리누스 토르발스</text>
+
+  <!-- linux-next -->
+  <path class="ln muted dash" d="M465 224 V262" marker-end="url(#ah-muted)"/>
+  <text class="t-xs" x="475" y="248">병합 전 통합 시험</text>
+  <rect class="ghost dash" x="380" y="266" width="170" height="52" rx="8"/>
+  <text class="t-mono t-b mid" x="465" y="288">linux-next</text>
+  <text class="t-xs mid" x="465" y="306">날마다 전부 합쳐 빌드</text>
+
+  <!-- 안정 트리 -->
+  <path class="ln muted" d="M670 208 V262" marker-end="url(#ah-muted)"/>
+  <text class="t-xs" x="680" y="240">수정만</text>
+  <rect class="box gray" x="600" y="266" width="140" height="52" rx="8"/>
+  <text class="t-b mid" x="670" y="288">안정 트리</text>
+  <text class="t-code mid" x="670" y="306">7.3.y · 6.18.y</text>
+
+  <text class="t-s mid" x="190" y="300">각 단계는 바로 앞 단계를 믿고,</text>
+  <text class="t-s mid" x="190" y="320">서명으로 보낸 사람을 확인한다</text>
+</svg>

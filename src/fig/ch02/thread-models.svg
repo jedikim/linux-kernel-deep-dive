@@ -1,0 +1,84 @@
+<svg viewBox="0 0 760 356" xmlns="http://www.w3.org/2000/svg">
+  <title>세 가지 스레드 모델: 1:1은 유저 스레드 하나가 커널 태스크 하나에 대응하고, N:1은 여러 유저 스레드가 태스크 하나 위에서 돌며, M:N은 런타임이 많은 유저 스레드를 적은 수의 태스크에 나눠 싣는다. 커널이 스케줄하는 것은 언제나 태스크다.</title>
+
+  <rect class="panel" x="20" y="16" width="230" height="302" rx="14"/>
+  <text class="t-l" x="34" y="42">1:1</text>
+  <text class="t-xs" x="80" y="42">스레드마다 커널 태스크 하나</text>
+  <path class="ln thin muted dash" d="M30 170 H240"/>
+  <text class="t-xs end" x="242" y="164">유저 공간</text>
+  <text class="t-xs end" x="242" y="186">커널</text>
+  <path class="ln thin" d="M60 86 V194"/>
+  <path class="ln thin" d="M120 86 V194"/>
+  <path class="ln thin" d="M180 86 V194"/>
+  <rect class="box blue" x="38" y="60" width="44" height="26" rx="13"/>
+  <text class="t-xs t-ink t-b mid" x="60" y="78">U1</text>
+  <rect class="box blue" x="98" y="60" width="44" height="26" rx="13"/>
+  <text class="t-xs t-ink t-b mid" x="120" y="78">U2</text>
+  <rect class="box blue" x="158" y="60" width="44" height="26" rx="13"/>
+  <text class="t-xs t-ink t-b mid" x="180" y="78">U3</text>
+  <rect class="box yellow" x="35" y="194" width="50" height="28" rx="6"/>
+  <text class="t-xs t-ink t-b mid" x="60" y="213">태스크</text>
+  <rect class="box yellow" x="95" y="194" width="50" height="28" rx="6"/>
+  <text class="t-xs t-ink t-b mid" x="120" y="213">태스크</text>
+  <rect class="box yellow" x="155" y="194" width="50" height="28" rx="6"/>
+  <text class="t-xs t-ink t-b mid" x="180" y="213">태스크</text>
+  <text class="t-xs t-ink t-b" x="34" y="252">glibc의 pthread (NPTL)</text>
+  <text class="t-xs" x="34" y="272">한 스레드가 블록되어도</text>
+  <text class="t-xs" x="34" y="292">나머지는 계속 돈다</text>
+
+  <rect class="panel" x="265" y="16" width="230" height="302" rx="14"/>
+  <text class="t-l" x="279" y="42">N:1</text>
+  <text class="t-xs" x="325" y="42">태스크 하나 위에 여러 스레드</text>
+  <path class="ln thin muted dash" d="M275 170 H485"/>
+  <text class="t-xs end" x="487" y="164">유저 공간</text>
+  <text class="t-xs end" x="487" y="186">커널</text>
+  <path class="ln thin" d="M310 86 V110"/>
+  <path class="ln thin" d="M380 86 V110"/>
+  <path class="ln thin" d="M450 86 V110"/>
+  <path class="ln thin" d="M380 136 V194"/>
+  <rect class="box purple" x="279" y="110" width="202" height="26" rx="6"/>
+  <text class="t-xs t-ink t-b mid" x="380" y="128">유저 수준 스케줄러</text>
+  <rect class="box blue" x="288" y="60" width="44" height="26" rx="13"/>
+  <text class="t-xs t-ink t-b mid" x="310" y="78">U1</text>
+  <rect class="box blue" x="358" y="60" width="44" height="26" rx="13"/>
+  <text class="t-xs t-ink t-b mid" x="380" y="78">U2</text>
+  <rect class="box blue" x="428" y="60" width="44" height="26" rx="13"/>
+  <text class="t-xs t-ink t-b mid" x="450" y="78">U3</text>
+  <rect class="box yellow" x="350" y="194" width="60" height="28" rx="6"/>
+  <text class="t-xs t-ink t-b mid" x="380" y="213">태스크</text>
+  <text class="t-xs t-ink t-b" x="279" y="252">옛 그린 스레드 라이브러리</text>
+  <text class="t-xs" x="279" y="272">커널은 태스크 하나만 본다</text>
+  <text class="t-xs" x="279" y="292">하나가 블록되면 모두 멈춘다</text>
+
+  <rect class="panel" x="510" y="16" width="230" height="302" rx="14"/>
+  <text class="t-l" x="524" y="42">M:N</text>
+  <text class="t-xs" x="570" y="42">적은 태스크에 많은 스레드</text>
+  <path class="ln thin muted dash" d="M520 170 H730"/>
+  <text class="t-xs end" x="732" y="164">유저 공간</text>
+  <text class="t-xs end" x="732" y="186">커널</text>
+  <path class="ln thin" d="M548 86 V110"/>
+  <path class="ln thin" d="M599 86 V110"/>
+  <path class="ln thin" d="M651 86 V110"/>
+  <path class="ln thin" d="M702 86 V110"/>
+  <path class="ln thin" d="M585 136 V194"/>
+  <path class="ln thin" d="M665 136 V194"/>
+  <rect class="box purple" x="524" y="110" width="202" height="26" rx="6"/>
+  <text class="t-xs t-ink t-b mid" x="625" y="128">런타임 스케줄러</text>
+  <rect class="box blue" x="526" y="60" width="44" height="26" rx="13"/>
+  <text class="t-xs t-ink t-b mid" x="548" y="78">U1</text>
+  <rect class="box blue" x="577" y="60" width="44" height="26" rx="13"/>
+  <text class="t-xs t-ink t-b mid" x="599" y="78">U2</text>
+  <rect class="box blue" x="629" y="60" width="44" height="26" rx="13"/>
+  <text class="t-xs t-ink t-b mid" x="651" y="78">U3</text>
+  <rect class="box blue" x="680" y="60" width="44" height="26" rx="13"/>
+  <text class="t-xs t-ink t-b mid" x="702" y="78">U4</text>
+  <rect class="box yellow" x="555" y="194" width="60" height="28" rx="6"/>
+  <text class="t-xs t-ink t-b mid" x="585" y="213">태스크</text>
+  <rect class="box yellow" x="635" y="194" width="60" height="28" rx="6"/>
+  <text class="t-xs t-ink t-b mid" x="665" y="213">태스크</text>
+  <text class="t-xs t-ink t-b" x="524" y="252">Go 고루틴, Java 가상 스레드</text>
+  <text class="t-xs" x="524" y="272">런타임이 태스크에 나눠 싣는다</text>
+  <text class="t-xs" x="524" y="292">코어를 여럿 쓸 수 있다</text>
+
+  <text class="t-s mid" x="380" y="342">어느 모델에서든 커널이 스케줄하는 것은 노란 태스크뿐이다. 그 위에 무엇을 실을지는 유저 공간이 정한다.</text>
+</svg>

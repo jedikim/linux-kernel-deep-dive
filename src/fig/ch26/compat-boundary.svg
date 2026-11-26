@@ -1,0 +1,43 @@
+<svg viewBox="0 0 760 336" xmlns="http://www.w3.org/2000/svg">
+  <title>호환성 약속의 범위: 유저 공간과 만나는 면은 깨뜨리지 않고, 커널 내부 API는 자유롭게 바꾸며, 트리 밖 모듈은 스스로 따라가야 한다</title>
+
+  <!-- 유저 공간 -->
+  <rect class="panel blue" x="20" y="16" width="720" height="70" rx="12"/>
+  <text class="t-b tc-blue" x="36" y="56">유저 공간</text>
+  <rect class="box" x="130" y="30" width="130" height="42" rx="8"/>
+  <text class="t-s t-ink mid" x="195" y="56">응용 프로그램</text>
+  <rect class="box" x="272" y="30" width="90" height="42" rx="8"/>
+  <text class="t-s t-ink mid" x="317" y="56">libc</text>
+  <rect class="box" x="374" y="30" width="170" height="42" rx="8"/>
+  <text class="t-s t-ink mid" x="459" y="56">오래전에 빌드한 바이너리</text>
+  <text class="t-xs tc-blue end" x="726" y="48">커널만 올려도</text>
+  <text class="t-xs tc-blue end" x="726" y="66">그대로 돈다</text>
+
+  <!-- 경계 -->
+  <rect class="solid green" x="20" y="98" width="720" height="32" rx="6"/>
+  <text class="t-b t-on mid" x="380" y="119">유저 공간과 만나는 면: 시스템 콜, /proc, /sys, ioctl · 깨뜨리지 않는다</text>
+
+  <!-- 커널 -->
+  <rect class="panel yellow" x="20" y="142" width="530" height="150" rx="12"/>
+  <text class="t-b tc-yellow" x="36" y="166">커널 (메인라인 트리)</text>
+  <rect class="box" x="36" y="178" width="220" height="52" rx="8"/>
+  <text class="t-s t-ink t-b" x="50" y="199">코어 서브시스템</text>
+  <text class="t-xs" x="50" y="217">스케줄러, 메모리, VFS, 네트워크</text>
+  <rect class="box" x="314" y="178" width="220" height="52" rx="8"/>
+  <text class="t-s t-ink t-b" x="328" y="199">트리 안 드라이버</text>
+  <text class="t-xs" x="328" y="217">drivers/ 아래 파일 37,988개</text>
+  <path class="ln" d="M262 204 H308" marker-start="url(#dot)" marker-end="url(#dot)"/>
+  <text class="t-s t-ink t-b" x="36" y="254">내부 API: 함수, 구조체, ops 테이블</text>
+  <text class="t-xs" x="36" y="274">언제든 바뀐다. 바꾸는 사람이 트리 안의 사용처를 같은 시리즈에서 고친다</text>
+
+  <!-- 트리 밖 -->
+  <rect class="ghost red dash" x="570" y="142" width="170" height="150" rx="12"/>
+  <text class="t-b tc-red mid" x="655" y="168">트리 밖 모듈</text>
+  <text class="t-xs mid" x="655" y="194">내부 API가 바뀌면</text>
+  <text class="t-xs mid" x="655" y="212">스스로 고쳐야 한다</text>
+  <text class="t-xs mid" x="655" y="240">회귀 규칙의 보호 없음</text>
+  <text class="t-code mid" x="655" y="268">taint: O</text>
+  <path class="ln red dash" d="M570 204 H556" marker-end="url(#ah-red)"/>
+
+  <text class="t-s mid" x="380" y="318">약속하는 면은 좁고 분명하게, 그 안쪽은 자유롭게</text>
+</svg>

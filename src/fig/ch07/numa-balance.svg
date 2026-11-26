@@ -1,0 +1,62 @@
+<svg viewBox="0 0 760 310" xmlns="http://www.w3.org/2000/svg">
+  <title>태스크 T는 노드 0의 CPU에서 돌지만 T의 페이지 대부분은 노드 1의 메모리에 있다. NUMA 힌트 폴트로 이것을 알아낸 뒤 태스크를 노드 1로 옮기거나 페이지를 노드 0으로 옮긴다.</title>
+
+  <!-- 노드 0 -->
+  <rect class="panel blue" x="20" y="14" width="340" height="216" rx="14"/>
+  <text class="t-b" x="36" y="38">노드 0</text>
+  <text class="t-xs" x="36" y="66">CPU</text>
+  <rect class="box" x="80" y="50" width="44" height="34" rx="6"/>
+  <circle class="solid blue" cx="102" cy="67" r="13"/>
+  <text class="t-s t-b t-on mid" x="102" y="72">T</text>
+  <rect class="box" x="132" y="50" width="44" height="34" rx="6"/>
+  <rect class="box" x="184" y="50" width="44" height="34" rx="6"/>
+  <rect class="box" x="236" y="50" width="44" height="34" rx="6"/>
+
+  <text class="t-xs" x="36" y="150">메모리</text>
+  <rect class="solid blue" x="80" y="124" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="108" y="124" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="136" y="124" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="164" y="124" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="192" y="124" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="80" y="152" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="108" y="152" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="136" y="152" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="164" y="152" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="192" y="152" width="22" height="22" rx="3"/>
+  <text class="t-xs" x="80" y="198">T의 페이지 2장</text>
+
+  <!-- 노드 1 -->
+  <rect class="panel warm" x="400" y="14" width="340" height="216" rx="14"/>
+  <text class="t-b end" x="724" y="40">노드 1</text>
+  <text class="t-xs" x="416" y="66">CPU</text>
+  <rect class="ghost green dash" x="460" y="50" width="44" height="34" rx="6"/>
+  <rect class="box" x="512" y="50" width="44" height="34" rx="6"/>
+  <rect class="box" x="564" y="50" width="44" height="34" rx="6"/>
+  <rect class="box" x="616" y="50" width="44" height="34" rx="6"/>
+
+  <text class="t-xs" x="416" y="150">메모리</text>
+  <rect class="solid blue" x="460" y="124" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="488" y="124" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="516" y="124" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="544" y="124" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="572" y="124" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="460" y="152" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="488" y="152" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="516" y="152" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="544" y="152" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="572" y="152" width="22" height="22" rx="3"/>
+  <text class="t-xs" x="460" y="198">T의 페이지 8장</text>
+
+  <!-- 원격 접근 -->
+  <path class="ln thin red dash" d="M102 84 V104 H471 V120" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="150" y="99">먼 메모리를 읽는다</text>
+
+  <!-- 해법 -->
+  <path class="ln green" d="M102 50 V36 H482 V46" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-green t-b mid" x="250" y="30">① 태스크를 옮긴다</text>
+  <path class="ln purple" d="M456 164 H220" marker-end="url(#ah-purple)"/>
+  <text class="t-xs tc-purple t-b mid" x="290" y="184">② 페이지를 옮긴다</text>
+
+  <text class="t-s t-ink mid" x="380" y="262">힌트 폴트를 세면 노드 0에서 2번, 노드 1에서 8번이다. T의 선호 노드는 1이 된다</text>
+  <text class="t-s mid" x="380" y="286">① T를 노드 1의 CPU로 옮기거나, ② 폴트가 난 페이지를 T가 도는 노드로 옮긴다</text>
+</svg>

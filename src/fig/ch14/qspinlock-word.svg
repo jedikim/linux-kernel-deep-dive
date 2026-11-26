@@ -1,0 +1,67 @@
+<svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg">
+  <title>qspinlock의 32비트 락 워드 배치(locked, pending, tail)와, 주인 하나에 대기자 넷이 붙었을 때 누가 어느 메모리를 보며 도는지</title>
+
+  <text class="t-h" x="20" y="30">struct qspinlock</text>
+  <text class="t-s" x="170" y="30">4바이트 · NR_CPUS가 16384보다 작을 때의 배치</text>
+
+  <text class="t-code mid tc-muted" x="200" y="62">31–18</text>
+  <text class="t-code mid tc-muted" x="425" y="62">17–16</text>
+  <text class="t-code mid tc-muted" x="537" y="62">15–8</text>
+  <text class="t-code mid tc-muted" x="672" y="62">7–0</text>
+
+  <rect class="box purple" x="20" y="70" width="360" height="48"/>
+  <text class="t-b mid" x="200" y="99">tail · CPU 번호 + 1</text>
+  <rect class="box purple" x="380" y="70" width="90" height="48"/>
+  <text class="t-b mid" x="425" y="99">tail · idx</text>
+  <rect class="box warm" x="470" y="70" width="135" height="48"/>
+  <text class="t-b mid" x="537" y="99">pending</text>
+  <rect class="box blue" x="605" y="70" width="135" height="48"/>
+  <text class="t-b mid" x="672" y="99">locked</text>
+
+  <text class="t-xs mid" x="200" y="136">대기열 맨 끝에 선 CPU</text>
+  <text class="t-xs mid" x="425" y="136">중첩 깊이 0–3</text>
+  <text class="t-xs mid" x="537" y="136">두 번째로 온 CPU</text>
+  <text class="t-xs mid" x="672" y="136">누군가 쥐고 있다</text>
+
+  <path class="ln thin muted" d="M20 154 H740"/>
+
+  <text class="t-s t-ink t-b" x="20" y="180">CPU 2가 락을 쥔 동안 CPU 7, 3, 5, 1이 차례로 도착했다면</text>
+
+  <rect class="box" x="250" y="194" width="260" height="40" rx="8"/>
+  <text class="t-code mid" x="380" y="218">tail=CPU1 · pending=1 · locked=1</text>
+
+  <rect class="box blue" x="20" y="290" width="128" height="66" rx="10"/>
+  <text class="t-b mid" x="84" y="312">CPU 2</text>
+  <text class="t-s t-ink mid" x="84" y="330">락 주인</text>
+  <text class="t-xs mid" x="84" y="347">임계 구역 실행</text>
+
+  <rect class="box warm" x="168" y="290" width="128" height="66" rx="10"/>
+  <text class="t-b mid" x="232" y="312">CPU 7</text>
+  <text class="t-s t-ink mid" x="232" y="330">pending</text>
+  <text class="t-xs mid" x="232" y="347">락 워드를 본다</text>
+
+  <rect class="box purple" x="316" y="290" width="128" height="66" rx="10"/>
+  <text class="t-b mid" x="380" y="312">CPU 3</text>
+  <text class="t-s t-ink mid" x="380" y="330">대기열 머리</text>
+  <text class="t-xs mid" x="380" y="347">락 워드를 본다</text>
+
+  <rect class="box purple" x="464" y="290" width="128" height="66" rx="10"/>
+  <text class="t-b mid" x="528" y="312">CPU 5</text>
+  <text class="t-s t-ink mid" x="528" y="330">대기열</text>
+  <text class="t-xs mid" x="528" y="347">자기 노드만 본다</text>
+
+  <rect class="box purple" x="612" y="290" width="128" height="66" rx="10"/>
+  <text class="t-b mid" x="676" y="312">CPU 1</text>
+  <text class="t-s t-ink mid" x="676" y="330">대기열 꼬리</text>
+  <text class="t-xs mid" x="676" y="347">자기 노드만 본다</text>
+
+  <path class="ln warm dash" d="M232 290 V262 H290 V238" marker-end="url(#ah-warm)"/>
+  <path class="ln purple dash" d="M380 290 V238" marker-end="url(#ah-purple)"/>
+  <path class="ln purple" d="M510 214 H676 V286" marker-end="url(#ah-purple)"/>
+  <text class="t-code tc-purple" x="560" y="206">tail</text>
+  <path class="ln purple" d="M444 323 H461" marker-end="url(#ah-purple)"/>
+  <path class="ln purple" d="M592 323 H609" marker-end="url(#ah-purple)"/>
+  <text class="t-code tc-purple mid" x="528" y="280">node-&gt;next →</text>
+
+  <text class="t-s mid" x="380" y="392">락 워드를 읽으며 도는 CPU는 많아야 둘이다. 나머지는 자기 CPU의 노드만 읽는다</text>
+</svg>

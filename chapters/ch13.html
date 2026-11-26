@@ -1,0 +1,1030 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>경쟁 조건과 실행 컨텍스트 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="누가 누구를 끊을 수 있는가">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="경쟁 조건과 실행 컨텍스트 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="누가 누구를 끊을 수 있는가">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch13" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html" aria-current="page"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">4부 동시성 › <b>13장 경쟁 조건과 실행 컨텍스트</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-purple">
+<div class="ch-kicker"><span class="ch-no">13</span><span class="part">4부 · 동시성</span></div>
+<h1>경쟁 조건과 실행 컨텍스트</h1>
+<p class="ch-sub">누가 누구를 끊을 수 있는가</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 50분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/preempt.h" target="_blank" rel="noopener">include/linux/preempt.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c" target="_blank" rel="noopener">kernel/sched/core.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/interrupt.h" target="_blank" rel="noopener">include/linux/interrupt.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/atomic.h" target="_blank" rel="noopener">arch/x86/include/asm/atomic.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/net/core/dev.c" target="_blank" rel="noopener">net/core/dev.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/spinlock_api_smp.h" target="_blank" rel="noopener">include/linux/spinlock_api_smp.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/interrupt_rc.h" target="_blank" rel="noopener">include/linux/interrupt_rc.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/workqueue.c" target="_blank" rel="noopener">kernel/workqueue.c</a></div>
+</header><div class="lead">
+<p><code>counter++</code> 한 줄은 혼자 실행될 때는 틀릴 수가 없습니다. 커널에서는 혼자 실행된다는 보장이 없습니다. 다른 CPU가 같은 줄을 동시에 실행하고, 인터럽트가 그 줄의 한가운데에 끼어들고, 스케줄러가 태스크를 중간에 끊습니다. 그 결과로 생기는 버그는 백만 번에 한 번 나타나고 재현되지 않습니다. 이 장은 락의 종류를 나열하기 전에 먼저 묻습니다. 지금 이 코드는 어떤 상황에서 실행되고 있고, 누가 끼어들 수 있는가. 이 질문에 답할 수 있으면 어떤 보호가 필요한지는 따라 나옵니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>커널에서 같은 데이터에 동시에 접근하게 만드는 원인은 무엇 무엇인가?</li>
+<li>태스크, softirq, hardirq, NMI 컨텍스트는 서로를 끊을 수 있는가?</li>
+<li>원자적 컨텍스트란 무엇이고, 거기서 잠들면 커널은 어떻게 알아채는가?</li>
+<li>CPU별 데이터와 원자 연산은 락과 무엇이 다른가?</li>
+<li>두 컨텍스트가 데이터를 나눠 쓸 때 <code>spin_lock()</code>, <code>_bh</code>, <code>_irqsave</code> 가운데 무엇을 써야 하는가?</li>
+<li>락을 잡았는데도 값이 어긋날 수 있는 메모리 순서 문제와 거짓 공유란 무엇인가?</li>
+</ul>
+</div>
+<section class="level2" id="sources">
+<h2><span class="sec-n">13.1</span>동시성은 어디서 오는가<a aria-label="이 절의 링크" class="anchor" href="#sources">#</a></h2>
+<p>커널 코드가 만지는 데이터에 다른 실행 흐름이 끼어드는 길은 넷입니다.</p>
+<ul>
+<li><strong>여러 CPU.</strong> 두 CPU가 같은 순간에 같은 함수를 실행합니다. 흉내가 아닌 진짜 병렬입니다.</li>
+<li><strong>선점.</strong> CPU가 하나여도 스케줄러가 커널 코드 중간에서 태스크를 바꿉니다(<a href="ch06.html">6장</a>). 바뀐 태스크가 같은 데이터를 만지면 결과는 두 CPU가 동시에 만진 것과 같습니다.</li>
+<li><strong>hardirq.</strong> 인터럽트는 어느 명령어 사이에든 끼어들어 핸들러를 실행합니다(<a href="ch10.html">10장</a>).</li>
+<li><strong>softirq.</strong> 인터럽트에서 돌아가는 길이나 <code>local_bh_enable()</code>에서 실행됩니다(<a href="ch11.html">11장</a>). 태스크가 보기에는 인터럽트처럼 끼어듭니다.</li>
+</ul>
+<p>여기에 <strong>NMI</strong>(마스크할 수 없는 인터럽트)가 있습니다. 인터럽트를 꺼 둔 구간까지 끊고 들어옵니다. 워치독과 성능 카운터 샘플링이 쓰고, 일반 드라이버 코드는 NMI 안에서 돌 일이 없습니다. 다만 NMI 핸들러를 쓰는 사람은 "무엇을 끊었는지 알 수 없다"는 조건에서 일해야 합니다.</p>
+<p>리눅스가 처음 SMP를 지원한 2.0은 이 문제를 가장 단순하게 풀었습니다. 커널 전체에 락 하나를 두어 한 번에 한 CPU만 커널 코드를 실행하게 했습니다. 올바르지만 CPU를 늘려도 커널 안의 일은 빨라지지 않습니다. 그 뒤 30년은 그 큰 락을 자료구조마다의 작은 락으로 쪼개고, 락 없이 되는 곳에서는 락을 없애 온 역사입니다. 쪼갤수록 "이 데이터에 누가 끼어들 수 있는가"를 정확히 알아야 했습니다.</p>
+</section>
+<section class="level2" id="anatomy">
+<h2><span class="sec-n">13.2</span>경쟁 조건의 해부<a aria-label="이 절의 링크" class="anchor" href="#anatomy">#</a></h2>
+<p><strong>경쟁 조건</strong>(race condition)은 결과가 실행 순서에 따라 달라지는 상황입니다. 가장 작은 예가 카운터 증가입니다.</p>
+<figure class="fig" id="fig-interleave"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>두 CPU가 같은 counter를 동시에 증가시킬 때, 읽기와 더하기와 쓰기가 엇갈려 증가 한 번이 사라지는 과정</title>
+
+  <text class="t-b tc-blue mid" x="155" y="28">CPU 0</text>
+  <text class="t-b mid" x="380" y="28">메모리의 counter</text>
+  <text class="t-b tc-green mid" x="605" y="28">CPU 1</text>
+  <rect class="box blue" x="40" y="44" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="52" y="64">읽기</text>
+  <text class="t-code" x="106" y="64">reg ← counter (5)</text>
+  <rect class="box" x="350" y="44" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid" x="380" y="64">5</text>
+  <path class="ln thin blue" d="M346 59 H278" marker-end="url(#ah-blue)"/>
+  <rect class="box green" x="490" y="82" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="502" y="102">읽기</text>
+  <text class="t-code" x="556" y="102">reg ← counter (5)</text>
+  <rect class="box" x="350" y="82" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid" x="380" y="102">5</text>
+  <path class="ln thin green" d="M414 97 H482" marker-end="url(#ah-green)"/>
+  <rect class="box blue" x="40" y="120" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="52" y="140">더하기</text>
+  <text class="t-code" x="106" y="140">reg ← reg + 1 (6)</text>
+  <rect class="box" x="350" y="120" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid" x="380" y="140">5</text>
+  <rect class="box green" x="490" y="158" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="502" y="178">더하기</text>
+  <text class="t-code" x="556" y="178">reg ← reg + 1 (6)</text>
+  <rect class="box" x="350" y="158" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid" x="380" y="178">5</text>
+  <rect class="box blue" x="40" y="196" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="52" y="216">쓰기</text>
+  <text class="t-code" x="106" y="216">counter ← reg (6)</text>
+  <rect class="box" x="350" y="196" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid" x="380" y="216">6</text>
+  <path class="ln thin blue" d="M274 211 H342" marker-end="url(#ah-blue)"/>
+  <rect class="box green" x="490" y="234" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="502" y="254">쓰기</text>
+  <text class="t-code" x="556" y="254">counter ← reg (6)</text>
+  <rect class="box red" x="350" y="234" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid tc-red" x="380" y="254">6</text>
+  <path class="ln thin green" d="M486 249 H418" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="22" y="40">시간</text>
+  <path class="ln thin muted" d="M22 48 V262" marker-end="url(#ah-muted)"/>
+  <text class="t-xs tc-red mid" x="380" y="282">7이어야 한다</text>
+  <text class="t-s mid" x="380" y="308">두 번 증가시켰는데 값은 한 번만 늘었다. counter++는 읽기, 더하기, 쓰기 세 단계다.</text>
+</svg></div><figcaption><b>그림 13-1</b><code>counter++</code>의 세 단계가 두 CPU에서 엇갈린 모습. 각 CPU는 자기 일을 올바르게 했지만 결과는 틀렸습니다.</figcaption></figure>
+<p>C의 한 문장은 CPU에게 하나의 동작이 아닙니다. 메모리에서 읽고, 레지스터에서 더하고, 메모리에 씁니다. x86 컴파일러가 이것을 <code>incl counter</code> 명령어 하나로 만들어도 사정은 같습니다. 명령어 하나 안에서 읽기와 쓰기가 따로 일어나고, 그 사이에 다른 CPU의 쓰기가 들어올 수 있습니다.</p>
+<p>패턴은 셋으로 정리됩니다.</p>
+<ul>
+<li><strong>읽고 고쳐 쓰기.</strong> 위의 카운터, 플래그 비트 켜기, 리스트의 <code>head</code> 갱신. 읽은 값이 쓰는 시점에는 낡아 있습니다.</li>
+<li><strong>여러 필드를 함께 고치기.</strong> 리스트에 노드를 넣으려면 포인터 둘을 고쳐야 합니다. 하나만 고쳐진 순간에 다른 쪽이 리스트를 따라가면 깨진 구조를 봅니다.</li>
+<li><strong>확인하고 나서 쓰기.</strong> <code>if (!list_empty(q))</code> 다음 줄에서 첫 노드를 꺼내는 코드는, 검사와 사용 사이에 다른 쪽이 그 노드를 가져가면 빈 리스트를 꺼냅니다.</li>
+</ul>
+<p>셋 다 해법의 모양은 같습니다. 엇갈리면 안 되는 구간, 곧 <strong>임계 구역</strong>(critical section)을 정하고, 그 구간에는 한 번에 하나만 들어가게 합니다. 어려운 것은 구간을 정하는 일이 아니라 "누가 들어올 수 있는가"를 빠짐없이 아는 일입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>경쟁 조건은 유저 공간에서도 똑같이 일어납니다. 스레드 둘이 카운터 셋을 천만 번씩 올립니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-file">race.c</span><span class="code-ver">C</span></div><div class="sourceCode" id="cb1" name="race.c"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="pp">#include </span><span class="im">&lt;pthread.h&gt;</span></span>
+<span id="cb1-2"><span class="pp">#include </span><span class="im">&lt;stdatomic.h&gt;</span></span>
+<span id="cb1-3"><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb1-4"></span>
+<span id="cb1-5"><span class="pp">#define N </span><span class="dv">10000000</span></span>
+<span id="cb1-6"></span>
+<span id="cb1-7"><span class="dt">static</span> <span class="dt">volatile</span> <span class="dt">long</span> plain<span class="op">;</span></span>
+<span id="cb1-8"><span class="dt">static</span> atomic_long atom<span class="op">;</span></span>
+<span id="cb1-9"><span class="dt">static</span> <span class="dt">long</span> locked<span class="op">;</span></span>
+<span id="cb1-10"><span class="dt">static</span> pthread_mutex_t m <span class="op">=</span> PTHREAD_MUTEX_INITIALIZER<span class="op">;</span></span>
+<span id="cb1-11"></span>
+<span id="cb1-12"><span class="dt">static</span> <span class="dt">void</span> <span class="op">*</span>work<span class="op">(</span><span class="dt">void</span> <span class="op">*</span>arg<span class="op">)</span></span>
+<span id="cb1-13"><span class="op">{</span></span>
+<span id="cb1-14">    <span class="cf">for</span> <span class="op">(</span><span class="dt">long</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> N<span class="op">;</span> i<span class="op">++)</span></span>
+<span id="cb1-15">        plain<span class="op">++;</span>            <span class="co">/* 읽기, 더하기, 쓰기 */</span></span>
+<span id="cb1-16">    <span class="cf">for</span> <span class="op">(</span><span class="dt">long</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> N<span class="op">;</span> i<span class="op">++)</span></span>
+<span id="cb1-17">        atomic_fetch_add<span class="op">(&amp;</span>atom<span class="op">,</span> <span class="dv">1</span><span class="op">);</span> <span class="co">/* 쪼개지지 않는 연산 하나 */</span></span>
+<span id="cb1-18">    <span class="cf">for</span> <span class="op">(</span><span class="dt">long</span> i <span class="op">=</span> <span class="dv">0</span><span class="op">;</span> i <span class="op">&lt;</span> N<span class="op">;</span> i<span class="op">++)</span> <span class="op">{</span></span>
+<span id="cb1-19">        pthread_mutex_lock<span class="op">(&amp;</span>m<span class="op">);</span></span>
+<span id="cb1-20">        locked<span class="op">++;</span></span>
+<span id="cb1-21">        pthread_mutex_unlock<span class="op">(&amp;</span>m<span class="op">);</span></span>
+<span id="cb1-22">    <span class="op">}</span></span>
+<span id="cb1-23">    <span class="cf">return</span> NULL<span class="op">;</span></span>
+<span id="cb1-24"><span class="op">}</span></span>
+<span id="cb1-25"></span>
+<span id="cb1-26"><span class="dt">int</span> main<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb1-27"><span class="op">{</span></span>
+<span id="cb1-28">    pthread_t a<span class="op">,</span> b<span class="op">;</span></span>
+<span id="cb1-29"></span>
+<span id="cb1-30">    pthread_create<span class="op">(&amp;</span>a<span class="op">,</span> NULL<span class="op">,</span> work<span class="op">,</span> NULL<span class="op">);</span></span>
+<span id="cb1-31">    pthread_create<span class="op">(&amp;</span>b<span class="op">,</span> NULL<span class="op">,</span> work<span class="op">,</span> NULL<span class="op">);</span></span>
+<span id="cb1-32">    pthread_join<span class="op">(</span>a<span class="op">,</span> NULL<span class="op">);</span></span>
+<span id="cb1-33">    pthread_join<span class="op">(</span>b<span class="op">,</span> NULL<span class="op">);</span></span>
+<span id="cb1-34">    printf<span class="op">(</span><span class="st">"plain  </span><span class="sc">%ld\n</span><span class="st">atomic </span><span class="sc">%ld\n</span><span class="st">mutex  </span><span class="sc">%ld\n</span><span class="st">"</span><span class="op">,</span></span>
+<span id="cb1-35">           plain<span class="op">,</span> atomic_load<span class="op">(&amp;</span>atom<span class="op">),</span> locked<span class="op">);</span></span>
+<span id="cb1-36">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-37"><span class="op">}</span></span></code></pre></div></div>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ gcc -O2 -pthread race.c -o race &amp;&amp; ./race
+plain  10023673
+atomic 20000000
+mutex  20000000</code></pre></div>
+<p><code>plain</code>은 실행할 때마다 다른 값이 나오고 2천만에 못 미칩니다. 위는 한 번의 실행 예이고, 증가의 절반 가까이가 사라졌습니다. <code>volatile</code>을 빼면 컴파일러가 반복문 전체를 덧셈 한 번으로 바꿔 경쟁이 가려집니다. 버그가 사라진 것이 아니라 드물어진 것이고, 걸리면 한 스레드 몫인 천만이 통째로 사라집니다. <code>time ./race</code>로 세 방식의 시간도 견주어 보세요. 올바른 두 방식이 훨씬 느립니다. 이 장의 뒷부분은 그 값을 줄이는 이야기입니다.</p>
+</div>
+</section>
+<section class="level2" id="contexts">
+<h2><span class="sec-n">13.3</span>실행 컨텍스트<a aria-label="이 절의 링크" class="anchor" href="#contexts">#</a></h2>
+<p>커널 코드는 넷 가운데 한 <strong>실행 컨텍스트</strong>(execution context)에서 돕니다. 컨텍스트가 할 수 있는 일을 정합니다.</p>
+<div class="table-wrap"><table style="width:100%;">
+<colgroup>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+</colgroup>
+<thead>
+<tr>
+<th>컨텍스트</th>
+<th>누구의 문맥인가</th>
+<th>잠들기</th>
+<th>유저 메모리</th>
+<th>쓸 수 있는 락</th>
+<th>확인</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>태스크</td>
+<td><code>current</code>가 실제 주인. 시스템 콜, 커널 스레드</td>
+<td>가능</td>
+<td>가능</td>
+<td>전부</td>
+<td><code>in_task()</code></td>
+</tr>
+<tr>
+<td>softirq</td>
+<td>끊긴 태스크나 <code>ksoftirqd</code>를 빌림</td>
+<td>불가</td>
+<td>불가</td>
+<td>스핀락</td>
+<td><code>in_serving_softirq()</code></td>
+</tr>
+<tr>
+<td>hardirq</td>
+<td>끊긴 태스크를 빌림</td>
+<td>불가</td>
+<td>불가</td>
+<td>스핀락</td>
+<td><code>in_hardirq()</code></td>
+</tr>
+<tr>
+<td>NMI</td>
+<td>무엇이든 끊고 들어옴</td>
+<td>불가</td>
+<td>불가</td>
+<td>기다리지 않는 것만</td>
+<td><code>in_nmi()</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>아래 세 컨텍스트가 잠들 수 없는 이유는 같습니다. <code>schedule()</code>은 <code>current</code>를 재웠다가 나중에 이어서 실행하는 함수인데, 이 컨텍스트들에서 <code>current</code>는 우연히 끊긴 남의 태스크입니다. 재울 주체가 없습니다. 유저 메모리 접근도 페이지 폴트로 잠들 수 있어 같은 이유로 막힙니다.</p>
+<figure class="fig" id="fig-context-matrix"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 356" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>실행 컨텍스트가 서로를 끊을 수 있는지 나타낸 행렬: 태스크는 모든 것에 끊기고, softirq는 hardirq와 NMI에, hardirq는 NMI에만 끊기며, NMI는 끊기지 않는다</title>
+
+  <text class="t-xs" x="20" y="34">실행 중인 쪽 ↓</text>
+  <text class="t-xs" x="20" y="52">끼어드는 쪽 →</text>
+  <text class="t-b mid" x="226" y="34">다른 태스크</text>
+  <text class="t-xs mid" x="226" y="52">선점</text>
+  <text class="t-b mid" x="372" y="44">softirq</text>
+  <text class="t-b mid" x="518" y="44">hardirq</text>
+  <text class="t-b mid" x="664" y="44">NMI</text>
+  <rect class="box" x="20" y="66" width="128" height="40" rx="8"/>
+  <text class="t-b mid" x="84" y="91">태스크</text>
+  <rect class="box warm" x="156" y="66" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="226" y="91">끊는다</text>
+  <rect class="box warm" x="302" y="66" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="372" y="91">끊는다</text>
+  <rect class="box warm" x="448" y="66" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="518" y="91">끊는다</text>
+  <rect class="box warm" x="594" y="66" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="664" y="91">끊는다</text>
+  <rect class="box" x="20" y="114" width="128" height="40" rx="8"/>
+  <text class="t-b mid" x="84" y="139">softirq</text>
+  <rect class="box gray" x="156" y="114" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="226" y="139">못 끊는다</text>
+  <rect class="box gray" x="302" y="114" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="372" y="139">못 끊는다</text>
+  <rect class="box warm" x="448" y="114" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="518" y="139">끊는다</text>
+  <rect class="box warm" x="594" y="114" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="664" y="139">끊는다</text>
+  <rect class="box" x="20" y="162" width="128" height="40" rx="8"/>
+  <text class="t-b mid" x="84" y="187">hardirq</text>
+  <rect class="box gray" x="156" y="162" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="226" y="187">못 끊는다</text>
+  <rect class="box gray" x="302" y="162" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="372" y="187">못 끊는다</text>
+  <rect class="box gray" x="448" y="162" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="518" y="187">못 끊는다</text>
+  <rect class="box warm" x="594" y="162" width="140" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="664" y="187">끊는다</text>
+  <rect class="box" x="20" y="210" width="128" height="40" rx="8"/>
+  <text class="t-b mid" x="84" y="235">NMI</text>
+  <rect class="box gray" x="156" y="210" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="226" y="235">못 끊는다</text>
+  <rect class="box gray" x="302" y="210" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="372" y="235">못 끊는다</text>
+  <rect class="box gray" x="448" y="210" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="518" y="235">못 끊는다</text>
+  <rect class="box gray" x="594" y="210" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="664" y="235">못 끊는다</text>
+  <path class="ln thin muted dash" d="M20 264 H734"/>
+  <text class="t-s t-ink t-b mid" x="84" y="297">막는 방법</text>
+  <rect class="box code" x="156" y="272" width="140" height="40" rx="8"/>
+  <text class="t-code mid" x="226" y="296">preempt_disable()</text>
+  <rect class="box code" x="302" y="272" width="140" height="40" rx="8"/>
+  <text class="t-code mid" x="372" y="296">local_bh_disable()</text>
+  <rect class="box code" x="448" y="272" width="140" height="40" rx="8"/>
+  <text class="t-code mid" x="518" y="296">local_irq_save()</text>
+  <rect class="ghost dash" x="594" y="272" width="140" height="40" rx="8"/>
+  <text class="t-s mid" x="664" y="297">막을 수 없다</text>
+  <text class="t-s mid" x="380" y="338">같은 CPU 안에서의 관계다. 다른 CPU에서 도는 코드는 이 표와 상관없이 언제나 동시에 실행된다.</text>
+</svg></div><figcaption><b>그림 13-2</b>한 CPU 안에서 누가 누구를 끊는가. 아래 행일수록 끊기지 않고, 오른쪽 열일수록 막기 어렵습니다.</figcaption></figure>
+<p>이 표가 락 규칙의 뿌리입니다. 읽는 법은 이렇습니다. 태스크 컨텍스트 코드가 softirq와 데이터를 나눠 쓴다면, 태스크 행의 softirq 칸이 "끊는다"이므로 태스크 쪽에서 <code>local_bh_disable()</code>로 막아야 합니다. 반대로 softirq 쪽은 태스크 칸이 "못 끊는다"이므로 막을 것이 없습니다. softirq가 도는 동안 같은 CPU의 태스크는 실행되지 않습니다.</p>
+<p>컨텍스트를 묻는 매크로는 <a href="ch06.html">6장</a>에서 본 <code>preempt_count</code>의 칸을 읽습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/preempt.h#L146" rel="noopener" target="_blank">include/linux/preempt.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/preempt.h" data-line="146" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><span class="co">/*</span></span>
+<span id="cb3-2"><span class="co"> * Macros to retrieve the current execution context:</span></span>
+<span id="cb3-3"><span class="co"> *</span></span>
+<span id="cb3-4"><span class="co"> * in_nmi()     - We're in NMI context</span></span>
+<span id="cb3-5"><span class="co"> * in_hardirq()     - We're in hard IRQ context</span></span>
+<span id="cb3-6"><span class="co"> * in_serving_softirq() - We're in softirq context</span></span>
+<span id="cb3-7"><span class="co"> * in_task()        - We're in task context</span></span>
+<span id="cb3-8"><span class="co"> */</span></span>
+<span id="cb3-9"><span class="pp">#define in_nmi</span><span class="op">()</span><span class="pp">        </span><span class="op">(</span><span class="pp">nmi_count</span><span class="op">())</span></span>
+<span id="cb3-10"><span class="pp">#define in_hardirq</span><span class="op">()</span><span class="pp">        </span><span class="op">(</span><span class="pp">hardirq_count</span><span class="op">())</span></span>
+<span id="cb3-11"><span class="pp">#define in_serving_softirq</span><span class="op">()</span><span class="pp">    </span><span class="op">(</span><span class="pp">softirq_count</span><span class="op">()</span><span class="pp"> </span><span class="op">&amp;</span><span class="pp"> SOFTIRQ_OFFSET</span><span class="op">)</span></span>
+<span id="cb3-12"><span class="co">/* ... */</span></span>
+<span id="cb3-13"><span class="co">/*</span></span>
+<span id="cb3-14"><span class="co"> * The following macros are deprecated and should not be used in new code:</span></span>
+<span id="cb3-15"><span class="co"> * in_softirq()   - We have BH disabled, or are processing softirqs</span></span>
+<span id="cb3-16"><span class="co"> * in_interrupt() - We're in NMI,IRQ,SoftIRQ context or have BH disabled</span></span>
+<span id="cb3-17"><span class="co"> */</span></span>
+<span id="cb3-18"><span class="pp">#define in_softirq</span><span class="op">()</span><span class="pp">        </span><span class="op">(</span><span class="pp">softirq_count</span><span class="op">())</span></span>
+<span id="cb3-19"><span class="pp">#define in_interrupt</span><span class="op">()</span><span class="pp">      </span><span class="op">(</span><span class="pp">irq_count</span><span class="op">())</span></span></code></pre></div></div>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료는 "인터럽트 컨텍스트인가"를 <code>in_interrupt()</code>로 묻고, 그 결과로 <code>GFP_ATOMIC</code>과 <code>GFP_KERNEL</code>을 고르는 코드를 예로 듭니다. v7.3의 헤더는 <code>in_interrupt()</code>와 <code>in_softirq()</code>를 새 코드에 쓰지 말라고 적어 두었습니다. 이 둘은 softirq를 실행 중일 때뿐 아니라 태스크가 <code>local_bh_disable()</code>을 한 구간에서도 참이 되어, "지금 인터럽트 안인가"라는 질문에 틀린 답을 줍니다. 정확한 질문에는 <code>in_hardirq()</code>, <code>in_serving_softirq()</code>, <code>in_task()</code>를 씁니다. 더 나은 방법은 묻지 않는 것입니다. 함수가 실행 중에 컨텍스트를 알아내 동작을 바꾸면, 스핀락을 쥔 호출자처럼 매크로로는 보이지 않는 제약을 놓칩니다. 잠들어도 되는지는 호출자가 인자로 알려 주는 것이 커널의 관례입니다.</p>
+</div>
+</section>
+<section class="level2" id="atomic">
+<h2><span class="sec-n">13.4</span>원자적 컨텍스트<a aria-label="이 절의 링크" class="anchor" href="#atomic">#</a></h2>
+<p>잠들 수 없는 상태를 통틀어 <strong>원자적 컨텍스트</strong>(atomic context)라고 부릅니다. softirq, hardirq, NMI 안이 그렇고, 태스크 컨텍스트라도 다음 구간은 원자적입니다.</p>
+<ul>
+<li>스핀락을 쥔 구간. <code>spin_lock()</code>이 선점을 끕니다.</li>
+<li><code>preempt_disable()</code>, <code>local_bh_disable()</code>로 막은 구간.</li>
+<li>인터럽트를 끈 구간.</li>
+</ul>
+<p>공통점은 <code>preempt_count</code>가 0이 아니거나 인터럽트가 꺼져 있다는 것입니다. 이런 구간에서 잠들면 락을 쥔 채 CPU를 떠나게 되고, 그 락을 기다리는 쪽은 끝없이 돕니다.</p>
+<p>커널은 이 실수를 두 군데에서 잡습니다. 첫째는 잠들 수 있는 함수의 입구입니다. <code>mutex_lock()</code>, <code>kmalloc(GFP_KERNEL)</code>, <code>copy_from_user()</code> 같은 함수는 첫머리에 <code>might_sleep()</code>을 둡니다. 이번 호출에서 실제로 잠들지 않더라도, 잠들면 안 되는 자리에서 불렸으면 경고합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L9241" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="9241" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1">    pr_err<span class="op">(</span><span class="st">"BUG: sleeping function called from invalid context at </span><span class="sc">%s</span><span class="st">:</span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span></span>
+<span id="cb4-2">           file<span class="op">,</span> line<span class="op">);</span></span>
+<span id="cb4-3">    pr_err<span class="op">(</span><span class="st">"in_atomic(): </span><span class="sc">%d</span><span class="st">, irqs_disabled(): </span><span class="sc">%d</span><span class="st">, non_block: </span><span class="sc">%d</span><span class="st">, pid: </span><span class="sc">%d</span><span class="st">, name: </span><span class="sc">%s\n</span><span class="st">"</span><span class="op">,</span></span>
+<span id="cb4-4">           in_atomic<span class="op">(),</span> irqs_disabled<span class="op">(),</span> current<span class="op">-&gt;</span>non_block_count<span class="op">,</span></span>
+<span id="cb4-5">           current<span class="op">-&gt;</span>pid<span class="op">,</span> current<span class="op">-&gt;</span>comm<span class="op">);</span></span>
+<span id="cb4-6">    pr_err<span class="op">(</span><span class="st">"preempt_count: </span><span class="sc">%x</span><span class="st">, expected: </span><span class="sc">%x\n</span><span class="st">"</span><span class="op">,</span> preempt_count<span class="op">(),</span></span>
+<span id="cb4-7">           offsets <span class="op">&amp;</span> MIGHT_RESCHED_PREEMPT_MASK<span class="op">);</span></span></code></pre></div></div>
+<p>둘째는 <code>schedule()</code> 자신입니다. 들어왔는데 <code>preempt_count</code>가 기대값이 아니면 "BUG: scheduling while atomic"을 찍습니다. 첫째 검사는 <code>CONFIG_DEBUG_ATOMIC_SLEEP</code>을 켠 커널에서만 동작합니다. 드물게만 잠드는 경로의 버그는 둘째 검사로는 몇 달에 한 번 걸리지만, 첫째 검사는 그 함수를 지나갈 때마다 걸립니다. 개발용 커널에 이 옵션을 켜 두는 이유입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p><code>dmesg</code>에서 이 경고를 만나면 세 줄을 읽습니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>BUG: sleeping function called from invalid context at kernel/locking/mutex.c:...
+in_atomic(): 1, irqs_disabled(): 0, non_block: 0, pid: 1234, name: mydrv_worker
+preempt_count: 1, expected: 0</code></pre></div>
+<p>첫 줄의 파일과 줄 번호는 잠들 수 있는 함수(여기서는 뮤텍스)의 위치입니다. 버그가 있는 곳은 그 함수를 부른 쪽이고, 아래에 이어지는 스택 추적에서 찾습니다. 둘째 줄이 원인을 가릅니다. <code>in_atomic(): 1</code>이고 <code>irqs_disabled(): 0</code>이면 스핀락이나 <code>preempt_disable()</code> 구간 안이고, <code>irqs_disabled(): 1</code>이면 인터럽트를 끈 구간입니다. 셋째 줄의 <code>preempt_count</code>를 6장의 비트 배치로 읽으면 더 좁혀집니다. <code>1</code>은 선점 칸 하나(스핀락 하나), <code>100</code>은 softirq를 실행하는 중, <code>200</code>은 <code>local_bh_disable()</code>입니다. lockdep을 켠 커널은 쥐고 있는 락의 목록도 함께 찍습니다.</p>
+</div>
+</section>
+<section class="level2" id="ladder">
+<h2><span class="sec-n">13.5</span>도구의 사다리<a aria-label="이 절의 링크" class="anchor" href="#ladder">#</a></h2>
+<p>보호 수단은 여럿이고 값이 다릅니다. 싼 것부터 봅니다.</p>
+<figure class="fig" id="fig-ladder"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>동시성을 다루는 도구를 비용 순으로 놓은 사다리: CPU별 데이터, 원자 연산, 선점 끄기, BH 끄기, 인터럽트 끄기, 스핀락, 잠드는 락이 각각 무엇을 막는지와, 읽기 위주 데이터를 위한 RCU와 seqlock</title>
+
+  <text class="t-xs" x="62" y="38">도구</text>
+  <text class="t-xs mid" x="518" y="16">같은 데이터에 끼어드는 것 가운데 무엇을 막는가</text>
+  <text class="t-s t-ink t-b mid" x="392" y="38">선점</text>
+  <text class="t-s t-ink t-b mid" x="476" y="38">softirq</text>
+  <text class="t-s t-ink t-b mid" x="560" y="38">hardirq</text>
+  <text class="t-s t-ink t-b mid" x="644" y="38">다른 CPU</text>
+  <path class="ln thin muted" d="M32 56 V326" marker-end="url(#ah-muted)"/>
+  <text class="t-xs mid" x="32" y="350">비용</text>
+  <rect class="box green" x="50" y="50" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="73">CPU별 데이터</text>
+  <text class="t-code end" x="310" y="73">this_cpu_inc()</text>
+  <rect class="ghost dash" x="350" y="53" width="336" height="30" rx="15"/>
+  <text class="t-xs mid" x="518" y="73">공유 자체를 없앤다</text>
+  <rect class="box green" x="50" y="92" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="115">원자 연산</text>
+  <text class="t-code end" x="310" y="115">atomic_t, cmpxchg</text>
+  <rect class="ghost dash" x="350" y="95" width="336" height="30" rx="15"/>
+  <text class="t-xs mid" x="518" y="115">명령어 하나라 끼어들 틈이 없다</text>
+  <rect class="box warm" x="50" y="134" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="157">선점 끄기</text>
+  <text class="t-code end" x="310" y="157">preempt_disable()</text>
+  <circle class="solid warm" cx="392" cy="152" r="8"/>
+  <circle class="ghost" cx="476" cy="152" r="8"/>
+  <circle class="ghost" cx="560" cy="152" r="8"/>
+  <circle class="ghost" cx="644" cy="152" r="8"/>
+  <rect class="box warm" x="50" y="176" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="199">BH 끄기</text>
+  <text class="t-code end" x="310" y="199">local_bh_disable()</text>
+  <circle class="solid warm" cx="392" cy="194" r="8"/>
+  <circle class="solid warm" cx="476" cy="194" r="8"/>
+  <circle class="ghost" cx="560" cy="194" r="8"/>
+  <circle class="ghost" cx="644" cy="194" r="8"/>
+  <rect class="box warm" x="50" y="218" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="241">인터럽트 끄기</text>
+  <text class="t-code end" x="310" y="241">local_irq_save()</text>
+  <circle class="solid warm" cx="392" cy="236" r="8"/>
+  <circle class="solid warm" cx="476" cy="236" r="8"/>
+  <circle class="solid warm" cx="560" cy="236" r="8"/>
+  <circle class="ghost" cx="644" cy="236" r="8"/>
+  <rect class="box blue" x="50" y="260" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="283">스핀락</text>
+  <text class="t-code end" x="310" y="283">spin_lock()</text>
+  <circle class="solid blue" cx="392" cy="278" r="8"/>
+  <text class="t-code tc-blue mid" x="476" y="282">_bh</text>
+  <text class="t-code tc-blue mid" x="560" y="282">_irqsave</text>
+  <circle class="solid blue" cx="644" cy="278" r="8"/>
+  <rect class="box blue" x="50" y="302" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="325">잠드는 락</text>
+  <text class="t-code end" x="310" y="325">mutex, rwsem</text>
+  <rect class="ghost dash" x="350" y="305" width="336" height="30" rx="15"/>
+  <text class="t-xs mid" x="518" y="325">다른 태스크만. 쥔 채 잠들 수 있다</text>
+  <path class="ln thin muted dash" d="M50 352 H740"/>
+  <rect class="box green" x="50" y="362" width="270" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="62" y="385">RCU, seqlock</text>
+  <text class="t-xs end" x="310" y="385">읽기가 훨씬 많을 때</text>
+  <rect class="ghost dash" x="350" y="365" width="336" height="30" rx="15"/>
+  <text class="t-xs mid" x="518" y="385">읽는 쪽은 기다리지 않는다</text>
+  <text class="t-xs" x="664" y="282">← 변형으로</text>
+</svg></div><figcaption><b>그림 13-3</b>아래로 갈수록 막는 범위가 넓고 값도 큽니다. 스핀락의 softirq와 hardirq 칸은 <code>spin_lock_bh()</code>, <code>spin_lock_irqsave()</code>로 채웁니다.</figcaption></figure>
+<section class="level3" id="cpu별-데이터">
+<h3>CPU별 데이터</h3>
+<p>가장 싼 방법은 공유하지 않는 것입니다. <strong>CPU별 데이터</strong>(per-CPU data)는 변수를 CPU 수만큼 만들어 각 CPU가 자기 것만 고치게 합니다. 다른 CPU와 겨룰 일이 없으니 락도 없습니다. <a href="ch11.html">11장</a>의 softirq pending 비트맵이 그렇습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/interrupt.h#L528" rel="noopener" target="_blank">include/linux/interrupt.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/interrupt.h" data-line="528" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="pp">#define local_softirq_pending</span><span class="op">()</span><span class="pp"> </span><span class="op">(</span><span class="pp">__this_cpu_read</span><span class="op">(</span><span class="pp">local_softirq_pending_ref</span><span class="op">))</span></span>
+<span id="cb6-2"><span class="pp">#define set_softirq_pending</span><span class="op">(</span><span class="pp">x</span><span class="op">)</span><span class="pp">  </span><span class="op">(</span><span class="pp">__this_cpu_write</span><span class="op">(</span><span class="pp">local_softirq_pending_ref</span><span class="op">,</span><span class="pp"> </span><span class="op">(</span><span class="pp">x</span><span class="op">)))</span></span>
+<span id="cb6-3"><span class="pp">#define or_softirq_pending</span><span class="op">(</span><span class="pp">x</span><span class="op">)</span><span class="pp">   </span><span class="op">(</span><span class="pp">__this_cpu_or</span><span class="op">(</span><span class="pp">local_softirq_pending_ref</span><span class="op">,</span><span class="pp"> </span><span class="op">(</span><span class="pp">x</span><span class="op">)))</span></span></code></pre></div></div>
+<p>남는 문제는 같은 CPU 안의 끼어들기입니다. 읽고 고쳐 쓰는 도중에 선점당해 다른 CPU로 옮겨지면 남의 변수에 쓰게 됩니다. <code>this_cpu_inc()</code> 같은 <code>this_cpu_*</code> 연산은 이것을 명령어 하나로 풉니다. x86에서는 세그먼트 레지스터를 기준으로 "이 CPU의 변수"를 가리키는 <code>inc</code> 명령어 하나가 됩니다. 인터럽트도 선점도 명령어 중간에는 끼어들지 못하므로, 주소 계산과 증가 사이에 틈이 없습니다. 값을 치르는 곳은 읽을 때입니다. 전체 합을 알려면 모든 CPU의 값을 더해야 하고, 그 합은 더하는 사이에도 바뀌는 근삿값입니다. 통계 카운터에는 충분하고, 정확한 값이 필요한 참조 카운트에는 맞지 않습니다.</p>
+</section>
+<section class="level3" id="원자-연산">
+<h3>원자 연산</h3>
+<p>변수 하나를 여러 CPU가 정확히 나눠 써야 하면 <strong>원자 연산</strong>(atomic operation)을 씁니다. <code>atomic_t</code>에 대한 x86의 증가입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/atomic.h#L51" rel="noopener" target="_blank">arch/x86/include/asm/atomic.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/include/asm/atomic.h" data-line="51" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="dt">static</span> __always_inline <span class="dt">void</span> arch_atomic_inc<span class="op">(</span>atomic_t <span class="op">*</span>v<span class="op">)</span></span>
+<span id="cb7-2"><span class="op">{</span></span>
+<span id="cb7-3">    asm_inline <span class="dt">volatile</span><span class="op">(</span>LOCK_PREFIX <span class="st">"incl %0"</span></span>
+<span id="cb7-4">             <span class="op">:</span> <span class="st">"+m"</span> <span class="op">(</span>v<span class="op">-&gt;</span>counter<span class="op">)</span> <span class="op">::</span> <span class="st">"memory"</span><span class="op">);</span></span>
+<span id="cb7-5"><span class="op">}</span></span></code></pre></div></div>
+<p><code>LOCK_PREFIX</code>가 전부입니다. 이 접두사가 붙은 명령어는 읽기와 쓰기 사이에 다른 CPU가 그 메모리를 건드리지 못하게 합니다. 앞의 <code>race.c</code>에서 <code>atomic_fetch_add()</code>가 한 일입니다. 종류는 넷쯤 됩니다.</p>
+<ul>
+<li><code>atomic_t</code>, <code>atomic_long_t</code>: 더하기, 빼기, 교환.</li>
+<li><code>set_bit()</code>, <code>test_and_set_bit()</code>: 비트 하나. 태스크릿의 <code>TASKLET_STATE_RUN</code>이 이것으로 락 노릇을 했습니다.</li>
+<li><code>cmpxchg()</code>, <code>try_cmpxchg()</code>: "값이 내가 읽은 그대로면 새 값으로 바꾼다." 실패하면 다시 읽고 재시도합니다.</li>
+<li><code>refcount_t</code>: 참조 카운트 전용입니다. 넘치면 0으로 돌아가는 대신 포화값에 붙어 움직이지 않습니다. 카운트 넘침을 해제 후 사용 버그로 바꾸는 공격을 막습니다.</li>
+</ul>
+<p><code>cmpxchg</code> 반복문의 실제 모습입니다. <a href="ch12.html">12장</a>에서 NAPI의 소유권을 잡던 함수입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/net/core/dev.c#L6824" rel="noopener" target="_blank">net/core/dev.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="net/core/dev.c" data-line="6824" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="dt">bool</span> napi_schedule_prep<span class="op">(</span><span class="kw">struct</span> napi_struct <span class="op">*</span>n<span class="op">)</span></span>
+<span id="cb8-2"><span class="op">{</span></span>
+<span id="cb8-3">    <span class="dt">unsigned</span> <span class="dt">long</span> new<span class="op">,</span> val <span class="op">=</span> READ_ONCE<span class="op">(</span>n<span class="op">-&gt;</span>state<span class="op">);</span></span>
+<span id="cb8-4"></span>
+<span id="cb8-5">    <span class="cf">do</span> <span class="op">{</span></span>
+<span id="cb8-6">        <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>val <span class="op">&amp;</span> NAPIF_STATE_DISABLE<span class="op">))</span></span>
+<span id="cb8-7">            <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb8-8">        new <span class="op">=</span> val <span class="op">|</span> NAPIF_STATE_SCHED<span class="op">;</span></span>
+<span id="cb8-9">        <span class="co">/* ... */</span></span>
+<span id="cb8-10">    <span class="op">}</span> <span class="cf">while</span> <span class="op">(!</span>try_cmpxchg<span class="op">(&amp;</span>n<span class="op">-&gt;</span>state<span class="op">,</span> <span class="op">&amp;</span>val<span class="op">,</span> new<span class="op">));</span></span>
+<span id="cb8-11"></span>
+<span id="cb8-12">    <span class="cf">return</span> <span class="op">!(</span>val <span class="op">&amp;</span> NAPIF_STATE_SCHED<span class="op">);</span></span>
+<span id="cb8-13"><span class="op">}</span></span></code></pre></div></div>
+<p>읽은 값 <code>val</code>로 새 값 <code>new</code>를 계산하고, 그 사이에 <code>n-&gt;state</code>가 바뀌지 않았을 때만 써넣습니다. 바뀌었으면 <code>try_cmpxchg()</code>가 <code>val</code>을 현재 값으로 고쳐 주고 반복문이 다시 돕니다. 락 없이 "읽고 고쳐 쓰기"를 안전하게 만드는 기본형입니다. 돌려주는 값이 "내가 비트를 세웠는가"이므로, 참을 받은 쪽 하나만 다음 단계로 갑니다.</p>
+<p>원자 연산은 변수 하나만 지킵니다. 두 변수를 함께 고쳐야 하거나, 확인과 사용 사이를 묶어야 하면 락이 필요합니다. 그리고 싸지 않습니다. 여러 CPU가 같은 변수를 두드리면 그 변수가 든 캐시 라인이 CPU 사이를 오갑니다(<a href="#cacheline">캐시 라인 절</a>).</p>
+</section>
+<section class="level3" id="이-cpu에서-끼어드는-것-막기">
+<h3>이 CPU에서 끼어드는 것 막기</h3>
+<p>그림의 가운데 세 줄은 락이 아닙니다. 그림 13-2의 "막는 방법" 줄 그대로, 같은 CPU에서 끼어드는 것을 한 단계씩 막습니다. 다른 CPU는 막지 못하므로 CPU별 데이터를 지킬 때만 단독으로 쓰입니다. 여러 CPU가 나눠 쓰는 데이터라면 이것들을 스핀락과 겹칩니다. 스핀락의 변형이 그 조합입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/spinlock_api_smp.h#L148" rel="noopener" target="_blank">include/linux/spinlock_api_smp.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/spinlock_api_smp.h" data-line="148" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">unsigned</span> <span class="dt">long</span> __raw_spin_lock_irqsave<span class="op">(</span>raw_spinlock_t <span class="op">*</span>lock<span class="op">)</span></span>
+<span id="cb9-2">    __acquires<span class="op">(</span>lock<span class="op">)</span> __no_context_analysis</span>
+<span id="cb9-3"><span class="op">{</span></span>
+<span id="cb9-4">    <span class="dt">unsigned</span> <span class="dt">long</span> flags<span class="op">;</span></span>
+<span id="cb9-5"></span>
+<span id="cb9-6">    local_irq_save<span class="op">(</span>flags<span class="op">);</span></span>
+<span id="cb9-7">    preempt_disable<span class="op">();</span></span>
+<span id="cb9-8">    spin_acquire<span class="op">(&amp;</span>lock<span class="op">-&gt;</span>dep_map<span class="op">,</span> <span class="dv">0</span><span class="op">,</span> <span class="dv">0</span><span class="op">,</span> _RET_IP_<span class="op">);</span></span>
+<span id="cb9-9">    LOCK_CONTENDED<span class="op">(</span>lock<span class="op">,</span> do_raw_spin_trylock<span class="op">,</span> do_raw_spin_lock<span class="op">);</span></span>
+<span id="cb9-10">    <span class="cf">return</span> flags<span class="op">;</span></span>
+<span id="cb9-11"><span class="op">}</span></span>
+<span id="cb9-12"><span class="co">/* ... */</span></span>
+<span id="cb9-13"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">void</span> __raw_spin_lock_bh<span class="op">(</span>raw_spinlock_t <span class="op">*</span>lock<span class="op">)</span></span>
+<span id="cb9-14">    __acquires<span class="op">(</span>lock<span class="op">)</span> __no_context_analysis</span>
+<span id="cb9-15"><span class="op">{</span></span>
+<span id="cb9-16">    __local_bh_disable_ip<span class="op">(</span>_RET_IP_<span class="op">,</span> SOFTIRQ_LOCK_OFFSET<span class="op">);</span></span>
+<span id="cb9-17">    spin_acquire<span class="op">(&amp;</span>lock<span class="op">-&gt;</span>dep_map<span class="op">,</span> <span class="dv">0</span><span class="op">,</span> <span class="dv">0</span><span class="op">,</span> _RET_IP_<span class="op">);</span></span>
+<span id="cb9-18">    LOCK_CONTENDED<span class="op">(</span>lock<span class="op">,</span> do_raw_spin_trylock<span class="op">,</span> do_raw_spin_lock<span class="op">);</span></span>
+<span id="cb9-19"><span class="op">}</span></span></code></pre></div></div>
+<p>순서를 봅니다. 끼어들 수 있는 것을 <strong>먼저</strong> 막고 그다음에 락을 잡습니다. 락을 잡은 뒤에 인터럽트를 끄면 그 사이에 인터럽트가 들어와 같은 락을 잡으려 할 수 있습니다.</p>
+<p><code>local_irq_save(flags)</code>는 인터럽트가 이미 꺼져 있었는지를 <code>flags</code>에 담아 두었다가 복원합니다. 호출자가 변수를 들고 다녀야 하고, 짝이 어긋나면 인터럽트가 엉뚱한 때 켜집니다. v7.3에는 횟수를 세는 방식이 추가되어 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/interrupt_rc.h#L58" rel="noopener" target="_blank">include/linux/interrupt_rc.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/interrupt_rc.h" data-line="58" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">void</span> local_interrupt_disable<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb10-2"><span class="op">{</span></span>
+<span id="cb10-3">    <span class="dt">int</span> new_count<span class="op">;</span></span>
+<span id="cb10-4">    <span class="dt">unsigned</span> <span class="dt">long</span> flags<span class="op">;</span></span>
+<span id="cb10-5"></span>
+<span id="cb10-6">    WARN_ON_ONCE<span class="op">(</span>in_nmi<span class="op">());</span></span>
+<span id="cb10-7"></span>
+<span id="cb10-8">    local_irq_save<span class="op">(</span>flags<span class="op">);</span></span>
+<span id="cb10-9">    new_count <span class="op">=</span> hardirq_disable_enter<span class="op">();</span></span>
+<span id="cb10-10"></span>
+<span id="cb10-11">    <span class="cf">if</span> <span class="op">((</span>new_count <span class="op">&amp;</span> HARDIRQ_DISABLE_MASK<span class="op">)</span> <span class="op">==</span> HARDIRQ_DISABLE_OFFSET<span class="op">)</span></span>
+<span id="cb10-12">        _local_interrupt_save_state<span class="op">(</span>flags<span class="op">);</span></span>
+<span id="cb10-13"><span class="op">}</span></span></code></pre></div></div>
+<p><code>preempt_disable()</code>이 중첩 횟수를 세듯, <code>preempt_count</code>의 hardirq 비활성 칸으로 인터럽트를 끈 횟수를 셉니다. 맨 바깥에서 끌 때만 원래 상태를 CPU별 변수에 저장하고, 횟수가 0으로 돌아올 때 복원합니다. 이 위에 <code>spin_lock_irq_disable()</code>이 있습니다. <code>flags</code>를 들고 다닐 필요가 없어, 스코프가 끝날 때 자동으로 풀리는 가드나 Rust의 락 타입과 맞물리기 쉽습니다.</p>
+</section>
+<section class="level3" id="락">
+<h3>락</h3>
+<p>사다리의 아래쪽이 락입니다. 스핀락은 기다리는 동안 CPU를 쥐고 돌고, 뮤텍스는 잠듭니다. 스핀락은 어느 컨텍스트에서나 쓸 수 있지만 쥔 채 잠들 수 없고, 뮤텍스는 쥔 채 잠들 수 있지만 태스크 컨텍스트에서만 씁니다. 내부는 <a href="ch14.html">14장</a>에서 봅니다. 읽기가 압도적으로 많은 데이터에는 읽는 쪽이 아무것도 기다리지 않는 RCU(<a href="ch16.html">16장</a>)와 seqlock이 있습니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>동시성 설계의 첫 질문은 "어떤 락을 걸까"가 아니라 "공유를 없앨 수 있는가"입니다. 커널의 뜨거운 경로가 CPU별로 쪼개져 있는 것은 우연이 아닙니다. 런큐, softirq pending, 네트워크의 <code>softnet_data</code>, 슬랩의 CPU별 캐시, 통계 카운터가 모두 그렇습니다. 락은 올바름을 주지만 확장성을 주지 않습니다. CPU가 64개여도 락 하나를 지나는 일은 한 번에 하나씩입니다. 공유하지 않는 데이터는 CPU 수만큼 빨라집니다. 유저 공간에서도 같습니다. 스레드별 할당 캐시, 샤드로 나눈 해시 테이블, 코어당 이벤트 루프 하나라는 구조가 모두 이 발상입니다.</p>
+</div>
+</section>
+</section>
+<section class="level2" id="which-lock">
+<h2><span class="sec-n">13.6</span>어떤 락을 고를까<a aria-label="이 절의 링크" class="anchor" href="#which-lock">#</a></h2>
+<p>데이터를 만지는 컨텍스트가 정해지면 필요한 최소한의 보호도 정해집니다.</p>
+<figure class="fig" id="fig-lock-table"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>같은 데이터를 만지는 두 컨텍스트의 조합마다 필요한 최소한의 락: 태스크끼리는 뮤텍스, 태스크와 softirq는 spin_lock_bh, hardirq가 끼면 spin_lock_irq 계열</title>
+
+  <text class="t-b mid" x="237" y="30">태스크</text>
+  <text class="t-xs mid" x="237" y="48">시스템 콜, kworker</text>
+  <text class="t-b mid" x="439" y="30">softirq</text>
+  <text class="t-xs mid" x="439" y="48">타이머, NAPI, BH 워크</text>
+  <text class="t-b mid" x="641" y="30">hardirq</text>
+  <text class="t-xs mid" x="641" y="48">인터럽트 핸들러</text>
+  <text class="t-b" x="20" y="100">태스크</text>
+  <text class="t-b" x="20" y="172">softirq</text>
+  <text class="t-b" x="20" y="244">hardirq</text>
+  <rect class="box blue" x="140" y="62" width="194" height="64" rx="8"/>
+  <text class="t-code t-b mid" x="237" y="88">mutex_lock()</text>
+  <text class="t-xs mid" x="237" y="110">짧고 안 잠들면 spin_lock()</text>
+  <rect class="box purple" x="140" y="134" width="194" height="64" rx="8"/>
+  <text class="t-xs" x="150" y="160">태스크 쪽</text>
+  <text class="t-code" x="214" y="160">spin_lock_bh()</text>
+  <text class="t-xs" x="150" y="182">softirq 쪽</text>
+  <text class="t-code" x="214" y="182">spin_lock()</text>
+  <rect class="box purple" x="342" y="134" width="194" height="64" rx="8"/>
+  <text class="t-code t-b mid" x="439" y="160">spin_lock()</text>
+  <text class="t-xs mid" x="439" y="182">CPU별 데이터면 락 없이</text>
+  <rect class="box warm" x="140" y="206" width="194" height="64" rx="8"/>
+  <text class="t-xs" x="150" y="232">태스크 쪽</text>
+  <text class="t-code" x="214" y="232">spin_lock_irq()</text>
+  <text class="t-xs" x="150" y="254">핸들러 쪽</text>
+  <text class="t-code" x="214" y="254">spin_lock()</text>
+  <rect class="box warm" x="342" y="206" width="194" height="64" rx="8"/>
+  <text class="t-xs" x="352" y="232">softirq 쪽</text>
+  <text class="t-code" x="416" y="232">spin_lock_irq()</text>
+  <text class="t-xs" x="352" y="254">핸들러 쪽</text>
+  <text class="t-code" x="416" y="254">spin_lock()</text>
+  <rect class="box warm" x="544" y="206" width="194" height="64" rx="8"/>
+  <text class="t-code t-b mid" x="641" y="232">spin_lock_irqsave()</text>
+  <text class="t-xs mid" x="641" y="254">서로 다른 핸들러끼리</text>
+  <rect class="ghost dash" x="342" y="62" width="194" height="64" rx="8"/>
+  <rect class="ghost dash" x="544" y="62" width="194" height="64" rx="8"/>
+  <rect class="ghost dash" x="544" y="134" width="194" height="64" rx="8"/>
+  <text class="t-s mid" x="380" y="298">끊길 수 있는 쪽이 끼어드는 쪽을 막아 두고 잡는다. 끼어드는 쪽은 그냥 잡으면 된다.</text>
+</svg></div><figcaption><b>그림 13-4</b>행과 열은 같은 데이터를 만지는 두 쪽입니다. 커널 문서 <code>Documentation/kernel-hacking/locking.rst</code>의 표를 세 컨텍스트로 줄인 것입니다.</figcaption></figure>
+<p>규칙은 셋으로 줄일 수 있습니다.</p>
+<ol type="1">
+<li><strong>끊길 수 있는 쪽이 막습니다.</strong> 태스크와 softirq가 나눠 쓰면 태스크 쪽이 <code>spin_lock_bh()</code>를 씁니다. softirq 쪽은 태스크에게 끊기지 않으므로 <code>spin_lock()</code>이면 됩니다. <a href="ch12.html">12장</a>의 소켓 락에서 태스크는 <code>spin_lock_bh()</code>를, <code>tcp_v4_rcv()</code>는 <code>bh_lock_sock()</code>(평범한 <code>spin_lock()</code>)을 쓰던 것이 이 규칙입니다.</li>
+<li><strong>잠들어야 하면 뮤텍스이고, 그러면 그 데이터는 태스크 컨텍스트에서만 만질 수 있습니다.</strong> 인터럽트 핸들러가 그 데이터를 고쳐야 한다면 고치는 일을 워크큐로 넘깁니다(<a href="ch11.html">11장</a>). 락의 선택이 코드를 어느 컨텍스트에서 돌릴지를 정하는 셈입니다.</li>
+<li><strong>확신이 없으면 <code>spin_lock_irqsave()</code>입니다.</strong> 어느 컨텍스트에서 불려도 안전합니다. 대신 인터럽트가 꺼지는 시간이 생기므로, 꼭 필요한 곳에만 씁니다.</li>
+</ol>
+<p>같은 softirq끼리도 락이 필요하다는 점을 빠뜨리기 쉽습니다. softirq는 같은 CPU에서는 중첩되지 않지만 다른 CPU에서 동시에 돕니다. 표의 가운데 칸이 "락 없음"이 아니라 <code>spin_lock()</code>인 이유입니다.</p>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"CPU가 하나면 락이 필요 없다." 다른 CPU는 없어도 선점과 인터럽트는 있습니다. 단일 CPU용으로 빌드한 커널에서 <code>spin_lock()</code>은 실제 락 없이 <code>preempt_disable()</code>만 남고, <code>spin_lock_irqsave()</code>는 인터럽트 끄기만 남습니다. 보호가 사라지는 것이 아니라 "다른 CPU" 몫만 빠집니다. 락을 올바르게 건 코드는 CPU가 몇 개든 그대로 올바릅니다.</p>
+</div>
+<div class="callout note"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-book"></use></svg>참고</div>
+<p><code>PREEMPT_RT</code> 커널에서는 <code>spinlock_t</code>가 잠드는 락이 되고 인터럽트 핸들러가 스레드에서 돌기 때문에, 이 표의 일부가 달라집니다. <code>spin_lock_irqsave()</code>가 실제로는 인터럽트를 끄지 않습니다. 코드를 고칠 필요는 없지만, "스핀락을 쥐었으니 선점되지 않는다"는 가정에 기댄 코드는 깨집니다. <a href="ch14.html">14장</a>에서 다룹니다.</p>
+</div>
+</section>
+<section class="level2" id="deadlock">
+<h2><span class="sec-n">13.7</span>교착<a aria-label="이 절의 링크" class="anchor" href="#deadlock">#</a></h2>
+<p>락은 경쟁 조건을 없애는 대신 새 버그를 들여옵니다. <strong>교착</strong>(deadlock)입니다. 커널에서 흔한 모양은 둘입니다.</p>
+<figure class="fig" id="fig-irq-deadlock"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>같은 CPU에서 태스크가 스핀락을 쥔 채 인터럽트가 들어와 핸들러가 같은 락을 잡으려 하면 교착이 된다. spin_lock_irqsave()를 쓰면 인터럽트가 락을 풀 때까지 미뤄진다.</title>
+
+  <!-- 위: spin_lock() -->
+  <text class="t-b" x="20" y="26">태스크가 spin_lock()으로 잡았을 때</text>
+  <text class="t-xs tc-warm" x="304" y="46">↓ 인터럽트</text>
+
+  <text class="t-s t-ink t-b" x="20" y="72">태스크</text>
+  <rect class="box blue" x="110" y="52" width="190" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="72">락 L을 쥐고 실행</text>
+  <rect class="ghost blue dash" x="300" y="52" width="440" height="30" rx="6"/>
+  <text class="t-xs tc-blue mid" x="520" y="72">끊긴 채 멈춰 있다. L을 풀 기회가 없다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="112">hardirq</text>
+  <rect class="box red" x="300" y="92" width="440" height="30" rx="6"/>
+  <rect x="300" y="92" width="440" height="30" rx="6" fill="url(#hatch-red)"/>
+  <text class="t-s tc-red mid" x="430" y="144">핸들러가 spin_lock(&amp;L)에서 영원히 돈다. 핸들러가 끝나야 태스크가 돌아오는데 끝나지 않는다</text>
+
+  <path class="ln thin muted dash" d="M20 166 H740"/>
+
+  <!-- 아래: spin_lock_irqsave() -->
+  <text class="t-b" x="20" y="196">태스크가 spin_lock_irqsave()로 잡았을 때</text>
+  <text class="t-xs tc-warm" x="244" y="216">↓ 인터럽트: CPU가 받지 않고 미뤄 둔다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="242">태스크</text>
+  <rect class="box blue" x="110" y="222" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="225" y="242">락 L을 쥐고 실행, 인터럽트 꺼짐</text>
+  <rect class="box blue" x="500" y="222" width="240" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="242">이어서 실행</text>
+
+  <text class="t-s t-ink t-b" x="20" y="282">hardirq</text>
+  <rect class="box warm" x="340" y="262" width="160" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="420" y="282">L을 잡고 처리</text>
+  <path class="ln thin blue dash" d="M340 224 V298"/>
+  <text class="t-xs" x="346" y="310">spin_unlock_irqrestore()가 인터럽트를 켜는 순간 핸들러가 실행된다</text>
+</svg></div><figcaption><b>그림 13-5</b>한 CPU 안의 교착. 락을 쥔 코드를 끊고 들어온 핸들러가 같은 락을 기다립니다.</figcaption></figure>
+<p>첫째는 자기 자신과의 교착입니다. 태스크가 <code>spin_lock()</code>으로 락을 쥔 상태에서 인터럽트가 오고, 핸들러가 같은 락을 잡으려 합니다. 핸들러는 락이 풀리기를 기다리며 돌고, 락을 풀 태스크는 핸들러가 끝나야 실행됩니다. 다른 CPU가 도울 방법도 없습니다. 앞 절의 규칙 1이 막으려는 것이 이 상황입니다. 스핀락은 재귀적이지 않으므로, 락을 쥔 함수가 같은 락을 잡는 함수를 부르는 것도 같은 교착입니다.</p>
+<figure class="fig" id="fig-abba"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>ABBA 교착: 태스크 1은 락 A를 쥐고 B를 기다리고, 태스크 2는 락 B를 쥐고 A를 기다려 기다림이 고리를 이룬다. 모든 경로가 같은 순서로 잡으면 고리가 생기지 않는다.</title>
+
+  <!-- 고리 -->
+  <rect class="box blue" x="30" y="96" width="110" height="44" rx="10"/>
+  <text class="t-b mid" x="85" y="123">태스크 1</text>
+  <rect class="box green" x="310" y="96" width="110" height="44" rx="10"/>
+  <text class="t-b mid" x="365" y="123">태스크 2</text>
+  <rect class="solid" x="180" y="24" width="90" height="38" rx="19"/>
+  <text class="t-b t-on mid" x="225" y="48">락 A</text>
+  <rect class="solid" x="180" y="174" width="90" height="38" rx="19"/>
+  <text class="t-b t-on mid" x="225" y="198">락 B</text>
+
+  <path class="ln blue" d="M85 96 V43 H174" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="94" y="36">① 쥐고 있다</text>
+  <path class="ln green" d="M365 140 V193 H276" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-green end" x="356" y="216">② 쥐고 있다</text>
+  <path class="ln red dash" d="M85 140 V193 H174" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="94" y="216">③ 기다린다</text>
+  <path class="ln red dash" d="M365 96 V43 H276" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red end" x="356" y="36">④ 기다린다</text>
+
+  <!-- 코드 -->
+  <rect class="box code" x="460" y="18" width="280" height="68" rx="8"/>
+  <text class="t-xs tc-blue" x="474" y="38">태스크 1이 지나는 경로</text>
+  <text class="t-code" x="474" y="58">spin_lock(&amp;A);</text>
+  <text class="t-code" x="474" y="76">spin_lock(&amp;B);</text>
+  <rect class="box code" x="460" y="96" width="280" height="68" rx="8"/>
+  <text class="t-xs tc-green" x="474" y="116">태스크 2가 지나는 경로</text>
+  <text class="t-code" x="474" y="136">spin_lock(&amp;B);</text>
+  <text class="t-code" x="474" y="154">spin_lock(&amp;A);</text>
+  <text class="t-s t-ink t-b" x="460" y="190">규칙: 순서를 하나로 정한다</text>
+  <text class="t-xs" x="460" y="210">모든 경로가 A 다음에 B를 잡으면</text>
+  <text class="t-xs" x="460" y="228">기다림이 고리를 이룰 수 없다</text>
+
+  <text class="t-s mid" x="380" y="254">두 경로가 실제로 동시에 실행되어야 걸린다. 그래서 테스트에서 잘 드러나지 않는다.</text>
+</svg></div><figcaption><b>그림 13-6</b>두 락을 서로 다른 순서로 잡는 두 경로. 기다림이 고리를 이루면 아무도 나아가지 못합니다.</figcaption></figure>
+<p>둘째는 <strong>락 순서</strong>(lock ordering)의 역전입니다. 해법은 규율입니다. 함께 잡는 락에는 순서를 정하고 모든 경로가 지킵니다. 순서는 보통 자료구조의 포함 관계를 따르고, 같은 종류의 락 둘을 잡아야 하면 주소가 작은 쪽을 먼저 잡는 식으로 정합니다.</p>
+<p>사람이 수만 개의 락 순서를 기억할 수는 없습니다. <strong>lockdep</strong>이 대신합니다. 락을 잡을 때마다 "A를 쥔 채 B를 잡았다"는 관계를 기록하고, 언젠가 반대 순서가 한 번이라도 나타나면 실제로 교착이 일어나지 않았어도 경고합니다. 인터럽트 핸들러에서 잡힌 적이 있는 락을 인터럽트를 켠 채 잡는 것도 같은 방식으로 잡습니다. 자세한 것은 <a href="ch27.html">27장</a>입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>락은 코드를 보호하지 않습니다. 데이터를 보호합니다. "이 함수는 락을 잡는다"가 아니라 "이 필드는 이 락을 쥐고 만진다"로 적어야 합니다. 커널의 큰 구조체는 필드마다 이 규칙을 주석으로 답니다. 워크큐가 좋은 예입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/workqueue.c#L151" rel="noopener" target="_blank">kernel/workqueue.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/workqueue.c" data-line="151" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1"> <span class="op">*</span> Structure fields follow one of the following exclusion rules<span class="op">.</span></span>
+<span id="cb11-2"> <span class="op">*</span></span>
+<span id="cb11-3"> <span class="op">*</span> I<span class="op">:</span> Modifiable by initialization<span class="op">/</span>destruction paths and read<span class="op">-</span>only <span class="cf">for</span></span>
+<span id="cb11-4"> <span class="op">*</span>    everyone <span class="cf">else</span><span class="op">.</span></span>
+<span id="cb11-5"> <span class="op">*</span></span>
+<span id="cb11-6"> <span class="op">*</span> P<span class="op">:</span> Preemption protected<span class="op">.</span>  Disabling preemption is enough and should</span>
+<span id="cb11-7"> <span class="op">*</span>    only be modified and accessed from the local cpu<span class="op">.</span></span>
+<span id="cb11-8"> <span class="op">*</span></span>
+<span id="cb11-9"> <span class="op">*</span> L<span class="op">:</span> pool<span class="op">-&gt;</span>lock protected<span class="op">.</span>  Access with pool<span class="op">-&gt;</span>lock held<span class="op">.</span></span></code></pre></div></div>
+<p>그리고 구조체 정의에서 필드마다 <code>/* L: list of pending works */</code>처럼 글자를 붙입니다. 주석은 낡을 수 있으므로 코드로도 적습니다. <code>lockdep_assert_held(&amp;pool-&gt;lock)</code> 한 줄은 "이 함수는 이 락을 쥔 채 불려야 한다"는 계약을 실행할 때 검사합니다. 불변식을 사람이 읽는 형태와 기계가 검사하는 형태 둘 다로 남기는 것은 동시성 코드가 아니어도 통하는 습관입니다.</p>
+</div>
+</section>
+<section class="level2" id="ordering">
+<h2><span class="sec-n">13.8</span>순서가 바뀐다<a aria-label="이 절의 링크" class="anchor" href="#ordering">#</a></h2>
+<p>지금까지는 명령어가 쓰인 순서대로 실행된다고 가정했습니다. 락 없이 공유 변수를 읽고 쓰는 코드에서는 이 가정이 두 번 깨집니다.</p>
+<p><strong>컴파일러가 바꿉니다.</strong> 컴파일러는 다른 스레드가 없다고 보고 최적화합니다. 변수를 한 번 읽어 레지스터에 두고 계속 쓰기도 하고, 반대로 한 번 읽으라고 쓴 변수를 두 번 읽기도 합니다. 둘째 경우가 위험합니다. 값을 검사한 뒤 쓰는 사이에 다시 읽으면 검사한 값과 쓰는 값이 달라집니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/asm-generic/rwonce.h#L43" rel="noopener" target="_blank">include/asm-generic/rwonce.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/asm-generic/rwonce.h" data-line="43" id="cb12"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb12-1"><span class="pp">#ifndef __READ_ONCE</span></span>
+<span id="cb12-2"><span class="pp">#define __READ_ONCE</span><span class="op">(</span><span class="pp">x</span><span class="op">)</span><span class="pp">  </span><span class="op">(*(</span><span class="dt">const</span><span class="pp"> </span><span class="dt">volatile</span><span class="pp"> __unqual_scalar_typeof</span><span class="op">(</span><span class="pp">x</span><span class="op">)</span><span class="pp"> </span><span class="op">*)&amp;(</span><span class="pp">x</span><span class="op">))</span></span>
+<span id="cb12-3"><span class="pp">#endif</span></span>
+<span id="cb12-4"></span>
+<span id="cb12-5"><span class="pp">#define READ_ONCE</span><span class="op">(</span><span class="pp">x</span><span class="op">)</span><span class="pp">                            </span><span class="op">\</span></span>
+<span id="cb12-6"><span class="op">({</span><span class="pp">                                  </span><span class="op">\</span></span>
+<span id="cb12-7"><span class="pp">    compiletime_assert_rwonce_type</span><span class="op">(</span><span class="pp">x</span><span class="op">);</span><span class="pp">              </span><span class="op">\</span></span>
+<span id="cb12-8"><span class="pp">    __READ_ONCE</span><span class="op">(</span><span class="pp">x</span><span class="op">);</span><span class="pp">                         </span><span class="op">\</span></span>
+<span id="cb12-9"><span class="op">})</span></span></code></pre></div></div>
+<p><code>READ_ONCE()</code>는 <code>volatile</code> 캐스트를 거쳐 읽어서 컴파일러가 "정확히 한 번" 읽게 합니다. <code>WRITE_ONCE()</code>는 쓰기 쪽의 짝입니다. 락 없이 접근하는 공유 변수에는 이 둘을 붙이는 것이 규칙이고, 그 자체로 "여기는 일부러 락 없이 읽는다"는 표시가 됩니다. 앞에서 본 워크큐와 NAPI 코드에 <code>READ_ONCE()</code>가 여러 번 나온 것이 이것입니다.</p>
+<p><strong>CPU가 바꿉니다.</strong> CPU는 쓰기를 곧바로 캐시에 반영하지 않고 <strong>스토어 버퍼</strong>(store buffer)에 넣어 둔 채 다음 명령어로 넘어갑니다.</p>
+<figure class="fig" id="fig-store-buffer"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 326" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>스토어 버퍼 때문에 생기는 재배치: 두 CPU가 각자 한 변수에 쓰고 상대의 변수를 읽을 때, 쓰기가 스토어 버퍼에 머무는 동안 읽기가 먼저 이루어져 둘 다 0을 읽는다</title>
+
+  <!-- CPU 0 -->
+  <rect class="box blue" x="30" y="16" width="300" height="134" rx="12"/>
+  <text class="t-b tc-blue" x="44" y="40">CPU 0</text>
+  <text class="t-mono" x="44" y="64">① x = 1;</text>
+  <text class="t-mono" x="44" y="86">② r0 = y;</text>
+  <text class="t-xs tc-red end" x="318" y="86">0을 읽는다</text>
+  <rect class="box yellow" x="44" y="100" width="170" height="38" rx="8"/>
+  <text class="t-xs" x="56" y="124">스토어 버퍼</text>
+  <text class="t-code end" x="204" y="124">x = 1</text>
+
+  <!-- CPU 1 -->
+  <rect class="box green" x="430" y="16" width="300" height="134" rx="12"/>
+  <text class="t-b tc-green" x="444" y="40">CPU 1</text>
+  <text class="t-mono" x="444" y="64">① y = 1;</text>
+  <text class="t-mono" x="444" y="86">② r1 = x;</text>
+  <text class="t-xs tc-red end" x="718" y="86">0을 읽는다</text>
+  <rect class="box yellow" x="546" y="100" width="170" height="38" rx="8"/>
+  <text class="t-xs" x="558" y="124">스토어 버퍼</text>
+  <text class="t-code end" x="706" y="124">y = 1</text>
+
+  <!-- 메모리 -->
+  <rect class="panel" x="230" y="204" width="300" height="62" rx="12"/>
+  <rect class="box" x="260" y="212" width="90" height="24" rx="5"/>
+  <text class="t-code mid" x="305" y="229">x: 0</text>
+  <rect class="box" x="410" y="212" width="90" height="24" rx="5"/>
+  <text class="t-code mid" x="455" y="229">y: 0</text>
+  <text class="t-xs mid" x="380" y="256">캐시와 메모리: 모든 CPU가 보는 값</text>
+
+  <!-- 쓰기: 버퍼에서 나중에 -->
+  <path class="ln thin muted dash" d="M114 138 V224 H254" marker-end="url(#ah-muted)"/>
+  <text class="t-xs" x="122" y="186">나중에 반영</text>
+  <path class="ln thin muted dash" d="M646 138 V224 H506" marker-end="url(#ah-muted)"/>
+  <text class="t-xs end" x="638" y="186">나중에 반영</text>
+
+  <!-- 읽기: 지금 -->
+  <path class="ln thin red" d="M455 210 L306 154" marker-end="url(#ah-red)"/>
+  <path class="ln thin red" d="M305 210 L454 154" marker-end="url(#ah-red)"/>
+
+  <text class="t-s mid" x="380" y="292">쓰기는 버퍼에 넣는 것으로 끝난 셈 치고 다음 명령으로 넘어간다. 그래서 r0과 r1이 둘 다 0일 수 있다.</text>
+  <text class="t-s mid" x="380" y="312">x86에서도 일어나는 재배치다. 쓰기와 읽기 사이에 smp_mb()를 넣으면 막힌다.</text>
+</svg></div><figcaption><b>그림 13-7</b>두 CPU가 각자 쓰고 나서 상대의 변수를 읽습니다. 코드 순서로는 불가능해 보이는 "둘 다 0"이 나옵니다.</figcaption></figure>
+<p>x86은 이 한 가지 재배치만 허용합니다. 쓰기 뒤의 읽기가 쓰기보다 먼저 보일 수 있습니다. arm64 같은 약한 순서의 아키텍처는 독립된 읽기끼리, 쓰기끼리도 순서를 바꿉니다. 순서를 강제하는 명령이 <strong>메모리 배리어</strong>(memory barrier)이고, 두 아키텍처의 정의를 나란히 놓으면 차이가 보입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/barrier.h#L53" rel="noopener" target="_blank">arch/x86/include/asm/barrier.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/include/asm/barrier.h" data-line="53" id="cb13"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1"><span class="pp">#define __smp_mb</span><span class="op">()</span><span class="pp">  asm </span><span class="dt">volatile</span><span class="op">(</span><span class="st">"lock addl $0,-4(</span><span class="sc">%%</span><span class="st">"</span><span class="pp"> _ASM_SP </span><span class="st">")"</span><span class="pp"> </span><span class="op">:::</span><span class="pp"> </span><span class="st">"memory"</span><span class="op">,</span><span class="pp"> </span><span class="st">"cc"</span><span class="op">)</span></span>
+<span id="cb13-2"></span>
+<span id="cb13-3"><span class="pp">#define __smp_rmb</span><span class="op">()</span><span class="pp"> dma_rmb</span><span class="op">()</span></span>
+<span id="cb13-4"><span class="pp">#define __smp_wmb</span><span class="op">()</span><span class="pp"> barrier</span><span class="op">()</span></span></code></pre></div></div>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/arm64/include/asm/barrier.h#L126" rel="noopener" target="_blank">arch/arm64/include/asm/barrier.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/arm64/include/asm/barrier.h" data-line="126" id="cb14"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb14-1"><span class="pp">#define __smp_mb</span><span class="op">()</span><span class="pp">  dmb</span><span class="op">(</span><span class="pp">ish</span><span class="op">)</span></span>
+<span id="cb14-2"><span class="pp">#define __smp_rmb</span><span class="op">()</span><span class="pp"> dmb</span><span class="op">(</span><span class="pp">ishld</span><span class="op">)</span></span>
+<span id="cb14-3"><span class="pp">#define __smp_wmb</span><span class="op">()</span><span class="pp"> dmb</span><span class="op">(</span><span class="pp">ishst</span><span class="op">)</span></span></code></pre></div></div>
+<p>x86에서 <code>smp_rmb()</code>와 <code>smp_wmb()</code>는 컴파일러만 막는 <code>barrier()</code>입니다. CPU가 이미 그 순서를 지키기 때문입니다. arm64에서는 셋 다 실제 명령어입니다. x86에서만 테스트한 락 없는 코드가 arm64에서 깨지는 이유입니다.</p>
+<p>스토어 버퍼 문제는 커널의 가장 기본적인 자리에 있습니다. 잠드는 쪽은 "상태를 바꾸고 조건을 확인"하고, 깨우는 쪽은 "조건을 세우고 상태를 확인"합니다. 그림 13-7과 같은 모양입니다. 둘 다 상대의 쓰기를 못 보면 깨움을 놓칩니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/sched.h#L247" rel="noopener" target="_blank">include/linux/sched.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/sched.h" data-line="247" id="cb15"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb15-1"><span class="pp">#define set_current_state</span><span class="op">(</span><span class="pp">state_value</span><span class="op">)</span><span class="pp">                  </span><span class="op">\</span></span>
+<span id="cb15-2"><span class="pp">    </span><span class="cf">do</span><span class="pp"> </span><span class="op">{</span><span class="pp">                                </span><span class="op">\</span></span>
+<span id="cb15-3"><span class="pp">        debug_normal_state_change</span><span class="op">((</span><span class="pp">state_value</span><span class="op">));</span><span class="pp">       </span><span class="op">\</span></span>
+<span id="cb15-4"><span class="pp">        trace_set_current_state</span><span class="op">(</span><span class="pp">state_value</span><span class="op">);</span><span class="pp">           </span><span class="op">\</span></span>
+<span id="cb15-5"><span class="pp">        smp_store_mb</span><span class="op">(</span><span class="pp">current</span><span class="op">-&gt;</span><span class="pp">__state</span><span class="op">,</span><span class="pp"> </span><span class="op">(</span><span class="pp">state_value</span><span class="op">));</span><span class="pp">      </span><span class="op">\</span></span>
+<span id="cb15-6"><span class="pp">    </span><span class="op">}</span><span class="pp"> </span><span class="cf">while</span><span class="pp"> </span><span class="op">(</span><span class="dv">0</span><span class="op">)</span></span></code></pre></div></div>
+<p><code>smp_store_mb()</code>는 쓰고 나서 완전한 배리어를 칩니다. 태스크 상태를 쓴 것이 다른 CPU에 보이게 된 뒤에야 조건을 읽습니다. <a href="ch03.html">3장</a>의 잠들기 순서가 지켜지는 것은 이 한 줄 덕분입니다.</p>
+<div class="callout warn"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-warn"></use></svg>주의</div>
+<p>배리어를 직접 쓰는 코드는 드물어야 합니다. 락을 잡고 푸는 동작, 원자 연산, RCU의 API에는 필요한 배리어가 이미 들어 있습니다. 락으로 보호한 데이터는 메모리 순서를 걱정할 필요가 없습니다. 락 없는 알고리즘을 직접 쓰기로 했다면 <code>Documentation/memory-barriers.txt</code>를 읽고, <code>tools/memory-model</code>의 리눅스 커널 메모리 모델로 검증하고, 락 없이 접근하는 변수를 찾아 주는 KCSAN(<a href="ch27.html">27장</a>)을 켜고 돌려야 합니다. 대부분은 그 수고보다 락이 쌉니다.</p>
+</div>
+</section>
+<section class="level2" id="cacheline">
+<h2><span class="sec-n">13.9</span>캐시 라인<a aria-label="이 절의 링크" class="anchor" href="#cacheline">#</a></h2>
+<p>올바르게 동기화한 코드가 느린 이유는 대개 캐시입니다. CPU는 메모리를 <strong>캐시 라인</strong> 단위로 가져옵니다. x86-64와 arm64에서 64바이트입니다. 한 CPU가 어떤 라인에 쓰려면 그 라인을 독점해야 하고, 다른 CPU의 캐시에 있던 사본은 무효가 됩니다. 다음에 그 CPU가 같은 라인을 만지면 다시 가져와야 합니다.</p>
+<p>여러 CPU가 원자 연산으로 카운터 하나를 올리면, 연산 하나하나는 정확하지만 라인이 CPU 사이를 계속 오갑니다. 이것을 <strong>캐시 라인 바운싱</strong>이라고 합니다. 락 변수도 메모리의 한 워드이므로 마찬가지입니다. 경합이 없어도, 여러 CPU가 번갈아 잡기만 해도 락이 든 라인이 오갑니다.</p>
+<figure class="fig" id="fig-false-sharing"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 292" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>거짓 공유: 서로 다른 CPU가 쓰는 두 필드가 한 캐시 라인에 있으면 쓸 때마다 라인이 CPU 사이를 오간다. 필드를 다른 캐시 라인으로 떼면 각 CPU가 자기 라인을 독점한다.</title>
+
+  <!-- 위: 같은 라인 -->
+  <text class="t-b" x="30" y="28">두 필드가 같은 캐시 라인에 있을 때</text>
+  <text class="t-xs mid" x="380" y="44">캐시 라인 하나 (64바이트)</text>
+
+  <rect class="box blue" x="30" y="50" width="130" height="36" rx="8"/>
+  <text class="t-s t-ink mid" x="95" y="73">CPU 0 · a에 쓰기</text>
+  <rect class="box green" x="600" y="50" width="130" height="36" rx="8"/>
+  <text class="t-s t-ink mid" x="665" y="73">CPU 1 · b에 쓰기</text>
+
+  <rect class="box blue" x="220" y="52" width="70" height="32"/>
+  <text class="t-mono t-b mid" x="255" y="73">a</text>
+  <rect class="box gray" x="290" y="52" width="180" height="32"/>
+  <text class="t-xs mid" x="380" y="72">다른 필드</text>
+  <rect class="box green" x="470" y="52" width="70" height="32"/>
+  <text class="t-mono t-b mid" x="505" y="73">b</text>
+
+  <path class="ln blue" d="M160 68 H214" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M600 68 H546" marker-end="url(#ah-green)"/>
+
+  <path class="ln red dash" d="M168 106 H592" marker-start="url(#ah-red)" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red mid" x="380" y="128">한쪽이 쓰면 다른 쪽 캐시에서 이 라인이 무효가 된다. 쓸 때마다 라인이 오간다</text>
+
+  <path class="ln thin muted dash" d="M30 146 H730"/>
+
+  <!-- 아래: 다른 라인 -->
+  <text class="t-b" x="30" y="174">서로 다른 캐시 라인으로 떼었을 때</text>
+  <text class="t-code mid" x="465" y="188">____cacheline_aligned_in_smp</text>
+
+  <rect class="box blue" x="30" y="194" width="130" height="36" rx="8"/>
+  <text class="t-s t-ink mid" x="95" y="217">CPU 0 · a에 쓰기</text>
+  <rect class="box green" x="600" y="194" width="130" height="36" rx="8"/>
+  <text class="t-s t-ink mid" x="665" y="217">CPU 1 · b에 쓰기</text>
+
+  <rect class="box blue" x="220" y="196" width="70" height="32"/>
+  <text class="t-mono t-b mid" x="255" y="217">a</text>
+  <rect class="box gray" x="290" y="196" width="80" height="32"/>
+  <text class="t-xs mid" x="330" y="216">다른 필드</text>
+  <rect class="box green" x="390" y="196" width="70" height="32"/>
+  <text class="t-mono t-b mid" x="425" y="217">b</text>
+  <rect class="ghost dash" x="460" y="196" width="80" height="32"/>
+  <text class="t-xs mid" x="500" y="216">빈 자리</text>
+
+  <path class="ln blue" d="M160 212 H214" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M665 230 V250 H425 V234" marker-end="url(#ah-green)"/>
+
+  <text class="t-s mid" x="380" y="276">각 CPU가 자기 라인을 독점한다. 한쪽의 쓰기가 다른 쪽의 캐시를 건드리지 않는다.</text>
+</svg></div><figcaption><b>그림 13-8</b>거짓 공유. 두 CPU는 서로 다른 필드를 쓰지만 캐시는 라인 단위로만 봅니다.</figcaption></figure>
+<p><strong>거짓 공유</strong>(false sharing)는 논리적으로는 공유하지 않는데 물리적으로 같은 라인에 놓여 생기는 바운싱입니다. 코드를 읽어서는 보이지 않습니다. 커널은 뜨거운 구조체의 필드 배치를 직접 관리합니다. <a href="ch12.html">12장</a>의 <code>softnet_data</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/netdevice.h#L3636" rel="noopener" target="_blank">include/linux/netdevice.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/netdevice.h" data-line="3636" id="cb16"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb16-1">    <span class="co">/* written and read only by owning cpu: */</span></span>
+<span id="cb16-2">    <span class="kw">struct</span> netdev_xmit xmit<span class="op">;</span></span>
+<span id="cb16-3"><span class="pp">#ifdef CONFIG_RPS</span></span>
+<span id="cb16-4">    <span class="co">/* input_queue_head should be written by cpu owning this struct,</span></span>
+<span id="cb16-5"><span class="co">     * and only read by other cpus. Worth using a cache line.</span></span>
+<span id="cb16-6"><span class="co">     */</span></span>
+<span id="cb16-7">    <span class="dt">unsigned</span> <span class="dt">int</span>        input_queue_head ____cacheline_aligned_in_smp<span class="op">;</span></span>
+<span id="cb16-8"></span>
+<span id="cb16-9">    <span class="co">/* Elements below can be accessed between CPUs for RPS/RFS */</span></span>
+<span id="cb16-10">    call_single_data_t  csd ____cacheline_aligned_in_smp<span class="op">;</span></span>
+<span id="cb16-11">    <span class="kw">struct</span> softnet_data <span class="op">*</span>rps_ipi_next<span class="op">;</span></span>
+<span id="cb16-12">    <span class="dt">unsigned</span> <span class="dt">int</span>        cpu<span class="op">;</span></span></code></pre></div></div>
+<p>주석이 필드를 "누가 쓰고 누가 읽는가"로 나눕니다. 자기 CPU만 쓰는 것, 자기가 쓰고 남이 읽는 것, 다른 CPU가 쓰는 것을 서로 다른 라인에 둡니다. <code>____cacheline_aligned_in_smp</code>는 그 필드를 새 캐시 라인의 시작에 맞춥니다. <a href="ch06.html">6장</a>의 <code>DECLARE_PER_CPU_CACHE_HOT</code>은 반대 방향의 같은 배려입니다. 함께 쓰이는 CPU별 변수를 한 라인에 모아 캐시 미스를 줄입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>거짓 공유는 <code>perf c2c</code>로 찾습니다. 같은 캐시 라인을 여러 CPU가 건드려 생긴 캐시 미스를 라인별로 모아 줍니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># perf c2c record -a -- sleep 10
+# perf c2c report --stdio</code></pre></div>
+<p>보고서의 맨 위에 오는 라인이 가장 많이 오간 라인입니다. 라인 안의 오프셋별로 어느 코드가 읽고 썼는지 나오므로, 서로 다른 오프셋을 서로 다른 CPU가 쓰고 있으면 거짓 공유입니다.</p>
+<p>락 경합은 <code>/proc/lock_stat</code>으로 봅니다. <code>CONFIG_LOCK_STAT</code>으로 빌드한 커널에서만 있고, 락별로 경합 횟수와 기다린 시간, 쥐고 있던 시간이 나옵니다. 배포판 커널에는 보통 꺼져 있습니다. 그럴 때는 <code>perf lock contention -a -b -- sleep 10</code>이 BPF로 락 경합 추적점을 모아 비슷한 정보를 줍니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.0 · 1996</dt>
+<dd>
+SMP 지원. 커널 전체를 감싸는 락 하나(BKL)로 한 번에 한 CPU만 커널 코드를 실행합니다.
+</dd>
+<dt>2.5.4 · 2002</dt>
+<dd>
+커널 선점. SMP를 위해 표시해 둔 스핀락 구간이 선점 금지 구간이 됩니다.
+</dd>
+<dt>2.6.18 · 2006</dt>
+<dd>
+lockdep. 락 순서와 컨텍스트 규칙 위반을 실행 중에 찾아냅니다.
+</dd>
+<dt>2.6.39 · 2011</dt>
+<dd>
+BKL이 소스에서 완전히 사라집니다.
+</dd>
+<dt>4.11 · 2017</dt>
+<dd>
+<code>refcount_t</code>. 넘침에 포화로 대응하는 참조 카운트 전용 타입입니다.
+</dd>
+<dt>5.8 · 2020</dt>
+<dd>
+KCSAN. 락 없이 일어나는 동시 접근을 찾는 데이터 경쟁 탐지기입니다.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>커널의 동시성은 여러 CPU, 선점, hardirq, softirq에서 옵니다. 경쟁 조건은 읽고 고쳐 쓰기, 여러 필드 고치기, 확인 후 사용의 세 모양으로 나타납니다.</li>
+<li>실행 컨텍스트는 태스크, softirq, hardirq, NMI 넷이고, 뒤의 것이 앞의 것을 끊습니다. 태스크 컨텍스트만 잠들 수 있습니다.</li>
+<li><code>preempt_count</code>가 0이 아니거나 인터럽트가 꺼진 상태가 원자적 컨텍스트입니다. 거기서 잠들면 <code>might_sleep()</code>과 <code>schedule()</code>의 검사가 잡습니다.</li>
+<li>보호 수단은 값이 다릅니다. 공유를 없애는 CPU별 데이터가 가장 싸고, 원자 연산, 같은 CPU의 끼어들기 막기, 스핀락, 잠드는 락 순으로 무거워집니다.</li>
+<li>락을 고르는 규칙은 "끊길 수 있는 쪽이 막는다"입니다. 태스크와 softirq는 <code>spin_lock_bh()</code>, hardirq가 끼면 <code>spin_lock_irqsave()</code>입니다.</li>
+<li>교착은 같은 CPU에서 인터럽트가 같은 락을 잡거나, 두 경로가 락을 반대 순서로 잡을 때 생깁니다.</li>
+<li>락 없이 공유 변수를 만지는 코드는 컴파일러와 CPU의 재배치를 직접 다뤄야 합니다. <code>READ_ONCE()</code>와 메모리 배리어가 그 도구입니다.</li>
+<li>올바른 코드도 캐시 라인을 다투면 느립니다. 거짓 공유는 필드 배치로 풉니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p>타이머 콜백(softirq)과 <code>ioctl()</code> 경로(태스크)가 같은 연결 리스트를 고칩니다. 각각 어떤 락 함수를 써야 하고, 양쪽이 다른 이유는 무엇입니까? <code>ioctl()</code> 쪽이 <code>spin_lock()</code>만 쓰면 어떤 일이 생깁니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>ioctl()</code> 쪽은 <code>spin_lock_bh()</code>, 타이머 콜백은 <code>spin_lock()</code>입니다. 태스크는 softirq에게 끊길 수 있으므로 락을 잡기 전에 softirq를 막아야 하고, softirq는 같은 CPU의 태스크에게 끊기지 않으므로 막을 것이 없습니다. <code>ioctl()</code>이 <code>spin_lock()</code>만 쓰면, 락을 쥔 채 인터럽트가 들어오고 그 복귀 길에 타이머 softirq가 실행되어 같은 락을 잡으려 합니다. softirq는 락이 풀리기를 기다리며 돌고, 락을 쥔 태스크는 softirq가 끝나야 실행되므로 그 CPU는 멈춥니다. 다른 CPU에서 콜백이 도는 경우에는 정상적으로 기다렸다 지나가므로, 이 버그는 타이머가 같은 CPU에서 만료될 때만 나타납니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>this_cpu_inc(stat)</code>은 선점도 인터럽트도 끄지 않고 안전합니다. 그런데 <code>x = this_cpu_read(stat); this_cpu_write(stat, x + 1);</code>은 안전하지 않습니다. 차이는 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>this_cpu_inc()</code>는 "이 CPU의 변수를 찾아 1을 더한다"가 명령어 하나입니다. 선점과 인터럽트는 명령어 사이에서만 일어나므로 끼어들 틈이 없습니다. 둘째 코드는 연산 둘이고 그 사이에 틈이 있습니다. 읽은 뒤 인터럽트 핸들러가 같은 변수를 올리면 그 증가가 덮어써집니다. 읽은 뒤 선점당해 다른 CPU로 옮겨지면, 이전 CPU에서 읽은 값에 1을 더해 새 CPU의 변수에 쓰게 됩니다. 연산 하나하나가 원자적이어도 묶음은 원자적이지 않습니다. 둘째 형태가 필요하면 <code>preempt_disable()</code>이나 <code>local_irq_save()</code>로 구간을 감싸야 합니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>인터럽트 핸들러 안에서 <code>kmalloc(size, GFP_KERNEL)</code>을 불렀습니다. 대부분은 문제없이 동작하다가 메모리가 모자란 날 시스템이 이상해집니다. <code>CONFIG_DEBUG_ATOMIC_SLEEP</code>을 켠 커널에서는 무엇이 달라집니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>GFP_KERNEL</code> 할당은 여유 메모리가 있으면 잠들지 않고 돌아오므로 평소에는 드러나지 않습니다. 메모리가 모자라면 회수를 기다리며 <code>schedule()</code>을 부르고, hardirq 컨텍스트에서 잠들려 한 것이므로 "scheduling while atomic"이 찍히거나 더 나쁜 일이 생깁니다. 디버그 옵션을 켜면 할당 함수 입구의 <code>might_sleep()</code> 계열 검사가 실제로 잠드는지와 상관없이 매번 실행됩니다. <code>preempt_count</code>의 hardirq 칸이 0이 아니므로 첫 호출에서 "sleeping function called from invalid context"와 스택 추적이 찍힙니다. 드물게 터지는 버그를 항상 터지는 경고로 바꿔 줍니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>잠드는 쪽이 <code>current-&gt;__state = TASK_INTERRUPTIBLE; if (!cond) schedule();</code>을, 깨우는 쪽이 <code>cond = 1; wake_up_process(t);</code>를 실행합니다. 상태를 쓰는 데 평범한 대입을 쓰면 x86에서도 깨움을 놓칠 수 있습니다. 어떤 순서로 그렇게 됩니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>잠드는 CPU의 <code>__state</code> 쓰기와 깨우는 CPU의 <code>cond</code> 쓰기가 각자의 스토어 버퍼에 머무는 동안, 양쪽이 상대의 변수를 읽습니다. 잠드는 쪽은 <code>cond</code>를 0으로 읽어 <code>schedule()</code>로 가고, 깨우는 쪽은 태스크 상태를 아직 <code>TASK_RUNNING</code>으로 읽어 깨울 필요가 없다고 판단합니다. 그 뒤 버퍼가 비워지면 태스크는 잠든 상태이고 깨워 줄 쪽은 이미 지나갔습니다. <code>set_current_state()</code>는 <code>smp_store_mb()</code>로 상태 쓰기 뒤에 완전한 배리어를 넣어, 쓰기가 다른 CPU에 보인 뒤에야 <code>cond</code>를 읽게 합니다. 깨우는 쪽에도 대응하는 배리어가 있어서, 둘 중 적어도 하나는 상대의 쓰기를 봅니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>스레드 넷이 각자 자기 카운터만 올리는데, 카운터를 <code>long counters[4]</code> 배열에 두었더니 스레드를 늘릴수록 느려집니다. 원인과 해법은 무엇이고, 어떻게 확인합니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>long</code> 넷은 32바이트라 한 캐시 라인에 들어갑니다. 스레드들은 서로 다른 원소를 쓰지만 CPU는 라인 단위로 독점권을 주고받으므로, 한 스레드가 쓸 때마다 다른 세 CPU의 캐시에서 그 라인이 무효가 됩니다. 거짓 공유입니다. 해법은 원소마다 캐시 라인 크기로 정렬해 서로 다른 라인에 놓는 것입니다. 커널이라면 CPU별 변수나 <code>____cacheline_aligned_in_smp</code>를 씁니다. 확인은 <code>perf c2c</code>로 합니다. 한 라인의 서로 다른 오프셋에 서로 다른 CPU의 쓰기가 몰려 있으면 거짓 공유입니다.</p>
+</div></details></div></div>
+
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>경쟁 조건<small>race condition</small></dt>
+<dd>
+결과가 여러 실행 흐름의 실행 순서에 따라 달라지는 상황.
+</dd>
+<dt>임계 구역<small>critical section</small></dt>
+<dd>
+한 번에 한 실행 흐름만 들어가야 올바른 코드 구간.
+</dd>
+<dt>실행 컨텍스트<small>execution context</small></dt>
+<dd>
+코드가 태스크, softirq, hardirq, NMI 가운데 어떤 상황에서 실행되는지. 할 수 있는 일을 정한다.
+</dd>
+<dt>원자적 컨텍스트<small>atomic context</small></dt>
+<dd>
+잠들면 안 되는 상태. <code>preempt_count</code>가 0이 아니거나 인터럽트가 꺼져 있다.
+</dd>
+<dt>CPU별 데이터<small>per-CPU data</small></dt>
+<dd>
+CPU마다 따로 두어 다른 CPU와 공유하지 않는 변수.
+</dd>
+<dt>원자 연산<small>atomic operation</small></dt>
+<dd>
+다른 CPU가 중간 상태를 볼 수 없게 한 번에 끝나는 읽고 고쳐 쓰기.
+</dd>
+<dt>교착<small>deadlock</small></dt>
+<dd>
+실행 흐름들이 서로가 쥔 락을 기다려 아무도 나아가지 못하는 상태.
+</dd>
+<dt>락 순서<small>lock ordering</small></dt>
+<dd>
+여러 락을 함께 잡을 때 모든 경로가 따르는 정해진 순서.
+</dd>
+<dt>스토어 버퍼<small>store buffer</small></dt>
+<dd>
+CPU가 쓰기를 캐시에 반영하기 전에 잠시 담아 두는 곳. 쓰기와 읽기의 순서가 바뀌어 보이는 원인.
+</dd>
+<dt>메모리 배리어<small>memory barrier</small></dt>
+<dd>
+앞뒤 메모리 접근의 순서가 다른 CPU에 그대로 보이도록 강제하는 명령.
+</dd>
+<dt>데이터 경쟁<small>data race</small></dt>
+<dd>
+락이나 원자 연산 없이 같은 변수에 동시에 접근하고 그 가운데 하나 이상이 쓰기인 경우.
+</dd>
+<dt>거짓 공유<small>false sharing</small></dt>
+<dd>
+서로 다른 변수가 같은 캐시 라인에 놓여, 공유하지 않는데도 라인이 CPU 사이를 오가는 현상.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/kernel-hacking/locking.html" rel="noopener" target="_blank"><code>Documentation/kernel-hacking/locking.rst</code></a>: 컨텍스트 조합별 락 선택의 원전. 예제로 캐시를 하나 만들며 설명한다.</li>
+<li><a href="https://docs.kernel.org/core-api/this_cpu_ops.html" rel="noopener" target="_blank"><code>Documentation/core-api/this_cpu_ops.rst</code></a>: <code>this_cpu_*</code> 연산의 원리와 쓰임.</li>
+<li><a href="https://docs.kernel.org/core-api/wrappers/atomic_t.html" rel="noopener" target="_blank"><code>Documentation/atomic_t.txt</code></a>: 원자 연산의 종류와 순서 보장.</li>
+<li><a href="https://docs.kernel.org/core-api/wrappers/memory-barriers.html" rel="noopener" target="_blank"><code>Documentation/memory-barriers.txt</code></a>: 메모리 배리어의 모든 것. 길지만 락 없는 코드를 쓰려면 피할 수 없다.</li>
+<li><a href="https://docs.kernel.org/locking/lockdep-design.html" rel="noopener" target="_blank"><code>Documentation/locking/lockdep-design.rst</code></a>: lockdep이 락 순서와 컨텍스트를 추적하는 방법.</li>
+<li><a href="https://docs.kernel.org/dev-tools/kcsan.html" rel="noopener" target="_blank"><code>Documentation/dev-tools/kcsan.rst</code></a>: 데이터 경쟁 탐지기 KCSAN.</li>
+<li><a href="https://docs.kernel.org/locking/lockstat.html" rel="noopener" target="_blank"><code>Documentation/locking/lockstat.rst</code></a>: <code>/proc/lock_stat</code> 읽는 법.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch12.html"><small>← 12장</small><b>패킷 하나의 여정</b></a><a class="next" href="ch14.html"><small>14장 →</small><b>스핀락과 뮤텍스</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#sources">동시성은 어디서 오는가</a><a href="#anatomy">경쟁 조건의 해부</a><a href="#contexts">실행 컨텍스트</a><a href="#atomic">원자적 컨텍스트</a><a href="#ladder">도구의 사다리</a><a href="#which-lock">어떤 락을 고를까</a><a href="#deadlock">교착</a><a href="#ordering">순서가 바뀐다</a><a href="#cacheline">캐시 라인</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg">
+  <title>list_del_rcu()의 포인터 변화: 떼어 낸 노드 B의 next는 그대로 두어 B를 지나던 읽는 쪽이 C로 갈 수 있고, 유예 기간 뒤에야 B를 해제한다</title>
+
+  <!-- 1 -->
+  <text class="t-s t-ink t-b" x="20" y="58">① 처음</text>
+  <text class="t-xs" x="20" y="76">읽는 쪽 하나가 B를 지나는 중</text>
+  <rect class="box" x="230" y="40" width="100" height="40" rx="8"/>
+  <text class="t-b mid" x="280" y="65">A</text>
+  <rect class="box" x="400" y="40" width="100" height="40" rx="8"/>
+  <text class="t-b mid" x="450" y="65">B</text>
+  <rect class="box" x="570" y="40" width="100" height="40" rx="8"/>
+  <text class="t-b mid" x="620" y="65">C</text>
+  <path class="ln" d="M330 60 H396" marker-end="url(#ah)"/>
+  <path class="ln" d="M500 60 H566" marker-end="url(#ah)"/>
+  <text class="t-xs tc-blue mid" x="450" y="30">↓ 읽는 쪽</text>
+
+  <path class="ln thin muted dash" d="M20 104 H740"/>
+
+  <!-- 2 -->
+  <text class="t-s t-ink t-b" x="20" y="158">② list_del_rcu(B)</text>
+  <text class="t-xs" x="20" y="176">새 읽는 쪽은 A에서 C로 간다</text>
+  <text class="t-xs" x="20" y="194">B의 next는 건드리지 않는다</text>
+  <rect class="box" x="230" y="146" width="100" height="40" rx="8"/>
+  <text class="t-b mid" x="280" y="171">A</text>
+  <rect class="box red" x="400" y="146" width="100" height="40" rx="8"/>
+  <text class="t-b mid" x="450" y="171">B</text>
+  <rect class="box" x="570" y="146" width="100" height="40" rx="8"/>
+  <text class="t-b mid" x="620" y="171">C</text>
+  <path class="ln blue" d="M280 146 V124 H620 V142" marker-end="url(#ah-blue)"/>
+  <text class="t-code tc-blue mid" x="450" y="118">A.next = C</text>
+  <path class="ln muted dash" d="M500 166 H566" marker-end="url(#ah-muted)"/>
+  <text class="t-xs tc-blue mid" x="450" y="206">↑ B에 있던 읽는 쪽은 C로 나아간다</text>
+
+  <path class="ln thin muted dash" d="M20 222 H740"/>
+
+  <!-- 3 -->
+  <text class="t-s t-ink t-b" x="20" y="276">③ 유예 기간 뒤 kfree(B)</text>
+  <text class="t-xs" x="20" y="294">B를 보던 읽는 쪽이 더는 없다</text>
+  <rect class="box" x="230" y="264" width="100" height="40" rx="8"/>
+  <text class="t-b mid" x="280" y="289">A</text>
+  <rect class="ghost dash" x="400" y="264" width="100" height="40" rx="8"/>
+  <text class="t-s mid" x="450" y="289">해제됨</text>
+  <rect class="box" x="570" y="264" width="100" height="40" rx="8"/>
+  <text class="t-b mid" x="620" y="289">C</text>
+  <path class="ln" d="M280 264 V242 H620 V260" marker-end="url(#ah)"/>
+</svg>

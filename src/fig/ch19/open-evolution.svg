@@ -1,0 +1,35 @@
+<svg viewBox="0 0 760 286" xmlns="http://www.w3.org/2000/svg">
+  <title>파일을 여는 시스템 콜의 세 세대: open은 기준 디렉터리가 없고, openat은 dfd를 더했지만 늘릴 자리가 없고, openat2는 크기가 실린 구조체를 받아 확장할 수 있다</title>
+
+  <rect class="box gray" x="20" y="24" width="226" height="208" rx="12"/>
+  <text class="t-xs" x="32" y="46">번호 2</text>
+  <text class="t-l" x="32" y="72">open()</text>
+  <text class="t-code" x="32" y="94">(path, flags, mode)</text>
+  <text class="t-xs tc-red t-b" x="32" y="124">남은 문제</text>
+  <text class="t-s t-ink" x="32" y="144">기준 디렉터리를 못 정한다</text>
+  <text class="t-s t-ink" x="32" y="164">모르는 플래그를 무시한다</text>
+  <path class="ln" d="M246 128 H263" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="267" y="24" width="226" height="208" rx="12"/>
+  <text class="t-xs" x="279" y="46">번호 257 · 2.6.16</text>
+  <text class="t-l" x="279" y="72">openat()</text>
+  <text class="t-code" x="279" y="94">(dfd, path, flags, mode)</text>
+  <text class="t-xs tc-green t-b" x="279" y="124">더한 것</text>
+  <text class="t-s t-ink" x="279" y="144">dfd · 기준 디렉터리의 fd</text>
+  <text class="t-xs tc-red t-b" x="279" y="174">남은 문제</text>
+  <text class="t-s t-ink" x="279" y="194">인자를 더 붙일 자리가 없다</text>
+  <text class="t-s t-ink" x="279" y="214">모르는 플래그를 여전히 무시</text>
+  <path class="ln" d="M493 128 H510" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="514" y="24" width="226" height="208" rx="12"/>
+  <text class="t-xs" x="526" y="46">번호 437 · 5.6</text>
+  <text class="t-l" x="526" y="72">openat2()</text>
+  <text class="t-code" x="526" y="94">(dfd, path, how, size)</text>
+  <text class="t-xs tc-green t-b" x="526" y="124">더한 것</text>
+  <text class="t-s t-ink" x="526" y="144">how · struct open_how</text>
+  <text class="t-s t-ink" x="526" y="164">size · 구조체의 크기</text>
+  <text class="t-s t-ink" x="526" y="184">모르는 플래그는 EINVAL</text>
+  <text class="t-s t-ink" x="526" y="204">resolve · 경로 해석 제한</text>
+
+  <text class="t-s mid" x="380" y="264">세 번호 모두 v7.3의 표에 남아 있다. 옛 프로그램은 옛 번호를 그대로 부른다</text>
+</svg>

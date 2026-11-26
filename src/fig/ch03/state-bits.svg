@@ -1,0 +1,104 @@
+<svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg">
+  <title>v7.3의 태스크 상태 비트: __state와 exit_state에 쓰이는 값, ps가 보여 주는 글자, 그리고 여러 비트를 묶은 TASK_KILLABLE, TASK_IDLE, TASK_STOPPED, TASK_NORMAL.</title>
+
+  <text class="t-xs" x="20" y="24">값</text>
+  <text class="t-xs" x="92" y="24">이름</text>
+  <text class="t-xs mid" x="290" y="24">ps</text>
+  <text class="t-xs" x="318" y="24">뜻</text>
+  <text class="t-code tc-muted" x="20" y="50">0x0000</text>
+  <rect class="box green" x="84" y="34" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="50">TASK_RUNNING</text>
+  <text class="t-mono t-b mid" x="290" y="50">R</text>
+  <text class="t-xs" x="318" y="50">실행 중이거나 실행 대기</text>
+  <text class="t-code tc-muted" x="20" y="74">0x0001</text>
+  <rect class="box blue" x="84" y="58" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="74">TASK_INTERRUPTIBLE</text>
+  <text class="t-mono t-b mid" x="290" y="74">S</text>
+  <text class="t-xs" x="318" y="74">시그널로도 깨어나는 잠</text>
+  <text class="t-code tc-muted" x="20" y="98">0x0002</text>
+  <rect class="box blue" x="84" y="82" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="98">TASK_UNINTERRUPTIBLE</text>
+  <text class="t-mono t-b mid" x="290" y="98">D</text>
+  <text class="t-xs" x="318" y="98">깨워 줄 때까지 자는 잠</text>
+  <text class="t-code tc-muted" x="20" y="122">0x0004</text>
+  <rect class="box blue" x="84" y="106" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="122">__TASK_STOPPED</text>
+  <text class="t-mono t-b mid" x="290" y="122">T</text>
+  <text class="t-xs" x="318" y="122">SIGSTOP으로 멈춤</text>
+  <text class="t-code tc-muted" x="20" y="146">0x0008</text>
+  <rect class="box blue" x="84" y="130" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="146">__TASK_TRACED</text>
+  <text class="t-mono t-b mid" x="290" y="146">t</text>
+  <text class="t-xs" x="318" y="146">디버거가 세워 둠</text>
+  <text class="t-code tc-muted" x="20" y="170">0x0010</text>
+  <rect class="box gray" x="84" y="154" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="170">EXIT_DEAD</text>
+  <text class="t-mono t-b mid" x="290" y="170">X</text>
+  <text class="t-xs" x="318" y="170">거두는 중 (exit_state)</text>
+  <text class="t-code tc-muted" x="20" y="194">0x0020</text>
+  <rect class="box gray" x="84" y="178" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="194">EXIT_ZOMBIE</text>
+  <text class="t-mono t-b mid" x="290" y="194">Z</text>
+  <text class="t-xs" x="318" y="194">좀비 (exit_state)</text>
+  <text class="t-code tc-muted" x="20" y="218">0x0040</text>
+  <rect class="box blue" x="84" y="202" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="218">TASK_PARKED</text>
+  <text class="t-mono t-b mid" x="290" y="218">P</text>
+  <text class="t-xs" x="318" y="218">커널 스레드를 세워 둠</text>
+  <text class="t-code tc-muted" x="20" y="242">0x0080</text>
+  <rect class="box gray" x="84" y="226" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="242">TASK_DEAD</text>
+  <text class="t-xs" x="318" y="242">마지막 스위치 직전</text>
+  <text class="t-code tc-muted" x="20" y="266">0x0100</text>
+  <rect class="box purple" x="84" y="250" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="266">TASK_WAKEKILL</text>
+  <text class="t-xs" x="318" y="266">수식: 치명적 시그널이면 깨움</text>
+  <text class="t-code tc-muted" x="20" y="290">0x0200</text>
+  <rect class="box" x="84" y="274" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="290">TASK_WAKING</text>
+  <text class="t-xs" x="318" y="290">깨우는 도중</text>
+  <text class="t-code tc-muted" x="20" y="314">0x0400</text>
+  <rect class="box purple" x="84" y="298" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="314">TASK_NOLOAD</text>
+  <text class="t-xs" x="318" y="314">수식: 부하 평균에서 뺌</text>
+  <text class="t-code tc-muted" x="20" y="338">0x0800</text>
+  <rect class="box" x="84" y="322" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="338">TASK_NEW</text>
+  <text class="t-xs" x="318" y="338">만드는 도중</text>
+  <text class="t-code tc-muted" x="20" y="362">0x1000</text>
+  <rect class="box blue" x="84" y="346" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="362">TASK_RTLOCK_WAIT</text>
+  <text class="t-mono t-b mid" x="290" y="362">D</text>
+  <text class="t-xs" x="318" y="362">RT 커널의 락 대기</text>
+  <text class="t-code tc-muted" x="20" y="386">0x2000</text>
+  <rect class="box purple" x="84" y="370" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="386">TASK_FREEZABLE</text>
+  <text class="t-xs" x="318" y="386">수식: 얼려도 되는 잠</text>
+  <text class="t-code tc-muted" x="20" y="410">0x8000</text>
+  <rect class="box blue" x="84" y="394" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="410">TASK_FROZEN</text>
+  <text class="t-mono t-b mid" x="290" y="410">D</text>
+  <text class="t-xs" x="318" y="410">얼어 있음</text>
+
+  <text class="t-b" x="520" y="24">여러 비트를 묶은 이름</text>
+  <rect class="box purple" x="520" y="34" width="220" height="88" rx="8"/>
+  <text class="t-code t-b" x="532" y="54">TASK_KILLABLE</text>
+  <text class="t-code" x="532" y="74">TASK_WAKEKILL |</text>
+  <text class="t-code" x="532" y="90">TASK_UNINTERRUPTIBLE</text>
+  <text class="t-xs" x="532" y="110">시그널은 치명적인 것만 깨운다</text>
+  <rect class="box purple" x="520" y="130" width="220" height="88" rx="8"/>
+  <text class="t-code t-b" x="532" y="150">TASK_IDLE</text>
+  <text class="t-code" x="532" y="170">TASK_UNINTERRUPTIBLE |</text>
+  <text class="t-code" x="532" y="186">TASK_NOLOAD</text>
+  <text class="t-xs" x="532" y="206">ps에서 I. 일감을 기다리는 커널 스레드</text>
+  <rect class="box purple" x="520" y="226" width="220" height="88" rx="8"/>
+  <text class="t-code t-b" x="532" y="246">TASK_STOPPED</text>
+  <text class="t-code" x="532" y="266">TASK_WAKEKILL |</text>
+  <text class="t-code" x="532" y="282">__TASK_STOPPED</text>
+  <text class="t-xs" x="532" y="302">멈췄지만 SIGKILL로는 깨어난다</text>
+  <rect class="box purple" x="520" y="322" width="220" height="88" rx="8"/>
+  <text class="t-code t-b" x="532" y="342">TASK_NORMAL</text>
+  <text class="t-code" x="532" y="362">TASK_INTERRUPTIBLE |</text>
+  <text class="t-code" x="532" y="378">TASK_UNINTERRUPTIBLE</text>
+  <text class="t-xs" x="532" y="398">wake_up()이 깨우는 대상</text>
+</svg>

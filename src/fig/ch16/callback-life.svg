@@ -1,0 +1,48 @@
+<svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg">
+  <title>call_rcu() 콜백의 일생: CPU별 콜백 리스트의 네 구간을 유예 기간에 따라 옮겨 가다가 DONE 구간에서 호출된다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="28">CPU별 rcu_data.cblist · 리스트 하나를 네 구간으로 나눈다</text>
+
+  <rect class="box warm" x="20" y="64" width="130" height="50" rx="10"/>
+  <text class="t-mono t-b mid" x="85" y="86">call_rcu()</text>
+  <text class="t-xs mid" x="85" y="104">콜백 등록</text>
+
+  <rect class="box gray" x="190" y="64" width="116" height="50" rx="8"/>
+  <text class="t-code t-b mid" x="248" y="86">NEXT</text>
+  <text class="t-xs mid" x="248" y="104">막 들어옴</text>
+  <rect class="box gray" x="328" y="64" width="116" height="50" rx="8"/>
+  <text class="t-code t-b mid" x="386" y="86">NEXT_READY</text>
+  <text class="t-xs mid" x="386" y="104">다음 유예 기간</text>
+  <rect class="box purple" x="466" y="64" width="116" height="50" rx="8"/>
+  <text class="t-code t-b mid" x="524" y="86">WAIT</text>
+  <text class="t-xs mid" x="524" y="104">지금 유예 기간</text>
+  <rect class="box green" x="604" y="64" width="116" height="50" rx="8"/>
+  <text class="t-code t-b mid" x="662" y="86">DONE</text>
+  <text class="t-xs mid" x="662" y="104">호출해도 된다</text>
+
+  <path class="ln" d="M150 89 H186" marker-end="url(#ah)"/>
+  <path class="ln" d="M306 89 H324" marker-end="url(#ah)"/>
+  <path class="ln purple" d="M444 89 H462" marker-end="url(#ah-purple)"/>
+  <path class="ln purple" d="M582 89 H600" marker-end="url(#ah-purple)"/>
+  <text class="t-xs tc-purple mid" x="453" y="54">유예 기간 시작</text>
+  <text class="t-xs tc-purple mid" x="593" y="54">유예 기간 끝</text>
+
+  <path class="ln green" d="M662 114 V150" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="420" y="154" width="300" height="50" rx="10"/>
+  <text class="t-mono t-b" x="434" y="176">rcu_do_batch()</text>
+  <text class="t-xs" x="434" y="194">DONE 구간의 콜백을 한 묶음씩 부른다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="238">누가 rcu_do_batch()를 부르는가</text>
+
+  <rect class="box yellow" x="20" y="250" width="226" height="56" rx="10"/>
+  <text class="t-mono t-b" x="34" y="273">RCU_SOFTIRQ</text>
+  <text class="t-xs" x="34" y="292">기본. 그 CPU의 softirq에서</text>
+
+  <rect class="box yellow" x="267" y="250" width="226" height="56" rx="10"/>
+  <text class="t-mono t-b" x="281" y="273">rcuc/N</text>
+  <text class="t-xs" x="281" y="292">PREEMPT_RT의 기본. CPU별 스레드</text>
+
+  <rect class="box yellow" x="514" y="250" width="226" height="56" rx="10"/>
+  <text class="t-mono t-b" x="528" y="273">rcuop/N</text>
+  <text class="t-xs" x="528" y="292">rcu_nocbs=로 떼어 낸 CPU의 콜백</text>
+</svg>

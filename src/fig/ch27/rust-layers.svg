@@ -1,0 +1,40 @@
+<svg viewBox="0 0 760 308" xmlns="http://www.w3.org/2000/svg">
+  <title>커널 Rust의 네 층: Rust 드라이버, 안전한 추상화를 제공하는 kernel 크레이트, bindgen이 만든 바인딩, C 코어</title>
+
+  <!-- 1: 드라이버 -->
+  <rect class="box green" x="20" y="16" width="480" height="58" rx="10"/>
+  <text class="t-b" x="36" y="40">Rust 드라이버</text>
+  <text class="t-code" x="36" y="60">nova-core, binder, tyr, rnull …</text>
+  <path class="ln" d="M260 74 V82" marker-end="url(#ah)"/>
+
+  <!-- 2: 추상화 -->
+  <rect class="box yellow" x="20" y="86" width="480" height="74" rx="10"/>
+  <text class="t-b" x="36" y="110">kernel 크레이트: 안전한 추상화</text>
+  <text class="t-code" x="36" y="130">rust/kernel/ · Lock&lt;T&gt;, KVec&lt;T&gt;, Module</text>
+  <text class="t-xs" x="36" y="149">unsafe 블록과 // SAFETY: 주석이 여기에 모인다</text>
+  <path class="ln" d="M260 160 V168" marker-end="url(#ah)"/>
+
+  <!-- 3: 바인딩 -->
+  <rect class="box gray" x="20" y="172" width="480" height="50" rx="10"/>
+  <text class="t-b" x="36" y="194">bindings: C 헤더에서 bindgen이 만든 선언</text>
+  <text class="t-code" x="36" y="212">bindings::spin_lock(ptr)</text>
+  <path class="ln" d="M260 222 V230" marker-end="url(#ah)"/>
+
+  <!-- 4: C -->
+  <rect class="box" x="20" y="234" width="480" height="58" rx="10"/>
+  <text class="t-b" x="36" y="258">C 코어</text>
+  <text class="t-code" x="36" y="278">spin_lock(), kmalloc(), list_add() …</text>
+
+  <!-- 오른쪽 풀이 -->
+  <rect class="solid green" x="512" y="16" width="4" height="58" rx="2"/>
+  <text class="t-s t-b tc-green" x="528" y="40">컴파일러가 검사한다</text>
+  <text class="t-xs" x="528" y="59">소유권, 수명, 데이터 경쟁</text>
+
+  <rect class="solid warm" x="512" y="86" width="4" height="74" rx="2"/>
+  <text class="t-s t-b tc-warm" x="528" y="116">사람이 검토한다</text>
+  <text class="t-xs" x="528" y="135">unsafe 블록마다 근거를 읽는다</text>
+
+  <rect class="solid gray" x="512" y="172" width="4" height="120" rx="2"/>
+  <text class="t-s t-b tc-muted" x="528" y="226">이 장의 다른 도구가 본다</text>
+  <text class="t-xs" x="528" y="245">lockdep, KASAN, 컨텍스트 분석</text>
+</svg>

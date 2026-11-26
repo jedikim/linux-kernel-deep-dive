@@ -1,0 +1,59 @@
+<svg viewBox="0 0 760 346" xmlns="http://www.w3.org/2000/svg">
+  <title>I/O API 네 세대 비교: 동기 read는 스레드가 잠들고, POSIX AIO는 glibc 스레드가 대신 잠들고, Linux AIO는 제출과 수확에 시스템 콜이 한 번씩 들며 O_DIRECT만 비동기이고, io_uring은 공유 링으로 한 번 또는 0번에 끝난다</title>
+
+  <text class="t-xs" x="34" y="24">방식</text>
+  <text class="t-xs" x="212" y="24">요청 한 건이 지나는 길</text>
+  <text class="t-xs" x="540" y="24">N건을 동시에 하려면</text>
+
+  <!-- 1 -->
+  <rect class="box" x="20" y="34" width="720" height="66" rx="10"/>
+  <text class="t-b" x="34" y="62">동기 I/O</text>
+  <text class="t-code" x="34" y="82">read() · write()</text>
+  <rect class="box gray" x="212" y="48" width="80" height="38" rx="6"/>
+  <text class="t-code mid" x="252" y="72">read()</text>
+  <rect class="box red" x="292" y="48" width="140" height="38"/>
+  <rect x="292" y="48" width="140" height="38" fill="url(#hatch-red)"/>
+  <text class="t-xs t-ink t-b mid" x="362" y="72">스레드가 잠든다</text>
+  <rect class="box gray" x="432" y="48" width="70" height="38" rx="6"/>
+  <text class="t-xs t-ink mid" x="467" y="72">복귀</text>
+  <text class="t-s t-ink" x="540" y="62">시스템 콜 N번</text>
+  <text class="t-xs" x="540" y="82">스레드도 N개가 잠든다</text>
+
+  <!-- 2 -->
+  <rect class="box" x="20" y="110" width="720" height="66" rx="10"/>
+  <text class="t-b" x="34" y="138">POSIX AIO</text>
+  <text class="t-code" x="34" y="158">aio_read() · glibc</text>
+  <rect class="box gray" x="212" y="124" width="90" height="38" rx="6"/>
+  <text class="t-code mid" x="257" y="148">aio_read()</text>
+  <path class="ln thin" d="M302 143 H322" marker-end="url(#ah)"/>
+  <rect class="box red" x="326" y="124" width="176" height="38"/>
+  <rect x="326" y="124" width="176" height="38" fill="url(#hatch-red)"/>
+  <text class="t-xs t-ink t-b mid" x="414" y="148">glibc 스레드가 read()로 잠든다</text>
+  <text class="t-s t-ink" x="540" y="138">스레드가 대신 부른다</text>
+  <text class="t-xs" x="540" y="158">스레드 수의 한계는 그대로</text>
+
+  <!-- 3 -->
+  <rect class="box" x="20" y="186" width="720" height="66" rx="10"/>
+  <text class="t-b" x="34" y="214">Linux AIO</text>
+  <text class="t-code" x="34" y="234">io_submit()</text>
+  <rect class="box gray" x="212" y="200" width="100" height="38" rx="6"/>
+  <text class="t-code mid" x="262" y="224">io_submit()</text>
+  <path class="ln thin" d="M312 219 H368" marker-end="url(#ah)"/>
+  <rect class="box gray" x="372" y="200" width="130" height="38" rx="6"/>
+  <text class="t-code mid" x="437" y="224">io_getevents()</text>
+  <text class="t-s t-ink" x="540" y="214">제출 1번 + 수확 1번</text>
+  <text class="t-xs" x="540" y="234">O_DIRECT만 실제로 비동기</text>
+
+  <!-- 4 -->
+  <rect class="box green" x="20" y="262" width="720" height="66" rx="10"/>
+  <text class="t-b" x="34" y="290">io_uring</text>
+  <text class="t-code" x="34" y="310">io_uring_enter()</text>
+  <rect class="box" x="212" y="276" width="82" height="38" rx="6"/>
+  <text class="t-xs t-ink mid" x="253" y="300">SQ에 쓴다</text>
+  <rect class="box gray" x="302" y="276" width="130" height="38" rx="6"/>
+  <text class="t-code mid" x="367" y="300">io_uring_enter()</text>
+  <rect class="box" x="440" y="276" width="62" height="38" rx="6"/>
+  <text class="t-xs t-ink mid" x="471" y="300">CQ 읽기</text>
+  <text class="t-s t-ink" x="540" y="290">1번, SQPOLL이면 0번</text>
+  <text class="t-xs" x="540" y="310">버퍼 I/O · 직접 I/O · 소켓 모두</text>
+</svg>

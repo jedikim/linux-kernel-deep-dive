@@ -1,0 +1,43 @@
+<svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg">
+  <title>락 둘에 걸친 우선순위 상속 사슬: H가 락 A를 기다리고, A의 주인 T가 락 B를 기다리고, B의 주인 L까지 우선순위가 전파된다</title>
+
+  <rect class="box purple" x="20" y="40" width="130" height="64" rx="10"/>
+  <text class="t-b mid" x="85" y="62">H</text>
+  <text class="t-xs mid" x="85" y="80">SCHED_FIFO 80</text>
+  <text class="t-code mid" x="85" y="96">prio 19</text>
+
+  <rect class="box yellow" x="190" y="52" width="80" height="40" rx="20"/>
+  <text class="t-b mid" x="230" y="77">락 A</text>
+
+  <rect class="box blue" x="310" y="40" width="130" height="64" rx="10"/>
+  <text class="t-b mid" x="375" y="62">T</text>
+  <text class="t-xs mid" x="375" y="80">일반 태스크</text>
+  <text class="t-code mid" x="375" y="96">prio 120 → 19</text>
+
+  <rect class="box yellow" x="480" y="52" width="80" height="40" rx="20"/>
+  <text class="t-b mid" x="520" y="77">락 B</text>
+
+  <rect class="box blue" x="600" y="40" width="130" height="64" rx="10"/>
+  <text class="t-b mid" x="665" y="62">L</text>
+  <text class="t-xs mid" x="665" y="80">일반 태스크</text>
+  <text class="t-code mid" x="665" y="96">prio 120 → 19</text>
+
+  <path class="ln" d="M150 72 H186" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="168" y="62">대기</text>
+  <path class="ln" d="M270 72 H306" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="288" y="62">주인</text>
+  <path class="ln" d="M440 72 H476" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="458" y="62">대기</text>
+  <path class="ln" d="M560 72 H596" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="578" y="62">주인</text>
+
+  <path class="ln purple dash" d="M85 104 V128 H665 V108" marker-end="url(#ah-purple)"/>
+  <text class="t-xs tc-purple mid" x="375" y="146">H의 우선순위가 사슬을 따라 전파된다</text>
+
+  <text class="t-s t-ink t-b" x="40" y="186">① H가 락 A를 기다리기 시작한다</text>
+  <text class="t-s" x="58" y="204">A의 top waiter가 H로 바뀐다. 주인 T의 prio를 19로 올린다</text>
+  <text class="t-s t-ink t-b" x="40" y="232">② T도 락 B를 기다리는 중이다 (pi_blocked_on)</text>
+  <text class="t-s" x="58" y="250">B의 트리에서 T를 다시 정렬한다. 주인 L의 prio를 19로 올린다</text>
+  <text class="t-s t-ink t-b" x="40" y="278">③ L은 아무것도 기다리지 않는다</text>
+  <text class="t-s" x="58" y="296">사슬의 끝이다. 걷는 깊이가 max_lock_depth를 넘으면 -EDEADLK로 포기한다</text>
+</svg>

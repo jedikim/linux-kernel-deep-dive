@@ -1,0 +1,1221 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>블록 계층과 io_uring — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="bio에서 blk-mq까지, 그리고 시스템 콜을 줄이는 I/O">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="블록 계층과 io_uring — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="bio에서 blk-mq까지, 그리고 시스템 콜을 줄이는 I/O">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch21" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html" aria-current="page"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">6부 시스템 콜과 I/O › <b>21장 블록 계층과 io_uring</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-teal">
+<div class="ch-kicker"><span class="ch-no">21</span><span class="part">6부 · 시스템 콜과 I/O</span></div>
+<h1>블록 계층과 io_uring</h1>
+<p class="ch-sub">bio에서 blk-mq까지, 그리고 시스템 콜을 줄이는 I/O</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 55분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/blk_types.h" target="_blank" rel="noopener">include/linux/blk_types.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/block/blk-mq.c" target="_blank" rel="noopener">block/blk-mq.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/drivers/nvme/host/pci.c" target="_blank" rel="noopener">drivers/nvme/host/pci.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/block/elevator.c" target="_blank" rel="noopener">block/elevator.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/uapi/linux/io_uring.h" target="_blank" rel="noopener">include/uapi/linux/io_uring.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/io_uring_types.h" target="_blank" rel="noopener">include/linux/io_uring_types.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/io_uring/io_uring.c" target="_blank" rel="noopener">io_uring/io_uring.c</a></div>
+</header><div class="lead">
+<p>회전하는 디스크 시절에는 I/O 한 건에 밀리초가 걸렸습니다. 커널이 그 사이에 쓰는 마이크로초는 눈에 띄지 않았습니다. 플래시 저장 장치가 기계 부품 없이 수많은 요청을 동시에 처리하게 되자 사정이 뒤집혔습니다. 병목이 장치에서 운영체제로 옮겨 왔습니다. 락 하나를 두고 모든 CPU가 다투는 요청 큐와, 요청마다 한 번씩 넘어야 하는 시스템 콜 경계가 문제가 되었습니다. 이 장은 그 두 문제에 대한 답인 blk-mq와 io_uring을 읽습니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>파일시스템이 블록 계층에 건네는 <code>bio</code>는 무엇을 담고 있는가?</li>
+<li>blk-mq는 왜 큐를 두 단으로 나누는가? 요청은 언제 큐를 거치지 않고 드라이버로 바로 가는가?</li>
+<li>I/O가 끝났다는 사실은 어느 CPU의 어떤 컨텍스트에서 처리되는가?</li>
+<li><code>read()</code>, POSIX AIO, Linux AIO, io_uring은 무엇이 다른가?</li>
+<li>io_uring의 두 링에서 head와 tail은 각각 누가 쓰는가? 락 없이 성립하는 까닭은 무엇인가?</li>
+<li>io_uring에 제출한 요청은 누가, 어떤 컨텍스트에서 실행하는가?</li>
+</ul>
+</div>
+<section class="level2" id="bio">
+<h2><span class="sec-n">21.1</span>블록 계층의 자리와 bio<a aria-label="이 절의 링크" class="anchor" href="#bio">#</a></h2>
+<p><strong>블록 계층</strong>(block layer)은 파일시스템과 저장 장치 드라이버 사이에 있습니다. 위에서는 "이 장치의 이 섹터부터 이 메모리 내용을 읽어라, 써라"는 요청을 받고, 아래로는 장치가 받아들일 수 있는 모양과 속도로 내려보냅니다.</p>
+<figure class="fig" id="fig-block-stack"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>블록 스택의 층: 파일시스템이 만든 bio가 디바이스 매퍼와 파티션에서 주소가 바뀌고, blk-mq에서 request가 되어 드라이버와 장치에 닿는다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="24">블록 스택</text>
+  <text class="t-s t-ink t-b" x="500" y="24">예: 암호화 볼륨에서 읽기 한 건</text>
+
+  <rect class="box green" x="20" y="36" width="450" height="44" rx="10"/>
+  <text class="t-b" x="36" y="63">파일시스템 · 페이지 캐시</text>
+  <text class="t-s end" x="454" y="63">bio를 만든다</text>
+  <path class="ln" d="M245 80 V104" marker-end="url(#ah)"/>
+  <text class="t-code" x="257" y="97">submit_bio()</text>
+
+  <rect class="box yellow" x="20" y="108" width="450" height="44" rx="10"/>
+  <text class="t-b" x="36" y="135">디바이스 매퍼 · md</text>
+  <text class="t-s end" x="454" y="135">암호화 · RAID · LVM</text>
+  <path class="ln" d="M245 152 V176" marker-end="url(#ah)"/>
+  <text class="t-code" x="257" y="169">submit_bio()</text>
+
+  <rect class="box yellow" x="20" y="180" width="450" height="44" rx="10"/>
+  <text class="t-b" x="36" y="207">파티션</text>
+  <text class="t-code end" x="454" y="207">blk_partition_remap()</text>
+  <path class="ln" d="M245 224 V248" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="20" y="252" width="450" height="60" rx="10"/>
+  <text class="t-b" x="36" y="277">blk-mq</text>
+  <text class="t-s end" x="454" y="277">bio → request</text>
+  <text class="t-s" x="36" y="298">태그 · 플러그와 병합 · I/O 스케줄러 · 하드웨어 큐</text>
+  <path class="ln" d="M245 312 V336" marker-end="url(#ah)"/>
+  <text class="t-code" x="257" y="329">queue_rq()</text>
+
+  <rect class="box blue" x="20" y="340" width="450" height="44" rx="10"/>
+  <text class="t-b" x="36" y="367">드라이버</text>
+  <text class="t-code end" x="454" y="367">nvme · sd · virtio_blk · ublk</text>
+  <path class="ln" d="M245 384 V408" marker-end="url(#ah)"/>
+
+  <rect class="box gray" x="20" y="412" width="450" height="44" rx="10"/>
+  <use href="#i-disk" x="32" y="420" width="28" height="28" class="ic gray"/>
+  <text class="t-b" x="70" y="439">저장 장치</text>
+
+  <!-- 오른쪽: 주소가 바뀌는 모습 -->
+  <rect class="box" x="500" y="36" width="240" height="44" rx="10"/>
+  <text class="t-xs" x="512" y="54">bio의 목적지</text>
+  <text class="t-code" x="512" y="71">dm-0 · 섹터 8192</text>
+  <path class="ln thin muted dash" d="M620 80 V104" marker-end="url(#ah-muted)"/>
+
+  <rect class="box" x="500" y="108" width="240" height="44" rx="10"/>
+  <text class="t-xs" x="512" y="126">매핑 테이블로 장치와 섹터를 바꾼다</text>
+  <text class="t-code" x="512" y="143">nvme0n1p2 · 섹터 12288</text>
+  <path class="ln thin muted dash" d="M620 152 V176" marker-end="url(#ah-muted)"/>
+
+  <rect class="box" x="500" y="180" width="240" height="44" rx="10"/>
+  <text class="t-xs" x="512" y="198">파티션 시작 섹터를 더한다</text>
+  <text class="t-code" x="512" y="215">nvme0n1 · 섹터 2109440</text>
+  <path class="ln thin muted dash" d="M620 224 V248" marker-end="url(#ah-muted)"/>
+
+  <rect class="box" x="500" y="252" width="240" height="60" rx="10"/>
+  <text class="t-xs" x="512" y="276">request가 되어 태그를 받는다</text>
+  <text class="t-code" x="512" y="296">tag 37 · hctx 5</text>
+  <path class="ln thin muted dash" d="M620 312 V336" marker-end="url(#ah-muted)"/>
+
+  <rect class="box" x="500" y="340" width="240" height="44" rx="10"/>
+  <text class="t-xs" x="512" y="358">장치의 명령으로 바뀐다</text>
+  <text class="t-code" x="512" y="375">NVMe Read · command_id 37</text>
+</svg></div><figcaption><b>그림 21-1</b>블록 스택의 층. 파일시스템이 만든 bio는 파티션과 디바이스 매퍼에서 주소가 바뀌며 내려가고, blk-mq에서 request가 되어 드라이버에 닿습니다.</figcaption></figure>
+<p>요청의 단위가 <code>struct bio</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/blk_types.h#L210" rel="noopener" target="_blank">include/linux/blk_types.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/blk_types.h" data-line="210" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="kw">struct</span> bio <span class="op">{</span></span>
+<span id="cb1-2">    <span class="kw">struct</span> bio      <span class="op">*</span>bi_next<span class="op">;</span>   <span class="co">/* request queue link */</span></span>
+<span id="cb1-3">    <span class="kw">struct</span> block_device <span class="op">*</span>bi_bdev<span class="op">;</span></span>
+<span id="cb1-4">    blk_opf_t       bi_opf<span class="op">;</span>     <span class="co">/* bottom bits REQ_OP, top bits</span></span>
+<span id="cb1-5"><span class="co">                         * req_flags.</span></span>
+<span id="cb1-6"><span class="co">                         */</span></span>
+<span id="cb1-7">    <span class="co">/* ... */</span></span>
+<span id="cb1-8">    blk_status_t        bi_status<span class="op">;</span></span>
+<span id="cb1-9">    <span class="co">/* ... */</span></span>
+<span id="cb1-10">    <span class="co">/* The actual vec list, preserved by bio_reset() */</span></span>
+<span id="cb1-11">    <span class="kw">struct</span> bio_vec      <span class="op">*</span>bi_io_vec<span class="op">;</span></span>
+<span id="cb1-12">    <span class="kw">struct</span> bvec_iter    bi_iter<span class="op">;</span></span>
+<span id="cb1-13">    <span class="co">/* ... */</span></span>
+<span id="cb1-14">    bio_end_io_t        <span class="op">*</span>bi_end_io<span class="op">;</span></span>
+<span id="cb1-15">    <span class="dt">void</span>            <span class="op">*</span>bi_private<span class="op">;</span></span>
+<span id="cb1-16">    <span class="co">/* ... */</span></span>
+<span id="cb1-17"><span class="op">};</span></span></code></pre></div></div>
+<p>읽을 곳은 네 군데입니다.</p>
+<ul>
+<li><code>bi_bdev</code>와 <code>bi_iter.bi_sector</code>가 <strong>어디에</strong>를 정합니다. 섹터는 장치의 실제 블록 크기와 상관없이 512바이트 단위입니다.</li>
+<li><code>bi_opf</code>가 <strong>무엇을</strong>을 정합니다. 아래 비트는 연산(<code>REQ_OP_READ</code>, <code>REQ_OP_WRITE</code>, <code>REQ_OP_FLUSH</code>, <code>REQ_OP_DISCARD</code>), 위 비트는 <code>REQ_SYNC</code>나 <code>REQ_NOWAIT</code> 같은 플래그입니다.</li>
+<li><code>bi_io_vec</code>가 <strong>어느 메모리와</strong>를 정합니다. <code>bio_vec</code>의 배열이고, 원소 하나는 <code>(페이지, 길이, 오프셋)</code>으로 연속된 메모리 한 조각을 가리킵니다. 대개 페이지 캐시의 폴리오입니다.</li>
+<li><code>bi_end_io</code>는 완료 콜백입니다. 블록 계층은 I/O가 끝나면 이 함수를 부를 뿐, bio를 누가 왜 만들었는지 모릅니다.</li>
+</ul>
+<figure class="fig" id="fig-bio-bvec"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>bio 하나는 bio_vec 배열로 흩어진 메모리 조각들을 가리키고, bi_iter로 장치의 연속된 섹터 구간을 가리킨다. 섹터가 이어지는 bio는 request 하나로 병합된다</title>
+
+  <rect class="box yellow" x="20" y="20" width="200" height="140" rx="10"/>
+  <text class="t-mono t-b" x="32" y="42">struct bio</text>
+  <text class="t-code" x="32" y="66">bi_bdev</text>
+  <text class="t-code" x="32" y="86">bi_iter.bi_sector</text>
+  <text class="t-code" x="32" y="106">bi_iter.bi_size</text>
+  <text class="t-code" x="32" y="126">bi_io_vec</text>
+  <text class="t-code" x="32" y="146">bi_end_io</text>
+
+  <path class="ln yellow" d="M220 122 H266" marker-end="url(#ah-yellow)"/>
+  <rect class="panel yellow" x="270" y="40" width="170" height="132" rx="10"/>
+  <text class="t-mono t-b" x="282" y="60">bio_vec[]</text>
+  <rect class="box" x="280" y="70" width="150" height="28"/>
+  <text class="t-code mid" x="355" y="89">len=16384 off=0</text>
+  <rect class="box" x="280" y="102" width="150" height="28"/>
+  <text class="t-code mid" x="355" y="121">len=4096 off=0</text>
+  <rect class="box" x="280" y="134" width="150" height="28"/>
+  <text class="t-code mid" x="355" y="153">len=8192 off=0</text>
+
+  <text class="t-s t-ink t-b" x="500" y="52">메모리: 흩어져 있어도 된다</text>
+  <path class="ln green" d="M430 84 H496" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="500" y="71" width="220" height="26" rx="4"/>
+  <text class="t-xs t-ink mid" x="610" y="89">폴리오 16KB</text>
+  <path class="ln green" d="M430 116 H596" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="600" y="103" width="70" height="26" rx="4"/>
+  <text class="t-xs t-ink mid" x="635" y="121">4KB</text>
+  <path class="ln green" d="M430 148 H526" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="530" y="135" width="130" height="26" rx="4"/>
+  <text class="t-xs t-ink mid" x="595" y="153">폴리오 8KB</text>
+
+  <!-- 장치 -->
+  <path class="ln yellow" d="M120 160 V222" marker-end="url(#ah-yellow)"/>
+  <text class="t-xs" x="130" y="198">bi_sector부터 bi_size만큼</text>
+  <text class="t-s t-ink t-b end" x="740" y="214">장치: 연속된 섹터여야 한다</text>
+  <rect class="box gray" x="20" y="226" width="720" height="30"/>
+  <rect class="box yellow" x="120" y="226" width="196" height="30"/>
+  <text class="t-xs t-ink mid" x="218" y="246">이 bio · 28KB</text>
+  <rect class="box blue" x="316" y="226" width="112" height="30"/>
+  <text class="t-xs t-ink mid" x="372" y="246">다음 bio</text>
+  <path class="ln thin" d="M120 266 H428"/>
+  <text class="t-xs mid" x="274" y="284">섹터가 이어지는 bio 둘 → request 하나로 병합</text>
+</svg></div><figcaption><b>그림 21-2</b>bio 하나는 장치의 연속된 섹터 구간과, 흩어져 있어도 되는 메모리 조각들의 목록을 잇습니다. 이웃한 bio들은 request 하나로 합쳐질 수 있습니다.</figcaption></figure>
+<p>메모리 쪽은 흩어져 있어도 되지만 장치 쪽은 연속이어야 합니다. 파일의 연속된 256KB가 디스크에서도 연속이면 bio 하나로 끝나고, 디스크에서 둘로 갈라져 있으면 bio 둘이 됩니다. <a href="ch20.html">20장</a>의 iomap이 "연속 구간"으로 답하는 것이 바로 bio를 크게 만들기 위해서입니다.</p>
+<p>파일시스템은 bio를 채워 <code>submit_bio()</code>를 부릅니다. 이 함수는 완료를 기다리지 않고 돌아옵니다. 완료는 나중에 <code>bi_end_io</code>로 알려집니다.</p>
+</section>
+<section class="level2" id="blk-mq">
+<h2><span class="sec-n">21.2</span>blk-mq: 소프트웨어 큐와 하드웨어 큐<a aria-label="이 절의 링크" class="anchor" href="#blk-mq">#</a></h2>
+<p><code>submit_bio()</code>는 <code>blk_mq_submit_bio()</code>에 닿습니다. 여기서 bio는 <code>struct request</code>가 됩니다. request는 드라이버에 건네는 단위이고, 섹터가 이어지는 bio 여러 개를 하나로 묶을 수 있습니다.</p>
+<p>request에는 <strong>태그</strong>(tag)가 붙습니다. 하드웨어 큐마다 깊이만큼의 정수가 있고, request는 그 가운데 빈 번호 하나를 받아야 장치로 갈 수 있습니다. 태그는 "장치에 동시에 걸려 있는 요청 수"를 제한하는 장치이자, 완료가 돌아왔을 때 request를 찾는 인덱스입니다. NVMe 드라이버는 태그를 명령 ID에 넣어 보내고, 완료 항목에 적혀 돌아온 ID로 <code>blk_mq_tag_to_rq()</code>를 불러 request를 꺼냅니다. 빈 태그 찾기는 여러 CPU가 캐시 라인을 덜 다투도록 만든 비트맵 sbitmap이 맡습니다.</p>
+<p>blk-mq의 큐는 두 단입니다.</p>
+<ul>
+<li><strong>소프트웨어 큐</strong>(<code>struct blk_mq_ctx</code>): CPU마다 하나. 스케줄러가 있거나 병합을 시도할 때 request가 잠시 머뭅니다.</li>
+<li><strong>하드웨어 큐</strong>(<code>struct blk_mq_hw_ctx</code>): 장치가 가진 큐마다 하나. 드라이버의 <code>queue_rq()</code>가 여기서 request를 받습니다.</li>
+</ul>
+<figure class="fig" id="fig-blkmq-queues"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 388" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>blk-mq의 큐 대응: CPU 8개마다 소프트웨어 큐가 하나씩 있고, 두 개씩 하드웨어 큐 하나에 묶이며, 하드웨어 큐는 NVMe 장치의 제출 큐·완료 큐 한 쌍에 대응한다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="50">CPU</text>
+  <text class="t-s t-ink t-b" x="20" y="108">소프트웨어 큐</text>
+  <text class="t-code" x="20" y="126">blk_mq_ctx</text>
+  <text class="t-s t-ink t-b" x="20" y="192">하드웨어 큐</text>
+  <text class="t-code" x="20" y="210">blk_mq_hw_ctx</text>
+  <text class="t-s t-ink t-b" x="20" y="300">NVMe 장치</text>
+  <text class="t-xs" x="20" y="318">큐 쌍마다 MSI-X 벡터</text>
+
+  <rect class="box blue" x="170" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="200" y="50">CPU 0</text>
+  <path class="ln thin blue" d="M200 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="170" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="200" y="116">ctx</text>
+  <path class="ln thin yellow" d="M200 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="242" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="272" y="50">CPU 1</text>
+  <path class="ln thin blue" d="M272 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="242" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="272" y="116">ctx</text>
+  <path class="ln thin yellow" d="M272 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="314" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="344" y="50">CPU 2</text>
+  <path class="ln thin blue" d="M344 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="314" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="344" y="116">ctx</text>
+  <path class="ln thin yellow" d="M344 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="386" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="416" y="50">CPU 3</text>
+  <path class="ln thin blue" d="M416 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="386" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="416" y="116">ctx</text>
+  <path class="ln thin yellow" d="M416 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="458" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="488" y="50">CPU 4</text>
+  <path class="ln thin blue" d="M488 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="458" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="488" y="116">ctx</text>
+  <path class="ln thin yellow" d="M488 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="530" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="560" y="50">CPU 5</text>
+  <path class="ln thin blue" d="M560 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="530" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="560" y="116">ctx</text>
+  <path class="ln thin yellow" d="M560 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="602" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="632" y="50">CPU 6</text>
+  <path class="ln thin blue" d="M632 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="602" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="632" y="116">ctx</text>
+  <path class="ln thin yellow" d="M632 126 V166" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="674" y="30" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="704" y="50">CPU 7</text>
+  <path class="ln thin blue" d="M704 60 V92" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="674" y="96" width="60" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="704" y="116">ctx</text>
+  <path class="ln thin yellow" d="M704 126 V166" marker-end="url(#ah-yellow)"/>
+
+  <rect class="panel gray" x="170" y="262" width="564" height="84" rx="12"/>
+  <rect class="box yellow" x="170" y="170" width="132" height="56" rx="8"/>
+  <text class="t-b mid" x="236" y="194">hctx 0</text>
+  <text class="t-xs mid" x="236" y="213">태그 · sbitmap</text>
+  <path class="ln" d="M236 226 V270" marker-end="url(#ah)"/>
+  <rect class="box" x="176" y="274" width="120" height="60" rx="8"/>
+  <text class="t-code mid" x="236" y="298">SQ 1 · CQ 1</text>
+  <text class="t-xs mid" x="236" y="318">→ CPU 0, 1</text>
+  <rect class="box yellow" x="314" y="170" width="132" height="56" rx="8"/>
+  <text class="t-b mid" x="380" y="194">hctx 1</text>
+  <text class="t-xs mid" x="380" y="213">태그 · sbitmap</text>
+  <path class="ln" d="M380 226 V270" marker-end="url(#ah)"/>
+  <rect class="box" x="320" y="274" width="120" height="60" rx="8"/>
+  <text class="t-code mid" x="380" y="298">SQ 2 · CQ 2</text>
+  <text class="t-xs mid" x="380" y="318">→ CPU 2, 3</text>
+  <rect class="box yellow" x="458" y="170" width="132" height="56" rx="8"/>
+  <text class="t-b mid" x="524" y="194">hctx 2</text>
+  <text class="t-xs mid" x="524" y="213">태그 · sbitmap</text>
+  <path class="ln" d="M524 226 V270" marker-end="url(#ah)"/>
+  <rect class="box" x="464" y="274" width="120" height="60" rx="8"/>
+  <text class="t-code mid" x="524" y="298">SQ 3 · CQ 3</text>
+  <text class="t-xs mid" x="524" y="318">→ CPU 4, 5</text>
+  <rect class="box yellow" x="602" y="170" width="132" height="56" rx="8"/>
+  <text class="t-b mid" x="668" y="194">hctx 3</text>
+  <text class="t-xs mid" x="668" y="213">태그 · sbitmap</text>
+  <path class="ln" d="M668 226 V270" marker-end="url(#ah)"/>
+  <rect class="box" x="608" y="274" width="120" height="60" rx="8"/>
+  <text class="t-code mid" x="668" y="298">SQ 4 · CQ 4</text>
+  <text class="t-xs mid" x="668" y="318">→ CPU 6, 7</text>
+  <text class="t-code" x="246" y="250">queue_rq()</text>
+
+  <text class="t-s mid" x="380" y="372">제출도 완료도 같은 CPU 묶음 안에서 끝난다. 큐 사이에 공유하는 락이 없다</text>
+</svg></div><figcaption><b>그림 21-3</b>CPU 8개와 NVMe 큐 4쌍의 대응. 각 CPU의 소프트웨어 큐는 하드웨어 큐 하나에 묶여 있고, 하드웨어 큐는 장치의 제출 큐·완료 큐 한 쌍에 대응합니다.</figcaption></figure>
+<p>NVMe는 큐를 CPU 수만큼 만들려고 합니다. 그러면 CPU마다 자기 하드웨어 큐가 있고, 제출 경로에서 다른 CPU와 공유하는 락이 없습니다. 큐가 CPU보다 적으면 <code>blk_mq_map_queues()</code>가 CPU들을 고르게 묶어 큐에 나눠 줍니다.</p>
+<p>request를 만든 다음의 갈림길은 <code>blk_mq_submit_bio()</code>의 끝에 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/block/blk-mq.c#L3208" rel="noopener" target="_blank">block/blk-mq.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="block/blk-mq.c" data-line="3208" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1">    <span class="cf">if</span> <span class="op">(</span>plug<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb2-2">        blk_add_rq_to_plug<span class="op">(</span>plug<span class="op">,</span> rq<span class="op">);</span></span>
+<span id="cb2-3">        <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb2-4">    <span class="op">}</span></span>
+<span id="cb2-5"></span>
+<span id="cb2-6">    hctx <span class="op">=</span> rq<span class="op">-&gt;</span>mq_hctx<span class="op">;</span></span>
+<span id="cb2-7">    <span class="cf">if</span> <span class="op">((</span>rq<span class="op">-&gt;</span>rq_flags <span class="op">&amp;</span> RQF_USE_SCHED<span class="op">)</span> <span class="op">||</span></span>
+<span id="cb2-8">        <span class="op">(</span>hctx<span class="op">-&gt;</span>dispatch_busy <span class="op">&amp;&amp;</span> <span class="op">(</span>q<span class="op">-&gt;</span>nr_hw_queues <span class="op">==</span> <span class="dv">1</span> <span class="op">||</span> <span class="op">!</span>is_sync<span class="op">)))</span> <span class="op">{</span></span>
+<span id="cb2-9">        blk_mq_insert_request<span class="op">(</span>rq<span class="op">,</span> <span class="dv">0</span><span class="op">);</span></span>
+<span id="cb2-10">        blk_mq_run_hw_queue<span class="op">(</span>hctx<span class="op">,</span> <span class="kw">true</span><span class="op">);</span></span>
+<span id="cb2-11">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb2-12">        blk_mq_run_dispatch_ops<span class="op">(</span>q<span class="op">,</span> blk_mq_try_issue_directly<span class="op">(</span>hctx<span class="op">,</span> rq<span class="op">));</span></span>
+<span id="cb2-13">    <span class="op">}</span></span>
+<span id="cb2-14">    <span class="cf">return</span><span class="op">;</span></span></code></pre></div></div>
+<p>세 갈래입니다.</p>
+<ul>
+<li><strong>플러그에 모은다.</strong> <strong>플러그</strong>(plug)는 태스크가 "곧 I/O를 여러 건 낼 것"이라고 알리는 표시입니다. <code>blk_start_plug()</code>와 <code>blk_finish_plug()</code> 사이에 낸 request는 <code>current-&gt;plug</code>에 쌓였다가 한꺼번에 내려갑니다. 미리 읽기와 writeback이 이렇게 합니다. 모아 두면 이웃한 것끼리 병합할 기회가 생기고, 드라이버에 묶음으로 넘길 수 있습니다. 플러그를 쥔 채 잠들면 <code>schedule()</code>이 대신 비워 줍니다.</li>
+<li><strong>큐에 넣는다.</strong> I/O 스케줄러가 붙어 있거나 장치가 바쁘면 큐에 넣고 <code>blk_mq_run_hw_queue()</code>로 큐를 돌립니다.</li>
+<li><strong>바로 낸다.</strong> 그 밖에는 <code>blk_mq_try_issue_directly()</code>가 큐를 거치지 않고 드라이버의 <code>queue_rq()</code>를 곧장 부릅니다. 스케줄러 없는 NVMe에서는 이 길이 보통입니다.</li>
+</ul>
+<p>NVMe의 <code>queue_rq()</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/drivers/nvme/host/pci.c#L1442" rel="noopener" target="_blank">drivers/nvme/host/pci.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="drivers/nvme/host/pci.c" data-line="1442" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><span class="dt">static</span> blk_status_t nvme_queue_rq<span class="op">(</span><span class="kw">struct</span> blk_mq_hw_ctx <span class="op">*</span>hctx<span class="op">,</span></span>
+<span id="cb3-2">             <span class="dt">const</span> <span class="kw">struct</span> blk_mq_queue_data <span class="op">*</span>bd<span class="op">)</span></span>
+<span id="cb3-3"><span class="op">{</span></span>
+<span id="cb3-4">    <span class="kw">struct</span> nvme_queue <span class="op">*</span>nvmeq <span class="op">=</span> hctx<span class="op">-&gt;</span>driver_data<span class="op">;</span></span>
+<span id="cb3-5">    <span class="co">/* ... */</span></span>
+<span id="cb3-6">    ret <span class="op">=</span> nvme_prep_rq<span class="op">(</span>req<span class="op">);</span></span>
+<span id="cb3-7">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>ret<span class="op">))</span></span>
+<span id="cb3-8">        <span class="cf">return</span> ret<span class="op">;</span></span>
+<span id="cb3-9">    spin_lock<span class="op">(&amp;</span>nvmeq<span class="op">-&gt;</span>sq_lock<span class="op">);</span></span>
+<span id="cb3-10">    nvme_sq_copy_cmd<span class="op">(</span>nvmeq<span class="op">,</span> <span class="op">&amp;</span>iod<span class="op">-&gt;</span>cmd<span class="op">);</span></span>
+<span id="cb3-11">    nvme_write_sq_db<span class="op">(</span>nvmeq<span class="op">,</span> bd<span class="op">-&gt;</span>last<span class="op">);</span></span>
+<span id="cb3-12">    spin_unlock<span class="op">(&amp;</span>nvmeq<span class="op">-&gt;</span>sq_lock<span class="op">);</span></span>
+<span id="cb3-13">    <span class="cf">return</span> BLK_STS_OK<span class="op">;</span></span>
+<span id="cb3-14"><span class="op">}</span></span></code></pre></div></div>
+<p><code>nvme_prep_rq()</code>가 request를 NVMe 명령으로 바꾸고 데이터 버퍼를 DMA 매핑합니다. 그다음 명령을 장치와 공유하는 제출 큐 메모리에 복사하고, 도어벨 레지스터에 새 tail을 씁니다. 장치는 도어벨을 보고 명령을 가져갑니다. <code>bd-&gt;last</code>가 거짓이면 뒤에 request가 더 온다는 뜻이므로 도어벨 쓰기를 미룹니다. MMIO 쓰기 한 번도 아끼는 것입니다. <code>sq_lock</code>은 이 큐 하나만의 락이므로 큐가 CPU마다 있으면 경합이 없습니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>오래된 블록 계층 설명에는 장치마다 요청 큐 하나와 <code>queue_lock</code> 하나가 있고, 드라이버가 <code>request_fn</code>을 등록하며, I/O 스케줄러로 CFQ·deadline·noop 가운데 하나를 고른다고 나옵니다. 그 단일 큐 경로는 5.0에서 코드째로 사라졌습니다. blk-mq는 3.13에 들어와 몇 해 동안 옛 경로와 나란히 있었고, 남은 드라이버가 모두 옮겨 온 뒤 옛 경로와 그 스케줄러들이 지워졌습니다. v7.3에는 blk-mq만 있고, <code>bio</code>에 직접 있던 <code>bi_sector</code>·<code>bi_size</code>도 <code>bi_iter</code> 안으로 들어가 있습니다.</p>
+</div>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>단일 큐가 버티지 못한 까닭은 락이 느려서가 아니라 <strong>공유해서</strong>입니다. 모든 CPU가 같은 큐의 같은 캐시 라인에 쓰면 그 캐시 라인이 CPU 사이를 오가는 비용이 I/O 한 건의 비용보다 커집니다. blk-mq는 자료구조를 CPU별로 쪼개 공유 자체를 없앴습니다. 소프트웨어 큐가 CPU마다 있고, 하드웨어도 큐를 여럿 주므로 끝까지 한 번도 합쳐지지 않습니다. 락을 더 빠르게 만드는 것보다 락이 지키는 데이터를 나누는 쪽이 멀리 간다는 것은 <a href="ch13.html">13장</a>의 CPU별 데이터와 같은 결론입니다.</p>
+</div>
+</section>
+<section class="level2" id="iosched">
+<h2><span class="sec-n">21.3</span>I/O 스케줄러<a aria-label="이 절의 링크" class="anchor" href="#iosched">#</a></h2>
+<p>소프트웨어 큐와 하드웨어 큐 사이에 <strong>I/O 스케줄러</strong>를 끼울 수 있습니다. request의 순서를 바꾸거나 잠시 붙들어 두는 층입니다. v7.3의 <code>block/Kconfig.iosched</code>에 있는 것은 셋이고, 아무것도 끼우지 않는 <code>none</code>까지 선택지는 넷입니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>스케줄러</th>
+<th>하는 일</th>
+<th>맞는 곳</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>none</code></td>
+<td>순서를 바꾸지 않습니다.</td>
+<td>큐가 여럿인 NVMe</td>
+</tr>
+<tr>
+<td><code>mq-deadline</code></td>
+<td>섹터 순으로 정렬하되, request마다 기한을 두어 굶지 않게 합니다.</td>
+<td>하드 디스크, SATA SSD</td>
+</tr>
+<tr>
+<td><code>kyber</code></td>
+<td>읽기와 동기 쓰기의 목표 지연 시간에 맞춰 큐 깊이를 스스로 조절합니다.</td>
+<td>빠른 장치에서 지연 시간을 관리할 때</td>
+</tr>
+<tr>
+<td><code>bfq</code></td>
+<td>프로세스별 가중치대로 장치의 처리량을 나눕니다. cgroup의 io 가중치를 따릅니다.</td>
+<td>느린 장치, 데스크톱의 반응성</td>
+</tr>
+</tbody>
+</table></div>
+<p>기본값을 고르는 코드는 짧습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/block/elevator.c#L729" rel="noopener" target="_blank">block/elevator.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="block/elevator.c" data-line="729" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="dt">void</span> elevator_set_default<span class="op">(</span><span class="kw">struct</span> request_queue <span class="op">*</span>q<span class="op">)</span></span>
+<span id="cb4-2"><span class="op">{</span></span>
+<span id="cb4-3">    <span class="kw">struct</span> elv_change_ctx ctx <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb4-4">        <span class="op">.</span>name <span class="op">=</span> <span class="st">"mq-deadline"</span><span class="op">,</span></span>
+<span id="cb4-5">        <span class="op">.</span>no_uevent <span class="op">=</span> <span class="kw">true</span><span class="op">,</span></span>
+<span id="cb4-6">    <span class="op">};</span></span>
+<span id="cb4-7">    <span class="co">/* ... */</span></span>
+<span id="cb4-8">    <span class="co">/*</span></span>
+<span id="cb4-9"><span class="co">     * For single queue devices, default to using mq-deadline. If we</span></span>
+<span id="cb4-10"><span class="co">     * have multiple queues or mq-deadline is not available, default</span></span>
+<span id="cb4-11"><span class="co">     * to "none".</span></span>
+<span id="cb4-12"><span class="co">     */</span></span>
+<span id="cb4-13">    <span class="co">/* ... */</span></span>
+<span id="cb4-14">    <span class="cf">if</span> <span class="op">((</span>q<span class="op">-&gt;</span>nr_hw_queues <span class="op">==</span> <span class="dv">1</span> <span class="op">||</span></span>
+<span id="cb4-15">            blk_mq_is_shared_tags<span class="op">(</span>q<span class="op">-&gt;</span>tag_set<span class="op">-&gt;</span>flags<span class="op">)))</span> <span class="op">{</span></span>
+<span id="cb4-16">        err <span class="op">=</span> elevator_change<span class="op">(</span>q<span class="op">,</span> <span class="op">&amp;</span>ctx<span class="op">);</span></span>
+<span id="cb4-17">        <span class="co">/* ... */</span></span>
+<span id="cb4-18">    <span class="op">}</span></span>
+<span id="cb4-19">    <span class="co">/* ... */</span></span>
+<span id="cb4-20"><span class="op">}</span></span></code></pre></div></div>
+<p>하드웨어 큐가 하나면 <code>mq-deadline</code>, 여럿이면 <code>none</code>입니다. 하드 디스크는 헤드가 움직이는 거리가 곧 시간이므로 섹터 순으로 정렬하면 이득이 큽니다. NVMe에는 헤드가 없습니다. 정렬해서 얻는 것이 없고, 정렬하려고 request를 한 곳에 모으면 CPU별로 쪼개 둔 구조에 공유 지점이 다시 생깁니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>장치의 큐 구성을 봅니다. 장치 이름은 <code>lsblk</code>로 확인해 바꿉니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ cat /sys/block/nvme0n1/queue/scheduler
+[none] mq-deadline kyber bfq
+$ cat /sys/block/nvme0n1/queue/nr_requests
+1023
+$ ls /sys/block/nvme0n1/mq/
+0  1  2  3  4  5  6  7
+$ cat /sys/block/nvme0n1/mq/3/cpu_list
+3</code></pre></div>
+<p>대괄호 안이 지금 쓰는 스케줄러입니다. 이 파일에 이름을 쓰면 바뀝니다. <code>mq/</code> 아래의 디렉터리가 하드웨어 큐이고, <code>cpu_list</code>가 그 큐에 묶인 CPU입니다. 큐 수가 CPU 수보다 적으면 한 큐에 CPU가 여럿 나옵니다.</p>
+<p>드라이버로 내려가는 request를 종류별로 세어 봅니다. <code>R</code>은 읽기, <code>W</code>는 쓰기, <code>S</code>는 동기, <code>M</code>은 메타데이터, <code>FF</code>는 캐시 비우기입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># bpftrace -e 'tracepoint:block:block_rq_issue { @[args-&gt;rwbs] = count(); }'</code></pre></div>
+<p><code>iostat -x 1</code>은 같은 계층의 통계를 장치별로 보여 줍니다. <code>aqu-sz</code>가 장치에 걸려 있는 request 수의 평균입니다.</p>
+</div>
+</section>
+<section class="level2" id="completion">
+<h2><span class="sec-n">21.4</span>완료: 인터럽트에서 bio_endio()까지<a aria-label="이 절의 링크" class="anchor" href="#completion">#</a></h2>
+<p>장치는 명령을 끝내면 완료 큐에 항목을 쓰고 인터럽트를 겁니다. NVMe는 큐마다 MSI-X 벡터를 따로 받고, 커널은 각 벡터를 그 큐에 묶인 CPU에 배달되도록 고정해 둡니다(<a href="ch10.html">10장</a>의 관리형 친화성). 그래서 완료 인터럽트는 대개 요청을 낸 CPU로 돌아옵니다. 그 CPU의 캐시에는 request와 bio가 아직 남아 있습니다.</p>
+<p>핸들러 <code>nvme_irq()</code>는 완료 큐를 훑어 명령 ID로 request를 찾고 <code>blk_mq_complete_request_remote()</code>에 묻습니다. 이 함수는 완료 처리를 <strong>어느 CPU에서</strong> 할지 정합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/block/blk-mq.c#L1301" rel="noopener" target="_blank">block/blk-mq.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="block/blk-mq.c" data-line="1301" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="dt">bool</span> blk_mq_complete_request_remote<span class="op">(</span><span class="kw">struct</span> request <span class="op">*</span>rq<span class="op">)</span></span>
+<span id="cb7-2"><span class="op">{</span></span>
+<span id="cb7-3">    WRITE_ONCE<span class="op">(</span>rq<span class="op">-&gt;</span>state<span class="op">,</span> MQ_RQ_COMPLETE<span class="op">);</span></span>
+<span id="cb7-4"></span>
+<span id="cb7-5">    <span class="co">/* ... */</span></span>
+<span id="cb7-6">    <span class="cf">if</span> <span class="op">((</span>rq<span class="op">-&gt;</span>mq_hctx<span class="op">-&gt;</span>nr_ctx <span class="op">==</span> <span class="dv">1</span> <span class="op">&amp;&amp;</span></span>
+<span id="cb7-7">         rq<span class="op">-&gt;</span>mq_ctx<span class="op">-&gt;</span>cpu <span class="op">==</span> raw_smp_processor_id<span class="op">())</span> <span class="op">||</span></span>
+<span id="cb7-8">         rq<span class="op">-&gt;</span>cmd_flags <span class="op">&amp;</span> REQ_POLLED<span class="op">)</span></span>
+<span id="cb7-9">        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb7-10"></span>
+<span id="cb7-11">    <span class="cf">if</span> <span class="op">(</span>blk_mq_complete_need_ipi<span class="op">(</span>rq<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb7-12">        blk_mq_complete_send_ipi<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb7-13">        <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb7-14">    <span class="op">}</span></span>
+<span id="cb7-15"></span>
+<span id="cb7-16">    <span class="cf">if</span> <span class="op">(</span>rq<span class="op">-&gt;</span>q<span class="op">-&gt;</span>nr_hw_queues <span class="op">==</span> <span class="dv">1</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb7-17">        blk_mq_raise_softirq<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb7-18">        <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb7-19">    <span class="op">}</span></span>
+<span id="cb7-20">    <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb7-21"><span class="op">}</span></span></code></pre></div></div>
+<ul>
+<li>요청을 낸 CPU에서 인터럽트를 받았으면 <code>false</code>를 돌려주고, 호출한 쪽이 그 자리에서 드라이버의 <code>complete()</code>를 부릅니다. hardirq 컨텍스트입니다.</li>
+<li>다른 CPU에서 받았고 두 CPU가 캐시도 공유하지 않으면, 요청을 낸 CPU에 IPI를 보내 거기서 <code>BLOCK_SOFTIRQ</code>로 처리합니다(<a href="ch11.html">11장</a>).</li>
+<li>하드웨어 큐가 하나뿐인 장치는 인터럽트가 한 CPU에 몰리므로 softirq로 미룹니다.</li>
+</ul>
+<p><code>complete()</code>는 <code>blk_mq_end_request()</code>를 거쳐 request에 묶인 bio마다 <code>bio_endio()</code>를 부르고, 거기서 <code>bi_end_io</code>가 불립니다. 읽기였다면 이 콜백이 폴리오를 최신 상태로 표시하고 락을 풉니다. <a href="ch20.html">20장</a>에서 <code>filemap_update_page()</code>에 잠들어 있던 태스크가 여기서 깨어납니다. 태그도 이때 반납됩니다.</p>
+<figure class="fig" id="fig-request-lifetime"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 296" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>요청 하나의 일생: 태스크 컨텍스트에서 blk_mq_submit_bio와 nvme_queue_rq가 실행되고, 장치가 명령을 처리한 뒤 같은 CPU의 인터럽트 컨텍스트에서 nvme_irq와 bio_endio가 실행되어 기다리던 태스크를 깨운다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="58">태스크</text>
+  <text class="t-xs" x="20" y="76">태스크 컨텍스트</text>
+  <text class="t-s t-ink t-b" x="20" y="137">NVMe 장치</text>
+  <text class="t-s t-ink t-b" x="20" y="198">인터럽트</text>
+  <text class="t-xs" x="20" y="216">같은 CPU · hardirq</text>
+
+  <!-- 태스크 레인 -->
+  <rect class="box yellow" x="140" y="40" width="152" height="44" rx="6"/>
+  <text class="t-code mid" x="216" y="58">blk_mq_submit_bio()</text>
+  <text class="t-xs mid" x="216" y="76">bio → request · 태그</text>
+  <rect class="box yellow" x="292" y="40" width="120" height="44" rx="6"/>
+  <text class="t-code mid" x="352" y="58">nvme_queue_rq()</text>
+  <text class="t-xs mid" x="352" y="76">명령 복사 · 도어벨</text>
+  <rect class="box gray" x="412" y="40" width="252" height="44" rx="6"/>
+  <text class="t-xs t-ink mid" x="538" y="67">다른 일을 하거나 폴리오 락을 기다리며 잠든다</text>
+  <rect class="box green" x="664" y="40" width="76" height="44" rx="6"/>
+  <text class="t-xs t-ink mid" x="702" y="67">이어서 실행</text>
+
+  <!-- 장치 레인 -->
+  <path class="ln blue" d="M412 84 V106" marker-end="url(#ah-blue)"/>
+  <text class="t-xs" x="420" y="100">도어벨 쓰기</text>
+  <rect class="box blue" x="412" y="110" width="100" height="44" rx="6"/>
+  <text class="t-s t-ink mid" x="462" y="137">명령 처리</text>
+  <path class="ln warm" d="M512 154 V176" marker-end="url(#ah-warm)"/>
+  <text class="t-xs" x="520" y="170">MSI-X 인터럽트</text>
+
+  <!-- 인터럽트 레인 -->
+  <rect class="box warm" x="512" y="180" width="152" height="44" rx="6"/>
+  <text class="t-code mid" x="588" y="198">nvme_irq()</text>
+  <text class="t-code mid" x="588" y="216">→ bio_endio()</text>
+  <path class="ln green" d="M664 180 V88" marker-end="url(#ah-green)"/>
+  <text class="t-xs" x="672" y="140">깨움</text>
+
+  <path class="ln thin muted" d="M140 240 H740" marker-end="url(#ah-muted)"/>
+  <text class="t-xs" x="140" y="262">제출 경로는 I/O를 기다리지 않는다. submit_bio()는 도어벨을 쓰고 곧 돌아온다</text>
+  <text class="t-xs" x="140" y="282">완료 인터럽트는 큐에 묶인 CPU로 온다. request와 bio가 그 CPU의 캐시에 남아 있다</text>
+</svg></div><figcaption><b>그림 21-4</b>요청 하나의 일생. 제출은 태스크 컨텍스트에서, 완료는 인터럽트 컨텍스트에서 일어나고, 그 사이에 태스크는 다른 일을 하거나 잠듭니다.</figcaption></figure>
+<p>장치가 충분히 빠르면 인터럽트 자체가 부담입니다. <strong>폴링 I/O</strong>는 인터럽트를 끄고 제출한 태스크가 완료 큐를 직접 들여다봅니다. NVMe 드라이버는 <code>poll_queues</code> 모듈 인자로 인터럽트 없는 큐를 따로 만들고, <code>REQ_POLLED</code>가 붙은 request가 그 큐로 갑니다. io_uring의 <code>IORING_SETUP_IOPOLL</code>이 이 경로를 씁니다.</p>
+</section>
+<section class="level2" id="stacking">
+<h2><span class="sec-n">21.5</span>쌓기와 요즘 장치<a aria-label="이 절의 링크" class="anchor" href="#stacking">#</a></h2>
+<p><code>submit_bio()</code>에 들어온 bio는 드라이버에 닿기 전에 주소가 몇 번 바뀔 수 있습니다.</p>
+<ul>
+<li><strong>파티션</strong>: <code>/dev/nvme0n1p2</code>에 대한 bio는 <code>blk_partition_remap()</code>에서 섹터에 파티션 시작 위치가 더해져 디스크 전체에 대한 bio가 됩니다. 디스크 하나가 <code>struct gendisk</code>이고, 디스크 전체와 각 파티션이 <code>struct block_device</code>입니다.</li>
+<li><strong>디바이스 매퍼와 md</strong>: LVM, dm-crypt, RAID는 대개 bio 단위로 동작합니다. 받은 bio를 고치거나 복제해 아래 장치에 다시 <code>submit_bio()</code>합니다. 암호화는 내용을 바꾸고, 스트라이핑은 장치와 섹터를 바꾸고, 미러링은 bio를 둘로 복제합니다.</li>
+</ul>
+<p>이 층들이 모두 같은 <code>bio</code>를 주고받으므로 임의의 순서로 쌓을 수 있습니다. 암호화한 논리 볼륨 위의 RAID가 가능한 까닭입니다.</p>
+<p>v7.3의 블록 계층에는 플래시와 대용량 디스크의 성질을 드러내는 기능도 들어 있습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>기능</th>
+<th>내용</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>zoned 장치</td>
+<td>구역 안에서 순서대로만 쓸 수 있는 장치(SMR 디스크, ZNS SSD). 블록 계층이 구역별로 쓰기 순서를 맞춥니다(<code>block/blk-zoned.c</code>).</td>
+</tr>
+<tr>
+<td>원자적 쓰기</td>
+<td><code>pwritev2()</code>의 <code>RWF_ATOMIC</code>. 전원이 나가도 쓰기 한 건이 전부 반영되거나 전혀 반영되지 않습니다. 장치가 지원해야 합니다.</td>
+</tr>
+<tr>
+<td>ublk</td>
+<td>블록 장치의 로직을 유저 공간 프로그램으로 구현합니다. 커널과 그 프로그램 사이의 요청 전달에 io_uring을 씁니다.</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section class="level2" id="api-history">
+<h2><span class="sec-n">21.6</span>I/O API의 변천<a aria-label="이 절의 링크" class="anchor" href="#api-history">#</a></h2>
+<p>여기서부터는 유저 공간과 커널의 경계입니다. 프로그램이 I/O를 요청하는 방법은 네 세대를 거쳤습니다.</p>
+<p><strong>동기 <code>read()</code>·<code>write()</code>.</strong> 데이터가 준비될 때까지 스레드가 잠듭니다. 동시에 여러 I/O를 하려면 스레드가 그만큼 필요합니다. 소켓은 <code>O_NONBLOCK</code>과 epoll로 풀 수 있지만 일반 파일에는 통하지 않습니다. 일반 파일은 <code>poll()</code>에 언제나 "읽을 수 있음"으로 보고되고 epoll은 등록 자체를 거부합니다. 페이지 캐시에 없으면 <code>read()</code>가 그대로 잠듭니다.</p>
+<p><strong>POSIX AIO.</strong> <code>aio_read()</code> 계열입니다. 리눅스에서는 glibc가 유저 공간에서 구현합니다. 내부에서 스레드를 만들어 동기 <code>read()</code>를 대신 부릅니다. 스레드 문제를 라이브러리 안으로 옮겼을 뿐입니다.</p>
+<p><strong>Linux AIO.</strong> <code>io_setup()</code>, <code>io_submit()</code>, <code>io_getevents()</code>. 커널이 구현한 비동기 인터페이스입니다. 한계가 뚜렷했습니다. <code>io_submit()</code>은 파일의 <code>read_iter</code>를 그 자리에서 부르므로, 버퍼를 거치는 읽기는 페이지를 기다리며 제출 시스템 콜 안에서 잠듭니다. 비동기로 동작하는 것은 사실상 <code>O_DIRECT</code>뿐이었습니다. 제출과 수확에도 시스템 콜이 한 번씩 듭니다.</p>
+<p><strong>io_uring.</strong> 5.1에서 들어왔습니다. 겨냥한 것은 셋입니다. 버퍼 I/O, 직접 I/O, 소켓을 가리지 않고 비동기일 것. 시스템 콜 횟수를 요청 수와 무관하게 만들 것. 요청마다 드는 복사와 조회를 줄일 것.</p>
+<figure class="fig" id="fig-api-evolution"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 346" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>I/O API 네 세대 비교: 동기 read는 스레드가 잠들고, POSIX AIO는 glibc 스레드가 대신 잠들고, Linux AIO는 제출과 수확에 시스템 콜이 한 번씩 들며 O_DIRECT만 비동기이고, io_uring은 공유 링으로 한 번 또는 0번에 끝난다</title>
+
+  <text class="t-xs" x="34" y="24">방식</text>
+  <text class="t-xs" x="212" y="24">요청 한 건이 지나는 길</text>
+  <text class="t-xs" x="540" y="24">N건을 동시에 하려면</text>
+
+  <!-- 1 -->
+  <rect class="box" x="20" y="34" width="720" height="66" rx="10"/>
+  <text class="t-b" x="34" y="62">동기 I/O</text>
+  <text class="t-code" x="34" y="82">read() · write()</text>
+  <rect class="box gray" x="212" y="48" width="80" height="38" rx="6"/>
+  <text class="t-code mid" x="252" y="72">read()</text>
+  <rect class="box red" x="292" y="48" width="140" height="38"/>
+  <rect x="292" y="48" width="140" height="38" fill="url(#hatch-red)"/>
+  <text class="t-xs t-ink t-b mid" x="362" y="72">스레드가 잠든다</text>
+  <rect class="box gray" x="432" y="48" width="70" height="38" rx="6"/>
+  <text class="t-xs t-ink mid" x="467" y="72">복귀</text>
+  <text class="t-s t-ink" x="540" y="62">시스템 콜 N번</text>
+  <text class="t-xs" x="540" y="82">스레드도 N개가 잠든다</text>
+
+  <!-- 2 -->
+  <rect class="box" x="20" y="110" width="720" height="66" rx="10"/>
+  <text class="t-b" x="34" y="138">POSIX AIO</text>
+  <text class="t-code" x="34" y="158">aio_read() · glibc</text>
+  <rect class="box gray" x="212" y="124" width="90" height="38" rx="6"/>
+  <text class="t-code mid" x="257" y="148">aio_read()</text>
+  <path class="ln thin" d="M302 143 H322" marker-end="url(#ah)"/>
+  <rect class="box red" x="326" y="124" width="176" height="38"/>
+  <rect x="326" y="124" width="176" height="38" fill="url(#hatch-red)"/>
+  <text class="t-xs t-ink t-b mid" x="414" y="148">glibc 스레드가 read()로 잠든다</text>
+  <text class="t-s t-ink" x="540" y="138">스레드가 대신 부른다</text>
+  <text class="t-xs" x="540" y="158">스레드 수의 한계는 그대로</text>
+
+  <!-- 3 -->
+  <rect class="box" x="20" y="186" width="720" height="66" rx="10"/>
+  <text class="t-b" x="34" y="214">Linux AIO</text>
+  <text class="t-code" x="34" y="234">io_submit()</text>
+  <rect class="box gray" x="212" y="200" width="100" height="38" rx="6"/>
+  <text class="t-code mid" x="262" y="224">io_submit()</text>
+  <path class="ln thin" d="M312 219 H368" marker-end="url(#ah)"/>
+  <rect class="box gray" x="372" y="200" width="130" height="38" rx="6"/>
+  <text class="t-code mid" x="437" y="224">io_getevents()</text>
+  <text class="t-s t-ink" x="540" y="214">제출 1번 + 수확 1번</text>
+  <text class="t-xs" x="540" y="234">O_DIRECT만 실제로 비동기</text>
+
+  <!-- 4 -->
+  <rect class="box green" x="20" y="262" width="720" height="66" rx="10"/>
+  <text class="t-b" x="34" y="290">io_uring</text>
+  <text class="t-code" x="34" y="310">io_uring_enter()</text>
+  <rect class="box" x="212" y="276" width="82" height="38" rx="6"/>
+  <text class="t-xs t-ink mid" x="253" y="300">SQ에 쓴다</text>
+  <rect class="box gray" x="302" y="276" width="130" height="38" rx="6"/>
+  <text class="t-code mid" x="367" y="300">io_uring_enter()</text>
+  <rect class="box" x="440" y="276" width="62" height="38" rx="6"/>
+  <text class="t-xs t-ink mid" x="471" y="300">CQ 읽기</text>
+  <text class="t-s t-ink" x="540" y="290">1번, SQPOLL이면 0번</text>
+  <text class="t-xs" x="540" y="310">버퍼 I/O · 직접 I/O · 소켓 모두</text>
+</svg></div><figcaption><b>그림 21-5</b>네 세대의 I/O API. 요청 N건을 처리하는 데 드는 시스템 콜 수와, 기다리는 동안 누가 막히는지가 다릅니다.</figcaption></figure>
+</section>
+<section class="level2" id="rings">
+<h2><span class="sec-n">21.7</span>io_uring의 두 링<a aria-label="이 절의 링크" class="anchor" href="#rings">#</a></h2>
+<p>io_uring 인스턴스는 fd 하나입니다. <code>io_uring_setup()</code>이 만들어 돌려주고, 프로그램은 그 fd를 <code>mmap()</code>해서 커널과 <strong>같은 메모리</strong>를 봅니다. 그 메모리에 링 버퍼가 둘 있습니다.</p>
+<ul>
+<li><strong>제출 큐</strong>(submission queue, SQ): 유저가 쓰고 커널이 읽습니다. 원소는 <code>struct io_uring_sqe</code>입니다.</li>
+<li><strong>완료 큐</strong>(completion queue, CQ): 커널이 쓰고 유저가 읽습니다. 원소는 <code>struct io_uring_cqe</code>입니다.</li>
+</ul>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/uapi/linux/io_uring.h#L32" rel="noopener" target="_blank">include/uapi/linux/io_uring.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/uapi/linux/io_uring.h" data-line="32" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="kw">struct</span> io_uring_sqe <span class="op">{</span></span>
+<span id="cb8-2">    __u8    opcode<span class="op">;</span>     <span class="co">/* type of operation for this sqe */</span></span>
+<span id="cb8-3">    __u8    flags<span class="op">;</span>      <span class="co">/* IOSQE_ flags */</span></span>
+<span id="cb8-4">    __u16   ioprio<span class="op">;</span>     <span class="co">/* ioprio for the request */</span></span>
+<span id="cb8-5">    __s32   fd<span class="op">;</span>     <span class="co">/* file descriptor to do IO on */</span></span>
+<span id="cb8-6">    <span class="kw">union</span> <span class="op">{</span></span>
+<span id="cb8-7">        __u64   off<span class="op">;</span>    <span class="co">/* offset into file */</span></span>
+<span id="cb8-8">        <span class="co">/* ... */</span></span>
+<span id="cb8-9">    <span class="op">};</span></span>
+<span id="cb8-10">    <span class="kw">union</span> <span class="op">{</span></span>
+<span id="cb8-11">        __u64   addr<span class="op">;</span>   <span class="co">/* pointer to buffer or iovecs */</span></span>
+<span id="cb8-12">        <span class="co">/* ... */</span></span>
+<span id="cb8-13">    <span class="op">};</span></span>
+<span id="cb8-14">    __u32   len<span class="op">;</span>        <span class="co">/* buffer size or number of iovecs */</span></span>
+<span id="cb8-15">    <span class="co">/* ... */</span></span>
+<span id="cb8-16">    __u64   user_data<span class="op">;</span>  <span class="co">/* data to be passed back at completion time */</span></span>
+<span id="cb8-17">    <span class="co">/* ... */</span></span>
+<span id="cb8-18"><span class="op">};</span></span></code></pre></div></div>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/uapi/linux/io_uring.h#L500" rel="noopener" target="_blank">include/uapi/linux/io_uring.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/uapi/linux/io_uring.h" data-line="500" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="kw">struct</span> io_uring_cqe <span class="op">{</span></span>
+<span id="cb9-2">    __u64   user_data<span class="op">;</span>  <span class="co">/* sqe-&gt;user_data value passed back */</span></span>
+<span id="cb9-3">    __s32   res<span class="op">;</span>        <span class="co">/* result code for this event */</span></span>
+<span id="cb9-4">    __u32   flags<span class="op">;</span></span>
+<span id="cb9-5">    <span class="co">/* ... */</span></span>
+<span id="cb9-6"><span class="op">};</span></span></code></pre></div></div>
+<p>SQE는 시스템 콜 한 번의 인자를 구조체로 옮긴 것입니다. <code>opcode</code>가 <code>IORING_OP_READ</code>이면 <code>fd</code>, <code>addr</code>, <code>len</code>, <code>off</code>는 <code>pread()</code>의 인자입니다. v7.3의 <code>enum io_uring_op</code>에는 연산이 65개 있습니다. 읽기·쓰기만이 아니라 <code>accept</code>, <code>connect</code>, <code>openat</code>, <code>statx</code>, <code>futex</code> 대기까지 들어 있습니다. CQE의 <code>res</code>는 그 시스템 콜의 반환값이고, 오류면 음수 <code>errno</code>입니다. 완료는 제출한 순서대로 오지 않으므로 <code>user_data</code>로 짝을 맞춥니다. 커널은 이 값을 들여다보지 않고 그대로 돌려줍니다.</p>
+<p>링의 상태는 인덱스 네 개가 전부입니다. 누가 어느 것을 쓰는지가 소스의 주석에 못 박혀 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/io_uring_types.h#L190" rel="noopener" target="_blank">include/linux/io_uring_types.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/io_uring_types.h" data-line="190" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="kw">struct</span> io_rings <span class="op">{</span></span>
+<span id="cb10-2">    <span class="co">/*</span></span>
+<span id="cb10-3"><span class="co">     * Head and tail offsets into the ring; the offsets need to be</span></span>
+<span id="cb10-4"><span class="co">     * masked to get valid indices.</span></span>
+<span id="cb10-5"><span class="co">     *</span></span>
+<span id="cb10-6"><span class="co">     * The kernel controls head of the sq ring and the tail of the cq ring,</span></span>
+<span id="cb10-7"><span class="co">     * and the application controls tail of the sq ring and the head of the</span></span>
+<span id="cb10-8"><span class="co">     * cq ring.</span></span>
+<span id="cb10-9"><span class="co">     */</span></span>
+<span id="cb10-10">    <span class="kw">struct</span> io_uring     sq<span class="op">,</span> cq<span class="op">;</span></span>
+<span id="cb10-11">    <span class="co">/* ... */</span></span>
+<span id="cb10-12">    <span class="kw">struct</span> io_uring_cqe cqes<span class="op">[]</span> ____cacheline_aligned_in_smp<span class="op">;</span></span>
+<span id="cb10-13"><span class="op">};</span></span></code></pre></div></div>
+<figure class="fig" id="fig-uring-rings"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 352" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>io_uring의 두 링과 네 인덱스: 제출 큐는 유저가 tail을, 커널이 head를 쓰고, 완료 큐는 커널이 tail을, 유저가 head를 쓴다</title>
+
+  <rect class="box blue" x="20" y="14" width="720" height="44" rx="10"/>
+  <text class="t-b" x="36" y="41">유저 프로그램</text>
+  <text class="t-s end" x="724" y="41">SQE를 채우고 SQ tail을 올린다 · CQE를 읽고 CQ head를 올린다</text>
+
+  <rect class="panel green" x="20" y="88" width="720" height="150" rx="14"/>
+  <text class="t-b" x="44" y="114">제출 큐 (SQ)</text>
+  <text class="t-xs" x="140" y="114">유저 → 커널</text>
+  <text class="t-b" x="470" y="114">완료 큐 (CQ)</text>
+  <text class="t-xs" x="568" y="114">커널 → 유저</text>
+  <rect class="ghost dash" x="44" y="128" width="44" height="40"/>
+  <rect class="box blue" x="92" y="128" width="44" height="40"/>
+  <text class="t-xs t-ink mid" x="114" y="153">SQE</text>
+  <rect class="box blue" x="140" y="128" width="44" height="40"/>
+  <text class="t-xs t-ink mid" x="162" y="153">SQE</text>
+  <rect class="box blue" x="188" y="128" width="44" height="40"/>
+  <text class="t-xs t-ink mid" x="210" y="153">SQE</text>
+  <rect class="ghost dash" x="236" y="128" width="44" height="40"/>
+  <rect class="ghost dash" x="284" y="128" width="44" height="40"/>
+  <rect class="box yellow" x="432" y="128" width="44" height="40"/>
+  <text class="t-xs t-ink mid" x="454" y="153">CQE</text>
+  <rect class="box yellow" x="480" y="128" width="44" height="40"/>
+  <text class="t-xs t-ink mid" x="502" y="153">CQE</text>
+  <rect class="ghost dash" x="528" y="128" width="44" height="40"/>
+  <rect class="ghost dash" x="576" y="128" width="44" height="40"/>
+  <rect class="ghost dash" x="624" y="128" width="44" height="40"/>
+  <rect class="ghost dash" x="672" y="128" width="44" height="40"/>
+
+  <!-- 유저가 쓰는 인덱스 -->
+  <path class="ln blue" d="M258 58 V124" marker-end="url(#ah-blue)"/>
+  <text class="t-code tc-blue" x="266" y="80">tail</text>
+  <path class="ln blue" d="M454 58 V124" marker-end="url(#ah-blue)"/>
+  <text class="t-code tc-blue" x="462" y="80">head</text>
+  <!-- 커널이 쓰는 인덱스 -->
+  <path class="ln yellow" d="M114 268 V172" marker-end="url(#ah-yellow)"/>
+  <text class="t-code" x="122" y="196">head</text>
+  <text class="t-xs" x="122" y="214">커널이 여기까지 가져갔다</text>
+  <path class="ln yellow" d="M550 268 V172" marker-end="url(#ah-yellow)"/>
+  <text class="t-code" x="558" y="196">tail</text>
+  <text class="t-xs" x="558" y="214">커널이 여기까지 썼다</text>
+
+  <rect class="box yellow" x="20" y="268" width="720" height="44" rx="10"/>
+  <text class="t-b" x="36" y="295">커널</text>
+  <text class="t-s end" x="724" y="295">SQE를 읽고 SQ head를 올린다 · CQE를 쓰고 CQ tail을 올린다</text>
+
+  <text class="t-s mid" x="380" y="338">넣는 쪽은 tail만, 꺼내는 쪽은 head만 쓴다. tail − head가 들어 있는 개수다</text>
+</svg></div><figcaption><b>그림 21-6</b>두 링과 네 인덱스. 넣는 쪽은 tail만, 꺼내는 쪽은 head만 씁니다. 같은 인덱스를 두 쪽이 함께 쓰는 일이 없습니다.</figcaption></figure>
+<p>유저는 SQE를 채운 뒤 SQ tail을 올립니다. 커널은 SQE를 읽고 나서 SQ head를 올립니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/io_uring/io_uring.c#L1959" rel="noopener" target="_blank">io_uring/io_uring.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="io_uring/io_uring.c" data-line="1959" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1"><span class="dt">static</span> <span class="dt">void</span> io_commit_sqring<span class="op">(</span><span class="kw">struct</span> io_ring_ctx <span class="op">*</span>ctx<span class="op">)</span></span>
+<span id="cb11-2"><span class="op">{</span></span>
+<span id="cb11-3">    <span class="kw">struct</span> io_rings <span class="op">*</span>rings <span class="op">=</span> ctx<span class="op">-&gt;</span>rings<span class="op">;</span></span>
+<span id="cb11-4"></span>
+<span id="cb11-5">    <span class="cf">if</span> <span class="op">(</span>ctx<span class="op">-&gt;</span>flags <span class="op">&amp;</span> IORING_SETUP_SQ_REWIND<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb11-6">        ctx<span class="op">-&gt;</span>cached_sq_head <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb11-7">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb11-8">        <span class="co">/*</span></span>
+<span id="cb11-9"><span class="co">         * Ensure any loads from the SQEs are done at this point,</span></span>
+<span id="cb11-10"><span class="co">         * since once we write the new head, the application could</span></span>
+<span id="cb11-11"><span class="co">         * write new data to them.</span></span>
+<span id="cb11-12"><span class="co">         */</span></span>
+<span id="cb11-13">        smp_store_release<span class="op">(&amp;</span>rings<span class="op">-&gt;</span>sq<span class="op">.</span>head<span class="op">,</span> ctx<span class="op">-&gt;</span>cached_sq_head<span class="op">);</span></span>
+<span id="cb11-14">    <span class="op">}</span></span>
+<span id="cb11-15"><span class="op">}</span></span></code></pre></div></div>
+<p><code>smp_store_release()</code>가 핵심입니다. head를 올리는 순간 그 칸은 유저의 것으로 돌아가므로, 칸의 내용을 읽는 일이 head 쓰기보다 <strong>먼저 끝났음</strong>을 메모리 순서로 보장해야 합니다. 유저 쪽도 대칭입니다. SQE를 다 쓴 뒤에 tail을 올려야 하고, 그 순서를 <code>smp_store_release</code>에 해당하는 원자 연산으로 지킵니다. 메모리 순서와 배리어는 <a href="ch13.html">13장</a>의 주제입니다.</p>
+<p>커널은 이 메모리를 믿지 않습니다. 유저가 언제든 고쳐 쓸 수 있기 때문입니다. <code>io_get_sqe()</code>의 주석은 SQE의 필드를 검증한 뒤 다시 읽으면 안 된다고 경고하고, 코드는 공유 메모리에서 읽는 값마다 <code>READ_ONCE()</code>를 씁니다. 커널 쪽의 진짜 head는 유저가 볼 수 없는 <code>ctx-&gt;cached_sq_head</code>에 따로 있습니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>이 링이 락 없이 성립하는 조건은 <strong>생산자 하나, 소비자 하나</strong>입니다. tail은 생산자만, head는 소비자만 쓰므로 한 변수에 쓰는 쪽이 둘이 될 일이 없습니다. 상대의 인덱스는 읽기만 하고, 조금 낡은 값을 읽어도 "실제보다 덜 찼다" 또는 "덜 비었다"고 보수적으로 판단할 뿐 틀린 동작을 하지 않습니다. 남는 문제는 "데이터를 쓴 뒤에 인덱스를 올린다"는 순서 하나이고, 그것은 배리어로 풉니다. 한쪽이 여럿이 되면 이 구조는 깨집니다. 여러 스레드가 한 링에 제출하려면 유저 공간에서 락을 잡아야 합니다. 스레드마다 링을 하나씩 두는 편이 보통입니다.</p>
+</div>
+</section>
+<section class="level2" id="execution">
+<h2><span class="sec-n">21.8</span>요청이 실행되는 세 길<a aria-label="이 절의 링크" class="anchor" href="#execution">#</a></h2>
+<p>SQ에 넣는 것만으로는 아무 일도 일어나지 않습니다. <code>io_uring_enter(fd, to_submit, min_complete, flags, …)</code>가 커널에 "SQ에 <code>to_submit</code>개 넣었으니 가져가고, 완료가 <code>min_complete</code>개 쌓일 때까지 기다리겠다"고 알립니다. 제출과 수확이 시스템 콜 한 번입니다. 커널은 SQE마다 요청 객체(<code>struct io_kiocb</code>)를 만들어 <code>io_queue_sqe()</code>로 보냅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/io_uring/io_uring.c#L1610" rel="noopener" target="_blank">io_uring/io_uring.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="io_uring/io_uring.c" data-line="1610" id="cb12"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb12-1"><span class="dt">static</span> <span class="dt">void</span> io_queue_async<span class="op">(</span><span class="kw">struct</span> io_kiocb <span class="op">*</span>req<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span> issue_flags<span class="op">,</span> <span class="dt">int</span> ret<span class="op">)</span></span>
+<span id="cb12-2">    __must_hold<span class="op">(&amp;</span>req<span class="op">-&gt;</span>ctx<span class="op">-&gt;</span>uring_lock<span class="op">)</span></span>
+<span id="cb12-3"><span class="op">{</span></span>
+<span id="cb12-4">    <span class="co">/* ... */</span></span>
+<span id="cb12-5">    <span class="cf">switch</span> <span class="op">(</span>io_arm_poll_handler<span class="op">(</span>req<span class="op">,</span> <span class="dv">0</span><span class="op">))</span> <span class="op">{</span></span>
+<span id="cb12-6">    <span class="cf">case</span> IO_APOLL_READY<span class="op">:</span></span>
+<span id="cb12-7">        io_req_task_queue<span class="op">(</span>req<span class="op">);</span></span>
+<span id="cb12-8">        <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb12-9">    <span class="cf">case</span> IO_APOLL_ABORTED<span class="op">:</span></span>
+<span id="cb12-10">        io_queue_iowq<span class="op">(</span>req<span class="op">);</span></span>
+<span id="cb12-11">        <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb12-12">    <span class="cf">case</span> IO_APOLL_OK<span class="op">:</span></span>
+<span id="cb12-13">        <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb12-14">    <span class="op">}</span></span>
+<span id="cb12-15"><span class="op">}</span></span>
+<span id="cb12-16"></span>
+<span id="cb12-17"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">void</span> io_queue_sqe<span class="op">(</span><span class="kw">struct</span> io_kiocb <span class="op">*</span>req<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span> extra_flags<span class="op">)</span></span>
+<span id="cb12-18">    __must_hold<span class="op">(&amp;</span>req<span class="op">-&gt;</span>ctx<span class="op">-&gt;</span>uring_lock<span class="op">)</span></span>
+<span id="cb12-19"><span class="op">{</span></span>
+<span id="cb12-20">    <span class="dt">unsigned</span> <span class="dt">int</span> issue_flags <span class="op">=</span> IO_URING_F_NONBLOCK <span class="op">|</span></span>
+<span id="cb12-21">                   IO_URING_F_COMPLETE_DEFER <span class="op">|</span> extra_flags<span class="op">;</span></span>
+<span id="cb12-22">    <span class="dt">int</span> ret<span class="op">;</span></span>
+<span id="cb12-23"></span>
+<span id="cb12-24">    ret <span class="op">=</span> io_issue_sqe<span class="op">(</span>req<span class="op">,</span> issue_flags<span class="op">);</span></span>
+<span id="cb12-25"></span>
+<span id="cb12-26">    <span class="co">/* ... */</span></span>
+<span id="cb12-27">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>ret<span class="op">))</span></span>
+<span id="cb12-28">        io_queue_async<span class="op">(</span>req<span class="op">,</span> issue_flags<span class="op">,</span> ret<span class="op">);</span></span>
+<span id="cb12-29"><span class="op">}</span></span></code></pre></div></div>
+<p>이 두 함수에 io_uring의 실행 모델이 다 들어 있습니다.</p>
+<p><strong>첫째, 그 자리에서 논블로킹으로 해 본다.</strong> <code>io_issue_sqe()</code>가 <code>IO_URING_F_NONBLOCK</code>을 붙여 연산을 실행합니다. 페이지 캐시에 있는 파일 읽기, 수신 버퍼에 데이터가 있는 <code>recv</code>는 여기서 끝나고 CQE가 바로 생깁니다. 스레드도 컨텍스트 스위치도 없습니다.</p>
+<p><strong>둘째, 준비되면 알려 달라고 걸어 둔다.</strong> 지금은 할 수 없어 <code>-EAGAIN</code>이 나오면 <code>io_arm_poll_handler()</code>가 그 파일의 대기 큐에 콜백을 겁니다. epoll이 쓰는 것과 같은 <code>-&gt;poll()</code> 장치입니다. 소켓에 데이터가 도착하면 콜백이 불리고, 요청을 다시 실행하도록 예약합니다. 유저는 이 재시도를 보지 못합니다. 소켓과 파이프가 이 길을 탑니다.</p>
+<p><strong>셋째, 워커 스레드에 넘긴다.</strong> 폴링할 수 없는 파일이면 <code>io_queue_iowq()</code>가 요청을 <strong>io-wq</strong>의 워커에 넘기고, 워커가 블로킹으로 실행합니다. 워커는 <code>create_io_thread()</code>로 만듭니다. 제출한 프로세스의 스레드처럼 주소 공간과 fd 테이블을 공유하지만 유저 모드로는 돌아가지 않는 태스크이고(<a href="ch02.html">2장</a>), <code>ps</code>에 <code>iou-wrk-&lt;pid&gt;</code>로 보입니다.</p>
+<figure class="fig" id="fig-uring-exec-paths"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 358" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>io_uring 요청이 완료에 이르는 세 길: 논블로킹 시도로 그 자리에서 끝나거나, 폴링을 걸어 두었다가 준비되면 재시도하거나, io-wq 워커 스레드가 블로킹으로 실행한다</title>
+
+  <rect class="box blue" x="20" y="30" width="150" height="56" rx="10"/>
+  <text class="t-b mid" x="95" y="54">SQE</text>
+  <text class="t-xs mid" x="95" y="74">제출한 태스크 · SQPOLL</text>
+  <path class="ln" d="M95 86 V126" marker-end="url(#ah)"/>
+
+  <rect class="solid" x="20" y="130" width="150" height="84" rx="10"/>
+  <text class="t-code t-on t-b mid" x="95" y="160">io_issue_sqe()</text>
+  <text class="t-xs t-on mid" x="95" y="182">논블로킹으로</text>
+  <text class="t-xs t-on mid" x="95" y="200">먼저 해 본다</text>
+
+  <!-- 1 -->
+  <path class="ln green" d="M170 150 H195 V58 H216" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="220" y="30" width="380" height="56" rx="10"/>
+  <text class="t-b" x="236" y="54">① 그 자리에서 끝난다</text>
+  <text class="t-xs" x="236" y="74">페이지 캐시에 있는 읽기 · 데이터가 와 있는 recv</text>
+
+  <!-- 2 -->
+  <path class="ln blue" d="M170 172 H216" marker-end="url(#ah-blue)"/>
+  <text class="t-xs mid" x="95" y="236">-EAGAIN이면 ② 또는 ③</text>
+  <rect class="panel blue" x="220" y="116" width="380" height="112" rx="12"/>
+  <text class="t-b tc-blue" x="236" y="140">② 준비되면 다시 한다</text>
+  <rect class="box" x="236" y="152" width="170" height="30" rx="6"/>
+  <text class="t-code mid" x="321" y="172">io_arm_poll_handler()</text>
+  <path class="ln blue" d="M406 167 H426" marker-end="url(#ah-blue)"/>
+  <rect class="box" x="430" y="152" width="154" height="30" rx="6"/>
+  <text class="t-xs t-ink mid" x="507" y="172">task_work에서 재시도</text>
+  <text class="t-xs" x="236" y="206">소켓 · 파이프: 파일의 대기 큐에 콜백을 걸어 둔다</text>
+
+  <!-- 3 -->
+  <path class="ln warm" d="M170 194 H195 V286 H216" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="220" y="258" width="380" height="56" rx="10"/>
+  <text class="t-b" x="236" y="282">③ 워커에 넘긴다</text>
+  <text class="t-xs" x="236" y="302">io_queue_iowq() → iou-wrk 스레드가 블로킹으로 실행</text>
+
+  <!-- CQ -->
+  <path class="ln green" d="M600 58 H625 V140 H646" marker-end="url(#ah-green)"/>
+  <path class="ln blue" d="M600 172 H646" marker-end="url(#ah-blue)"/>
+  <path class="ln warm" d="M600 286 H625 V204 H646" marker-end="url(#ah-warm)"/>
+  <rect class="box yellow" x="650" y="116" width="90" height="112" rx="10"/>
+  <text class="t-b mid" x="695" y="166">CQE</text>
+  <text class="t-xs mid" x="695" y="186">완료 큐에</text>
+
+  <text class="t-s mid" x="380" y="342">아래로 갈수록 비싸다. 흔한 경우는 ①과 ②에서 끝난다</text>
+</svg></div><figcaption><b>그림 21-7</b>요청 하나가 완료에 이르는 세 길. 대부분은 첫째나 둘째 길에서 끝나고, 워커 스레드는 달리 방법이 없을 때만 씁니다.</figcaption></figure>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"io_uring은 커널 안의 스레드 풀이다." 아닙니다. 스레드 풀(io-wq)은 세 길 가운데 마지막입니다. 페이지 캐시에 없는 버퍼 읽기도 <code>FOP_BUFFER_RASYNC</code>를 선언한 파일시스템(ext4, XFS 등)에서는 워커로 가지 않습니다. 폴리오의 락이 풀릴 때 불리는 콜백을 걸어 두었다가 재시도합니다.</p>
+</div>
+<p>완료를 CQ에 쓰는 일도 정해진 자리에서 합니다. 인터럽트 컨텍스트에서 요청이 끝나면 io_uring은 CQE를 곧장 쓰지 않고 <strong>task_work</strong>로 제출한 태스크에 넘깁니다. task_work는 태스크가 커널에서 유저 모드로 돌아가기 직전에 실행되는 콜백 목록입니다. <code>IORING_SETUP_DEFER_TASKRUN</code>을 켜면 한 걸음 더 미룹니다. 태스크가 <code>io_uring_enter()</code>로 완료를 기다리러 들어올 때에만 이 작업을 돌립니다. 완료 처리가 유저 코드 실행 중간에 끼어들지 않으므로 캐시가 덜 흐트러지고, 여러 완료가 한 번에 처리됩니다.</p>
+<p><strong>SQPOLL</strong>(<code>IORING_SETUP_SQPOLL</code>)은 <code>io_uring_enter()</code>마저 없앱니다. 커널 스레드 <code>iou-sqp-&lt;pid&gt;</code>가 SQ의 tail을 계속 들여다보다가 새 SQE가 보이면 가져갑니다. 유저는 메모리에 쓰기만 하면 됩니다. 스레드는 한동안 일이 없으면 SQ 플래그에 <code>IORING_SQ_NEED_WAKEUP</code>을 세우고 잠들고, 유저는 이 플래그를 보았을 때만 <code>io_uring_enter()</code>로 깨웁니다. CPU 하나를 폴링에 쓰는 대신 시스템 콜을 0에 가깝게 만드는 거래입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>liburing으로 파일 하나를 읽어 표준 출력에 씁니다. liburing은 링의 <code>mmap()</code>과 인덱스 조작을 감싼 라이브러리입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-file">uring-cat.c</span><span class="code-ver">C</span></div><div class="sourceCode" id="cb13" name="uring-cat.c"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1"><span class="pp">#include </span><span class="im">&lt;fcntl.h&gt;</span></span>
+<span id="cb13-2"><span class="pp">#include </span><span class="im">&lt;liburing.h&gt;</span></span>
+<span id="cb13-3"><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
+<span id="cb13-4"></span>
+<span id="cb13-5"><span class="dt">int</span> main<span class="op">(</span><span class="dt">int</span> argc<span class="op">,</span> <span class="dt">char</span> <span class="op">**</span>argv<span class="op">)</span></span>
+<span id="cb13-6"><span class="op">{</span></span>
+<span id="cb13-7">    <span class="kw">struct</span> io_uring ring<span class="op">;</span></span>
+<span id="cb13-8">    <span class="kw">struct</span> io_uring_sqe <span class="op">*</span>sqe<span class="op">;</span></span>
+<span id="cb13-9">    <span class="kw">struct</span> io_uring_cqe <span class="op">*</span>cqe<span class="op">;</span></span>
+<span id="cb13-10">    <span class="dt">char</span> buf<span class="op">[</span><span class="dv">4096</span><span class="op">];</span></span>
+<span id="cb13-11">    __u64 off <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb13-12">    <span class="dt">int</span> fd <span class="op">=</span> open<span class="op">(</span>argv<span class="op">[</span><span class="dv">1</span><span class="op">],</span> O_RDONLY<span class="op">);</span></span>
+<span id="cb13-13"></span>
+<span id="cb13-14">    <span class="cf">if</span> <span class="op">(</span>fd <span class="op">&lt;</span> <span class="dv">0</span> <span class="op">||</span> io_uring_queue_init<span class="op">(</span><span class="dv">8</span><span class="op">,</span> <span class="op">&amp;</span>ring<span class="op">,</span> <span class="dv">0</span><span class="op">)</span> <span class="op">&lt;</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb13-15">        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb13-16">    <span class="cf">for</span> <span class="op">(;;)</span> <span class="op">{</span></span>
+<span id="cb13-17">        sqe <span class="op">=</span> io_uring_get_sqe<span class="op">(&amp;</span>ring<span class="op">);</span>  <span class="co">/* SQ의 빈 칸 */</span></span>
+<span id="cb13-18">        io_uring_prep_read<span class="op">(</span>sqe<span class="op">,</span> fd<span class="op">,</span> buf<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>buf<span class="op">),</span> off<span class="op">);</span></span>
+<span id="cb13-19">        io_uring_submit<span class="op">(&amp;</span>ring<span class="op">);</span>     <span class="co">/* SQ tail을 올리고 io_uring_enter() */</span></span>
+<span id="cb13-20">        io_uring_wait_cqe<span class="op">(&amp;</span>ring<span class="op">,</span> <span class="op">&amp;</span>cqe<span class="op">);</span> <span class="co">/* CQ에 항목이 생길 때까지 */</span></span>
+<span id="cb13-21">        <span class="dt">int</span> n <span class="op">=</span> cqe<span class="op">-&gt;</span>res<span class="op">;</span>       <span class="co">/* read()의 반환값에 해당 */</span></span>
+<span id="cb13-22">        io_uring_cqe_seen<span class="op">(&amp;</span>ring<span class="op">,</span> cqe<span class="op">);</span>  <span class="co">/* CQ head를 올린다 */</span></span>
+<span id="cb13-23">        <span class="cf">if</span> <span class="op">(</span>n <span class="op">&lt;=</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb13-24">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb13-25">        write<span class="op">(</span>STDOUT_FILENO<span class="op">,</span> buf<span class="op">,</span> n<span class="op">);</span></span>
+<span id="cb13-26">        off <span class="op">+=</span> n<span class="op">;</span></span>
+<span id="cb13-27">    <span class="op">}</span></span>
+<span id="cb13-28">    io_uring_queue_exit<span class="op">(&amp;</span>ring<span class="op">);</span></span>
+<span id="cb13-29">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb13-30"><span class="op">}</span></span></code></pre></div></div>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ gcc -O2 uring-cat.c -o uring-cat -luring
+$ strace -e trace=io_uring_setup,io_uring_enter ./uring-cat /etc/hostname
+io_uring_setup(8, {...}) = 4
+io_uring_enter(4, 1, 0, 0, NULL, 8) = 1
+...</code></pre></div>
+<p><code>io_uring_enter()</code>의 둘째 인자가 제출한 개수입니다. 페이지 캐시에 있는 파일이면 제출하는 그 호출 안에서 첫째 길로 완료되므로, <code>io_uring_wait_cqe()</code>는 CQ에 이미 있는 항목을 보고 시스템 콜 없이 돌아옵니다. 실행 중인 프로세스의 링 상태는 <code>cat /proc/PID/fdinfo/4</code>로 봅니다. <code>SqHead</code>, <code>SqTail</code>, <code>CqHead</code>, <code>CqTail</code>이 앞의 네 인덱스입니다.</p>
+</div>
+</section>
+<section class="level2" id="savings">
+<h2><span class="sec-n">21.9</span>경계를 넘는 비용 줄이기<a aria-label="이 절의 링크" class="anchor" href="#savings">#</a></h2>
+<p>시스템 콜 횟수를 줄이고 나면 요청 하나하나에 드는 일이 눈에 들어옵니다. io_uring은 그것도 미리 해 둘 수 있게 합니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>장치</th>
+<th>없앤 비용</th>
+<th>방법</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>고정 파일</td>
+<td>요청마다 fd를 조회하고 참조를 올리고 내리는 일</td>
+<td><code>io_uring_register()</code>로 fd 묶음을 등록해 두고 SQE에 <code>IOSQE_FIXED_FILE</code>과 인덱스를 씁니다.</td>
+</tr>
+<tr>
+<td>고정 버퍼</td>
+<td>요청마다 유저 페이지를 고정하고 푸는 일</td>
+<td>버퍼를 등록하면 한 번만 고정합니다. <code>IORING_OP_READ_FIXED</code>가 씁니다.</td>
+</tr>
+<tr>
+<td>제공 버퍼 링</td>
+<td>수신할지 모르는 연결마다 버퍼를 잡아 두는 일</td>
+<td>버퍼 묶음을 링으로 넘겨 두면 커널이 데이터가 올 때 하나를 고릅니다. 고른 버퍼의 ID가 CQE의 <code>flags</code>에 실립니다.</td>
+</tr>
+<tr>
+<td>멀티샷</td>
+<td>완료될 때마다 같은 SQE를 다시 넣는 일</td>
+<td><code>accept</code>나 <code>recv</code>를 한 번 제출하면 사건마다 CQE가 나옵니다. <code>IORING_CQE_F_MORE</code>가 "더 온다"는 표시입니다.</td>
+</tr>
+<tr>
+<td>연결된 SQE</td>
+<td>앞 요청의 완료를 받아 다음 요청을 제출하는 왕복</td>
+<td><code>IOSQE_IO_LINK</code>로 이으면 앞이 성공해야 뒤가 실행됩니다.</td>
+</tr>
+<tr>
+<td>zero-copy</td>
+<td>유저 버퍼와 소켓 버퍼 사이의 복사</td>
+<td><code>IORING_OP_SEND_ZC</code>, <code>IORING_OP_RECV_ZC</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>고정 파일은 <a href="ch20.html">20장</a>에서 본 <code>fdget()</code>이 I/O마다 하는 일을 등록 한 번으로 바꾼 것입니다. 그 비용이 문제가 될 만큼 나머지가 가벼워졌다는 뜻이기도 합니다.</p>
+<div class="callout note"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-book"></use></svg>참고 · v7.3의 io_uring/ 디렉터리</div>
+<p><code>io_uring/</code>에는 C 파일이 43개 있습니다. 읽기·쓰기에서 출발한 인터페이스가 범용 비동기 시스템 콜 통로로 자랐습니다. <code>IORING_OP_URING_CMD</code>는 드라이버가 정의한 명령을 그대로 실어 나릅니다. NVMe 패스스루와 ublk가 씁니다. <code>IORING_OP_EPOLL_WAIT</code>는 epoll의 대기를 링 안으로 가져옵니다. <code>IORING_REGISTER_RESIZE_RINGS</code>는 쓰는 중인 링의 크기를 바꾸고, <code>IORING_REGISTER_QUERY</code>는 커널이 지원하는 연산과 플래그를 물어봅니다. <code>io_uring/bpf-ops.c</code>는 완료를 기다리는 루프의 한 걸음을 BPF 프로그램으로 바꿔 끼우는 struct_ops를 정의합니다(<a href="ch24.html">24장</a>).</p>
+</div>
+<p>같은 네트워크 서버를 epoll로 쓸 때와 견주면 모델의 차이가 드러납니다. epoll은 <strong>준비 통지</strong>입니다. "이 소켓을 이제 읽을 수 있다"고 알려 주고, 읽는 일은 프로그램이 <code>read()</code>를 불러서 합니다. io_uring은 <strong>완료 통지</strong>입니다. "읽어 달라"고 맡기고 "읽었다"는 결과를 받습니다.</p>
+<figure class="fig" id="fig-epoll-vs-uring"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>소켓 세 개에 데이터가 도착했을 때 epoll은 epoll_wait 한 번과 read 세 번으로 유저·커널 경계를 네 번 넘고, io_uring은 io_uring_enter 한 번으로 완료된 결과를 받아 공유 메모리의 완료 큐에서 읽는다</title>
+
+  <!-- epoll -->
+  <rect class="panel" x="20" y="14" width="720" height="150" rx="14"/>
+  <text class="t-b" x="36" y="38">epoll · 준비 통지</text>
+  <text class="t-s end" x="724" y="38">시스템 콜 N + 1번</text>
+  <path class="ln thin muted dash" d="M36 100 H724"/>
+
+  <rect class="box blue" x="36" y="52" width="110" height="34" rx="6"/>
+  <text class="t-code mid" x="91" y="74">epoll_wait()</text>
+  <path class="ln blue" d="M152 69 V130" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="158" y="114" width="140" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="228" y="136">a, b, c 읽을 수 있음</text>
+  <path class="ln yellow" d="M304 131 V70" marker-end="url(#ah-yellow)"/>
+
+  <rect class="box blue" x="310" y="52" width="74" height="34" rx="6"/>
+  <text class="t-code mid" x="347" y="74">read(a)</text>
+  <path class="ln blue" d="M390 69 V130" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="396" y="114" width="40" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="416" y="136">복사</text>
+  <path class="ln yellow" d="M442 131 V70" marker-end="url(#ah-yellow)"/>
+
+  <rect class="box blue" x="448" y="52" width="74" height="34" rx="6"/>
+  <text class="t-code mid" x="485" y="74">read(b)</text>
+  <path class="ln blue" d="M528 69 V130" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="534" y="114" width="40" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="554" y="136">복사</text>
+  <path class="ln yellow" d="M580 131 V70" marker-end="url(#ah-yellow)"/>
+
+  <rect class="box blue" x="586" y="52" width="74" height="34" rx="6"/>
+  <text class="t-code mid" x="623" y="74">read(c)</text>
+  <path class="ln blue" d="M666 69 V130" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="672" y="114" width="40" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="692" y="136">복사</text>
+
+  <!-- io_uring -->
+  <rect class="panel green" x="20" y="180" width="720" height="150" rx="14"/>
+  <text class="t-b" x="36" y="204">io_uring · 완료 통지 (멀티샷 recv를 걸어 둔 상태)</text>
+  <text class="t-s end" x="724" y="204">1번, 또는 0번</text>
+  <path class="ln thin muted dash" d="M36 266 H724"/>
+
+  <rect class="box blue" x="36" y="218" width="140" height="34" rx="6"/>
+  <text class="t-code mid" x="106" y="240">io_uring_enter()</text>
+  <path class="ln blue" d="M182 235 V296" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="188" y="280" width="282" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="329" y="302">a, b, c에 대해 recv를 실행하고 CQE 3개를 쓴다</text>
+  <path class="ln yellow" d="M476 297 V236" marker-end="url(#ah-yellow)"/>
+  <rect class="box blue" x="482" y="218" width="242" height="34" rx="6"/>
+  <text class="t-xs t-ink mid" x="603" y="240">CQ에서 결과 3개를 읽는다 · 공유 메모리</text>
+
+  <!-- 범례 -->
+  <rect class="box blue" x="150" y="350" width="26" height="14" rx="3"/>
+  <text class="t-xs" x="184" y="362">유저 모드</text>
+  <rect class="box yellow" x="260" y="350" width="26" height="14" rx="3"/>
+  <text class="t-xs" x="294" y="362">커널 모드</text>
+  <path class="ln thin muted dash" d="M370 357 H396"/>
+  <text class="t-xs" x="404" y="362">유저·커널 경계. 화살표 하나가 모드 전환 한 번</text>
+  <text class="t-xs mid" x="380" y="382">데이터가 이미 와 있으면 io_uring은 경계를 넘지 않고 CQ만 읽는다</text>
+</svg></div><figcaption><b>그림 21-8</b>소켓 N개에 데이터가 도착했을 때. epoll은 준비된 소켓마다 <code>read()</code>를 한 번씩 더 불러야 하고, io_uring은 완료된 결과를 CQ에서 꺼내기만 합니다.</figcaption></figure>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>io_uring에 반복해서 나오는 발상은 둘입니다. 하나는 <strong>경계를 넘는 비용이 병목이면 경계를 넘는 횟수를 줄인다</strong>는 것입니다. 경계 자체를 싸게 만드는 데에는 한계가 있으므로, 한 번 넘을 때 여러 건을 싣고(배치), 미리 해 둘 수 있는 일은 등록으로 빼고, 끝내 경계를 공유 메모리로 바꿉니다. 다른 하나는 <strong>빠른 길을 먼저 시도하고 안 될 때만 비싼 길로 간다</strong>는 것입니다. 모든 요청을 워커에 넘기면 구현은 단순하지만 요청마다 컨텍스트 스위치를 치릅니다. 논블로킹 시도, 폴링, 워커의 세 단으로 나누면 흔한 경우의 비용이 0에 가까워집니다. <a href="ch20.html">20장</a>의 RCU-walk와 같은 구조입니다.</p>
+</div>
+</section>
+<section class="level2" id="security">
+<h2><span class="sec-n">21.10</span>공격 표면과 제한<a aria-label="이 절의 링크" class="anchor" href="#security">#</a></h2>
+<p>io_uring은 시스템 콜 65종에 해당하는 일을 시스템 콜 세 개 뒤에서 합니다. 이것이 보안에는 부담입니다. 새 코드가 많고 빠르게 바뀝니다. sysctl 문서도 io_uring을 끄면 "커널의 공격 표면이 줄어든다"고 적습니다. 그리고 seccomp가 들여다볼 수 없습니다. seccomp 필터는 시스템 콜 번호와 인자를 보는데(<a href="ch19.html">19장</a>), io_uring의 연산은 공유 메모리의 SQE에 적혀 있어 필터를 지나가지 않습니다. <code>openat()</code>을 막아 둔 샌드박스 안에서 <code>IORING_OP_OPENAT</code>이 통할 수 있습니다. 그래서 샌드박스는 io_uring 시스템 콜 자체를 막아 두는 일이 많습니다.</p>
+<p>커널이 주는 제한 장치는 세 단계입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/io_uring/io_uring.c#L3119" rel="noopener" target="_blank">io_uring/io_uring.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="io_uring/io_uring.c" data-line="3119" id="cb15"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb15-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">int</span> io_uring_allowed<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb15-2"><span class="op">{</span></span>
+<span id="cb15-3">    <span class="dt">int</span> disabled <span class="op">=</span> READ_ONCE<span class="op">(</span>sysctl_io_uring_disabled<span class="op">);</span></span>
+<span id="cb15-4">    kgid_t io_uring_group<span class="op">;</span></span>
+<span id="cb15-5"></span>
+<span id="cb15-6">    <span class="cf">if</span> <span class="op">(</span>disabled <span class="op">==</span> <span class="dv">2</span><span class="op">)</span></span>
+<span id="cb15-7">        <span class="cf">return</span> <span class="op">-</span>EPERM<span class="op">;</span></span>
+<span id="cb15-8"></span>
+<span id="cb15-9">    <span class="cf">if</span> <span class="op">(</span>disabled <span class="op">==</span> <span class="dv">0</span> <span class="op">||</span> capable<span class="op">(</span>CAP_SYS_ADMIN<span class="op">))</span></span>
+<span id="cb15-10">        <span class="cf">goto</span> allowed_lsm<span class="op">;</span></span>
+<span id="cb15-11"></span>
+<span id="cb15-12">    io_uring_group <span class="op">=</span> make_kgid<span class="op">(&amp;</span>init_user_ns<span class="op">,</span> sysctl_io_uring_group<span class="op">);</span></span>
+<span id="cb15-13">    <span class="cf">if</span> <span class="op">(!</span>gid_valid<span class="op">(</span>io_uring_group<span class="op">))</span></span>
+<span id="cb15-14">        <span class="cf">return</span> <span class="op">-</span>EPERM<span class="op">;</span></span>
+<span id="cb15-15"></span>
+<span id="cb15-16">    <span class="cf">if</span> <span class="op">(!</span>in_group_p<span class="op">(</span>io_uring_group<span class="op">))</span></span>
+<span id="cb15-17">        <span class="cf">return</span> <span class="op">-</span>EPERM<span class="op">;</span></span>
+<span id="cb15-18"></span>
+<span id="cb15-19">allowed_lsm<span class="op">:</span></span>
+<span id="cb15-20">    <span class="cf">return</span> security_uring_allowed<span class="op">();</span></span>
+<span id="cb15-21"><span class="op">}</span></span></code></pre></div></div>
+<ul>
+<li><strong>시스템 전체</strong>: sysctl <code>kernel.io_uring_disabled</code>. 0이면 누구나, 1이면 <code>CAP_SYS_ADMIN</code>이나 <code>kernel.io_uring_group</code>에 속한 프로세스만, 2면 아무도 새 링을 만들 수 없습니다. 마지막 줄의 LSM 훅으로 SELinux 같은 보안 모듈도 거부할 수 있습니다.</li>
+<li><strong>링 하나</strong>: <code>IORING_REGISTER_RESTRICTIONS</code>. 링을 만든 쪽이 허용할 연산과 플래그를 비트맵으로 정해 두고 나서 덜 신뢰하는 코드에 넘깁니다.</li>
+<li><strong>연산의 인자까지</strong>: <code>IORING_REGISTER_BPF_FILTER</code>. 연산 종류마다 BPF 필터를 붙여 요청 내용을 보고 거부합니다(<code>io_uring/bpf_filter.c</code>). seccomp가 하지 못하던 일을 io_uring 안에서 합니다.</li>
+</ul>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>3.13 · 2014</dt>
+<dd>
+blk-mq. CPU별 소프트웨어 큐와 다중 하드웨어 큐.
+</dd>
+<dt>5.0 · 2019</dt>
+<dd>
+단일 큐 블록 경로와 그 I/O 스케줄러들이 삭제됩니다. blk-mq만 남습니다.
+</dd>
+<dt>5.1 · 2019</dt>
+<dd>
+io_uring.
+</dd>
+<dt>6.0 · 2022</dt>
+<dd>
+ublk, io_uring의 zero-copy 송신.
+</dd>
+<dt>6.6 · 2023</dt>
+<dd>
+sysctl <code>kernel.io_uring_disabled</code>.
+</dd>
+<dt>6.11 · 2024</dt>
+<dd>
+블록 계층의 원자적 쓰기.
+</dd>
+<dt>6.15 · 2025</dt>
+<dd>
+io_uring의 zero-copy 수신.
+</dd>
+<dt>7.0 · 2026</dt>
+<dd>
+io_uring 연산에 대한 BPF 필터.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li><code>bio</code>는 장치의 연속된 섹터 구간과 메모리 조각 목록을 잇는 요청 단위입니다. 제출은 기다리지 않고 돌아오고, 완료는 <code>bi_end_io</code> 콜백으로 옵니다.</li>
+<li>blk-mq는 CPU별 소프트웨어 큐와 장치의 큐에 대응하는 하드웨어 큐로 이루어집니다. 스케줄러가 없고 장치가 한가하면 request는 큐를 거치지 않고 <code>queue_rq()</code>로 바로 갑니다.</li>
+<li>태그는 장치에 동시에 걸린 요청 수를 제한하고, 완료 때 request를 찾는 인덱스가 됩니다.</li>
+<li>완료는 되도록 요청을 낸 CPU에서 처리합니다. 다른 CPU로 인터럽트가 왔으면 IPI와 <code>BLOCK_SOFTIRQ</code>로 돌려보냅니다.</li>
+<li>io_uring은 유저와 커널이 공유하는 링 둘입니다. 넣는 쪽은 tail만, 꺼내는 쪽은 head만 쓰므로 락이 없습니다.</li>
+<li>요청은 먼저 논블로킹으로 시도하고, 안 되면 폴링을 걸고, 그것도 안 되면 io-wq 워커로 갑니다. 완료는 task_work로 제출한 태스크에서 CQ에 씁니다.</li>
+<li>고정 파일·버퍼, 제공 버퍼 링, 멀티샷, SQPOLL은 모두 요청 하나에 드는 반복 비용을 등록이나 공유 메모리로 옮기는 장치입니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p>CPU 16개인 서버에 NVMe SSD가 있고 I/O 스케줄러는 <code>none</code>입니다. CPU 5에서 도는 태스크가 <code>O_DIRECT</code>로 4KB 읽기를 한 건 냈습니다. 제출부터 완료까지 이 요청이 다른 CPU와 공유하는 락이나 큐를 거치는 곳이 있습니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>보통은 없습니다. <code>blk_mq_submit_bio()</code>는 request를 만들고 CPU 5에 묶인 하드웨어 큐의 태그를 받습니다. 스케줄러가 없으므로 <code>blk_mq_try_issue_directly()</code>가 <code>nvme_queue_rq()</code>를 바로 부르고, 거기서 잡는 <code>sq_lock</code>은 그 큐만의 락입니다. 큐가 CPU마다 있으면 다른 CPU는 이 락을 잡지 않습니다. 완료 인터럽트는 그 큐의 MSI-X 벡터가 묶인 CPU 5로 오고, <code>blk_mq_complete_request_remote()</code>가 같은 CPU임을 보고 그 자리에서 완료 처리를 합니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>io_uring의 SQ에서 유저는 tail을, 커널은 head를 씁니다. 유저 프로그램이 버그로 SQE를 다 채우기 전에 tail을 먼저 올렸다면 어떤 일이 생길 수 있습니까? 커널은 이런 유저로부터 자신을 어떻게 지킵니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>커널이 덜 채워진 SQE를 읽어 엉뚱한 연산을 실행할 수 있습니다. 그 결과는 유저 자신의 요청이 잘못되는 것까지입니다. 커널은 공유 메모리를 믿지 않습니다. SQE의 필드를 <code>READ_ONCE()</code>로 한 번만 읽어 요청 객체에 복사한 뒤 그 복사본을 검증하고 사용하므로, 검증한 뒤에 유저가 값을 바꿔도 영향이 없습니다. 인덱스는 마스크를 씌워 링 범위를 벗어나지 못하게 하고, 커널의 진짜 head는 유저가 건드릴 수 없는 <code>cached_sq_head</code>에 둡니다. fd와 권한 검사도 시스템 콜과 같은 경로를 거칩니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>io_uring으로 TCP 소켓에 <code>IORING_OP_RECV</code>를 제출했는데 아직 도착한 데이터가 없습니다. 이 요청은 어떻게 됩니까? 워커 스레드가 생깁니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>생기지 않습니다. <code>io_queue_sqe()</code>가 논블로킹으로 시도해 <code>-EAGAIN</code>을 받고, <code>io_queue_async()</code>가 <code>io_arm_poll_handler()</code>를 부릅니다. <code>RECV</code>는 연산 정의에 <code>pollin</code>이 서 있고 소켓은 <code>-&gt;poll()</code>을 지원하므로 소켓의 대기 큐에 콜백이 걸리고 <code>IO_APOLL_OK</code>로 끝납니다. 데이터가 도착하면 콜백이 task_work를 예약하고, 제출한 태스크의 컨텍스트에서 <code>recv</code>를 다시 실행해 CQE를 씁니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>seccomp로 <code>openat</code>을 막은 샌드박스가 있습니다. 이 샌드박스가 io_uring 시스템 콜 셋을 허용하면 무엇이 문제입니까? v7.3에서 io_uring을 허용하면서 이 구멍을 막는 방법은 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>io_uring의 연산은 시스템 콜 인자가 아니라 공유 메모리의 SQE에 적혀 있어 seccomp 필터가 보지 못합니다. <code>IORING_OP_OPENAT</code>으로 파일을 열 수 있습니다. 막는 방법은 io_uring 쪽의 제한을 쓰는 것입니다. 링을 만들어 <code>IORING_REGISTER_RESTRICTIONS</code>로 허용할 연산을 비트맵으로 정하거나, <code>IORING_REGISTER_BPF_FILTER</code>로 연산별 BPF 필터를 붙여 인자까지 검사합니다. 필요가 없다면 <code>kernel.io_uring_disabled</code>나 seccomp로 <code>io_uring_setup</code> 자체를 막는 편이 단순합니다.</p>
+</div></details></div></div>
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>bio</dt>
+<dd>
+장치의 연속된 섹터 구간에 대한 I/O 한 건. 메모리 조각의 목록과 완료 콜백을 가진다.
+</dd>
+<dt>request</dt>
+<dd>
+드라이버에 건네는 I/O 단위. 섹터가 이어지는 bio 여러 개를 묶을 수 있다.
+</dd>
+<dt>blk-mq</dt>
+<dd>
+CPU별 소프트웨어 큐와 다중 하드웨어 큐로 이루어진 블록 계층의 요청 처리 구조.
+</dd>
+<dt>태그<small>tag</small></dt>
+<dd>
+하드웨어 큐 안에서 진행 중인 request를 식별하는 번호. 큐 깊이만큼만 있다.
+</dd>
+<dt>플러그<small>plug</small></dt>
+<dd>
+태스크가 연달아 내는 request를 잠시 모았다가 한꺼번에 내려보내는 장치.
+</dd>
+<dt>I/O 스케줄러<small>I/O scheduler</small></dt>
+<dd>
+request의 순서를 바꾸거나 붙들어 두는 층. <code>none</code>, <code>mq-deadline</code>, <code>kyber</code>, <code>bfq</code>.
+</dd>
+<dt>제출 큐<small>submission queue, SQ</small></dt>
+<dd>
+io_uring에서 유저가 요청(SQE)을 넣고 커널이 꺼내는 링.
+</dd>
+<dt>완료 큐<small>completion queue, CQ</small></dt>
+<dd>
+io_uring에서 커널이 결과(CQE)를 넣고 유저가 꺼내는 링.
+</dd>
+<dt>io-wq</dt>
+<dd>
+논블로킹으로도 폴링으로도 처리할 수 없는 io_uring 요청을 블로킹으로 실행하는 워커 스레드 풀.
+</dd>
+<dt>SQPOLL</dt>
+<dd>
+커널 스레드가 제출 큐를 폴링해 <code>io_uring_enter()</code> 없이 요청을 가져가는 모드.
+</dd>
+<dt>task_work</dt>
+<dd>
+태스크가 유저 모드로 돌아가기 직전에 그 태스크의 컨텍스트에서 실행되는 콜백 목록.
+</dd>
+<dt>폴링 I/O<small>polled I/O</small></dt>
+<dd>
+완료 인터럽트를 쓰지 않고 제출한 쪽이 장치의 완료 큐를 직접 확인하는 방식.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/block/blk-mq.html" rel="noopener" target="_blank"><code>Documentation/block/blk-mq.rst</code></a>: blk-mq의 배경과 두 단 큐의 동작.</li>
+<li><a href="https://docs.kernel.org/block/biovecs.html" rel="noopener" target="_blank"><code>Documentation/block/biovecs.rst</code></a>: <code>bio_vec</code>과 <code>bvec_iter</code>를 다루는 규칙.</li>
+<li><a href="https://docs.kernel.org/block/ublk.html" rel="noopener" target="_blank"><code>Documentation/block/ublk.rst</code></a>: 유저 공간 블록 드라이버와 io_uring 명령 전달.</li>
+<li><a href="https://docs.kernel.org/networking/iou-zcrx.html" rel="noopener" target="_blank"><code>Documentation/networking/iou-zcrx.rst</code></a>: io_uring zero-copy 수신의 구성.</li>
+<li><a href="https://docs.kernel.org/admin-guide/sysctl/kernel.html" rel="noopener" target="_blank"><code>Documentation/admin-guide/sysctl/kernel.rst</code></a>: <code>io_uring_disabled</code>, <code>io_uring_group</code>.</li>
+<li>LWN, <a href="https://lwn.net/Articles/776703/" rel="noopener" target="_blank">Ringing in a new asynchronous I/O API</a>: io_uring이 처음 제안되었을 때의 설계와 Linux AIO의 문제.</li>
+<li><a href="https://man7.org/linux/man-pages/man7/aio.7.html" rel="noopener" target="_blank"><code>aio(7)</code></a>: POSIX AIO와 glibc 구현의 한계.</li>
+<li><a href="https://man7.org/linux/man-pages/man3/io_uring_prep_read.3.html" rel="noopener" target="_blank"><code>io_uring_prep_read(3)</code></a>: liburing의 요청 준비 함수와 결과 읽는 법.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch20.html"><small>← 20장</small><b>VFS와 파일시스템</b></a><a class="next" href="ch22.html"><small>22장 →</small><b>네임스페이스와 cgroup</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#bio">블록 계층의 자리와 bio</a><a href="#blk-mq">blk-mq: 소프트웨어 큐와 하드웨어 큐</a><a href="#iosched">I/O 스케줄러</a><a href="#completion">완료: 인터럽트에서 bio_endio()까지</a><a href="#stacking">쌓기와 요즘 장치</a><a href="#api-history">I/O API의 변천</a><a href="#rings">io_uring의 두 링</a><a href="#execution">요청이 실행되는 세 길</a><a href="#savings">경계를 넘는 비용 줄이기</a><a href="#security">공격 표면과 제한</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

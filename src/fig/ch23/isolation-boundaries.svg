@@ -1,0 +1,53 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>컨테이너, 가상 머신, 마이크로VM의 격리 경계 비교: 컨테이너는 앱 바로 아래 호스트 커널의 시스템 콜 인터페이스가 경계이고, 가상 머신은 게스트 커널 아래의 VM exit과 장치 모델이 경계이다.</title>
+
+  <!-- 컨테이너 -->
+  <text class="t-l mid" x="135" y="32">컨테이너</text>
+  <rect class="box blue" x="20" y="46" width="230" height="40" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="135" y="71">앱</text>
+  <path class="ln red thick" d="M20 99 H250"/>
+  <text class="t-xs tc-red t-b" x="20" y="116">경계: 시스템 콜 인터페이스</text>
+  <rect class="box yellow" x="20" y="126" width="230" height="170" rx="10"/>
+  <text class="t-s t-ink t-b" x="32" y="150">호스트 커널 · 모두가 공유</text>
+  <text class="t-xs" x="32" y="176">네임스페이스: 보이는 것을 나눈다</text>
+  <text class="t-xs" x="32" y="196">cgroup: 쓸 수 있는 양을 나눈다</text>
+  <text class="t-xs" x="32" y="216">seccomp: 시스템 콜을 걸러 낸다</text>
+  <text class="t-xs" x="32" y="262">커널 버그 하나가</text>
+  <text class="t-xs" x="32" y="280">곧 경계의 구멍이다</text>
+
+  <!-- 가상 머신 -->
+  <text class="t-l mid" x="380" y="32">가상 머신</text>
+  <rect class="box blue" x="265" y="46" width="230" height="40" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="380" y="71">앱</text>
+  <rect class="box blue" x="265" y="94" width="230" height="40" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="380" y="119">게스트 커널</text>
+  <path class="ln red thick" d="M265 147 H495"/>
+  <text class="t-xs tc-red t-b" x="265" y="164">경계: VM exit과 장치 모델</text>
+  <rect class="box green" x="265" y="174" width="230" height="56" rx="10"/>
+  <text class="t-s t-ink t-b" x="277" y="196">VMM</text>
+  <text class="t-xs" x="277" y="216">옛 PC의 장치까지 폭넓게 흉내</text>
+  <rect class="box yellow" x="265" y="240" width="230" height="56" rx="10"/>
+  <text class="t-s t-ink t-b" x="277" y="262">호스트 커널 + KVM</text>
+  <text class="t-xs" x="277" y="282">게스트는 exit으로만 닿는다</text>
+
+  <!-- 마이크로VM -->
+  <text class="t-l mid" x="625" y="32">마이크로VM</text>
+  <rect class="box blue" x="510" y="46" width="230" height="40" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="625" y="71">앱</text>
+  <rect class="box blue" x="510" y="94" width="230" height="40" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="625" y="119">게스트 커널</text>
+  <path class="ln red thick" d="M510 147 H740"/>
+  <text class="t-xs tc-red t-b" x="510" y="164">경계: VM exit과 virtio 장치 몇 개</text>
+  <rect class="box green" x="510" y="174" width="230" height="56" rx="10"/>
+  <text class="t-s t-ink t-b" x="522" y="196">작은 VMM</text>
+  <text class="t-xs" x="522" y="216">virtio 네트워크·블록 정도만</text>
+  <rect class="box yellow" x="510" y="240" width="230" height="56" rx="10"/>
+  <text class="t-s t-ink t-b" x="522" y="262">호스트 커널 + KVM</text>
+  <text class="t-xs" x="522" y="282">가상 머신과 같은 KVM</text>
+
+  <!-- 하드웨어 -->
+  <rect class="box gray" x="20" y="308" width="720" height="34" rx="10"/>
+  <text class="t-s t-ink mid" x="380" y="330">하드웨어</text>
+
+  <text class="t-s mid" x="380" y="370">빨간 선 아래가 공격받는 표면이다. 그 아래에서 입력을 받는 코드가 적을수록 좁다</text>
+</svg>

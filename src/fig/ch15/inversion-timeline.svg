@@ -1,0 +1,57 @@
+<svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg">
+  <title>우선순위 역전의 시간선: 상속이 없으면 H는 M이 끝날 때까지 기다리고, 상속이 있으면 L이 H의 우선순위로 임계 구역을 마친 뒤 곧바로 H가 실행된다</title>
+
+  <!-- 위: 상속 없음 -->
+  <text class="t-b" x="20" y="26">우선순위 상속이 없을 때</text>
+  <text class="t-xs tc-red" x="306" y="42">↓ H가 락을 요청</text>
+
+  <text class="t-s t-ink t-b" x="20" y="70">H · 높음</text>
+  <rect class="box purple" x="240" y="50" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="270" y="70">H</text>
+  <rect class="box red" x="300" y="50" width="380" height="30" rx="6"/>
+  <rect x="300" y="50" width="380" height="30" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box purple" x="680" y="50" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="710" y="70">H</text>
+
+  <text class="t-s t-ink t-b" x="20" y="110">M · 중간</text>
+  <rect class="box warm" x="340" y="90" width="280" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="480" y="110">M 실행 (락과 아무 상관이 없다)</text>
+
+  <text class="t-s t-ink t-b" x="20" y="150">L · 낮음</text>
+  <rect class="box blue" x="160" y="130" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="200" y="150">L</text>
+  <rect class="box blue" x="300" y="130" width="40" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="320" y="150">L</text>
+  <rect class="box blue" x="620" y="130" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="650" y="150">L</text>
+  <rect class="solid blue" x="200" y="166" width="480" height="6" rx="3"/>
+  <text class="t-xs tc-blue" x="200" y="188">L이 락을 쥔 구간</text>
+  <text class="t-s tc-red end" x="740" y="188">H는 M이 끝날 때까지 기다린다. 상한이 없다</text>
+
+  <path class="ln thin muted dash" d="M20 206 H740"/>
+
+  <!-- 아래: 상속 있음 -->
+  <text class="t-b" x="20" y="236">우선순위 상속이 있을 때</text>
+  <text class="t-xs tc-purple" x="306" y="252">↓ L이 H의 우선순위를 물려받는다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="280">H · 높음</text>
+  <rect class="box purple" x="240" y="260" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="270" y="280">H</text>
+  <rect class="box red" x="300" y="260" width="100" height="30" rx="6"/>
+  <rect x="300" y="260" width="100" height="30" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box purple" x="400" y="260" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="440" y="280">H</text>
+
+  <text class="t-s t-ink t-b" x="20" y="320">M · 중간</text>
+  <rect class="box warm" x="480" y="300" width="260" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="610" y="320">M 실행</text>
+
+  <text class="t-s t-ink t-b" x="20" y="360">L · 낮음</text>
+  <rect class="box blue" x="160" y="340" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="200" y="360">L</text>
+  <rect class="box blue" x="300" y="340" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="350" y="360">L · 부스트</text>
+  <rect class="solid blue" x="200" y="376" width="200" height="6" rx="3"/>
+  <text class="t-xs tc-blue" x="200" y="398">L이 락을 쥔 구간</text>
+  <text class="t-s end" x="740" y="398">H가 기다리는 시간은 L의 임계 구역 길이로 묶인다</text>
+</svg>

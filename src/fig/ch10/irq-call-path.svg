@@ -1,0 +1,45 @@
+<svg viewBox="0 0 760 566" xmlns="http://www.w3.org/2000/svg">
+  <title>x86-64 v7.3에서 벡터가 드라이버 핸들러에 닿는 호출 경로: 아키텍처 코드가 벡터로 irq_desc를 찾고, 범용 IRQ 코어의 플로 핸들러와 handle_irq_event가 action 사슬을 돌며 드라이버의 핸들러를 부른다</title>
+
+  <!-- 아키텍처 -->
+  <rect class="panel yellow" x="20" y="14" width="720" height="174" rx="12"/>
+  <text class="t-b tc-yellow" x="34" y="38">아키텍처 코드</text>
+  <text class="t-code end" x="726" y="38">arch/x86/</text>
+  <rect class="box" x="34" y="48" width="692" height="40" rx="8"/>
+  <text class="t-mono t-b" x="46" y="73">asm_common_interrupt</text>
+  <text class="t-xs end" x="714" y="73">스텁이 벡터를 넣고 error_entry가 pt_regs를 만든다 (9장)</text>
+  <path class="ln" d="M120 88 V101" marker-end="url(#ah)"/>
+  <rect class="box" x="34" y="106" width="692" height="70" rx="8"/>
+  <text class="t-mono t-b" x="46" y="130">common_interrupt()</text>
+  <text class="t-xs end" x="714" y="130">irqentry_enter() · IRQ 스택 전환 · irq_enter_rcu()</text>
+  <text class="t-code" x="46" y="158">desc = vector_irq[vector]</text>
+  <text class="t-xs end" x="714" y="158">이 CPU의 표에서 irq_desc를 찾는다</text>
+
+  <!-- 코어 -->
+  <rect class="panel green" x="20" y="200" width="720" height="204" rx="12"/>
+  <text class="t-b tc-green" x="170" y="224">범용 IRQ 코어</text>
+  <text class="t-code end" x="726" y="224">kernel/irq/</text>
+  <rect class="box" x="34" y="236" width="692" height="40" rx="8"/>
+  <text class="t-mono t-b" x="46" y="261">desc-&gt;handle_irq(desc)</text>
+  <text class="t-xs end" x="714" y="261">플로 핸들러(예: handle_edge_irq). lock을 잡고 칩에 ack</text>
+  <path class="ln" d="M120 276 V289" marker-end="url(#ah)"/>
+  <rect class="box" x="34" y="294" width="692" height="40" rx="8"/>
+  <text class="t-mono t-b" x="46" y="319">handle_irq_event(desc)</text>
+  <text class="t-xs end" x="714" y="319">INPROGRESS를 켜고 lock을 푼다</text>
+  <path class="ln" d="M120 334 V347" marker-end="url(#ah)"/>
+  <rect class="box" x="34" y="352" width="692" height="40" rx="8"/>
+  <text class="t-mono t-b" x="46" y="377">__handle_irq_event_percpu(desc)</text>
+  <text class="t-xs end" x="714" y="377">action 사슬을 차례로 돈다</text>
+
+  <!-- 드라이버 -->
+  <rect class="panel purple" x="20" y="416" width="720" height="88" rx="12"/>
+  <text class="t-b tc-purple" x="170" y="440">드라이버</text>
+  <rect class="box" x="34" y="452" width="692" height="40" rx="8"/>
+  <text class="t-mono t-b" x="46" y="477">action-&gt;handler(irq, dev_id)</text>
+  <text class="t-xs end" x="714" y="477">IRQ_HANDLED · IRQ_NONE · IRQ_WAKE_THREAD</text>
+
+  <text class="t-s" x="20" y="528">돌아가는 길에 irq_exit_rcu()가 hardirq 카운트를 내리고 밀린 softirq를 실행한다 (11장).</text>
+  <text class="t-s" x="20" y="550">마지막으로 irqentry_exit()가 선점 여부와 유저 모드 복귀 작업을 처리한다 (6장).</text>
+  <path class="ln" d="M120 176 V231" marker-end="url(#ah)"/>
+  <path class="ln" d="M120 392 V447" marker-end="url(#ah)"/>
+</svg>

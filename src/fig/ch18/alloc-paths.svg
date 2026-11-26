@@ -1,0 +1,56 @@
+<svg viewBox="0 0 760 418" xmlns="http://www.w3.org/2000/svg">
+  <title>페이지 할당의 빠른 경로와 느린 경로: 빠른 경로가 실패하면 kswapd 깨우기, min 기준 재시도, 직접 회수, 컴팩션, OOM 킬러 순으로 내려가고, 잠들 수 없는 요청은 재시도까지만 한다</title>
+
+  <rect class="box blue" x="200" y="14" width="360" height="36" rx="10"/>
+  <text class="t-mono t-b mid" x="380" y="37">alloc_pages(gfp, order)</text>
+  <path class="ln" d="M380 50 V62" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="200" y="66" width="360" height="52" rx="10"/>
+  <text class="t-b" x="214" y="88">빠른 경로</text>
+  <text class="t-code end" x="548" y="88">get_page_from_freelist()</text>
+  <text class="t-s" x="214" y="108">빈 페이지가 low 위인 존에서 꺼낸다</text>
+  <path class="ln green" d="M560 92 H596" marker-end="url(#ah-green)"/>
+  <text class="t-s tc-green" x="604" y="96">페이지 반환</text>
+
+  <path class="ln" d="M380 118 V136" marker-end="url(#ah)"/>
+  <text class="t-xs" x="388" y="131">실패</text>
+
+  <rect class="panel warm" x="180" y="140" width="400" height="264" rx="14"/>
+  <text class="t-b tc-warm" x="196" y="164">느린 경로</text>
+  <text class="t-code end" x="564" y="164">__alloc_pages_slowpath()</text>
+
+  <rect class="box" x="196" y="174" width="368" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="210" y="196">① kswapd를 깨운다</text>
+  <text class="t-code end" x="552" y="196">wake_all_kswapds()</text>
+
+  <rect class="box" x="196" y="214" width="368" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="210" y="236">② min 기준으로 재시도</text>
+  <text class="t-code end" x="552" y="236">get_page_from_freelist()</text>
+
+  <path class="ln thin red dash" d="M196 258 H564"/>
+  <text class="t-xs tc-red mid" x="380" y="274">잠들 수 없는 요청은 여기서 NULL을 받는다</text>
+
+  <rect class="box" x="196" y="282" width="368" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="210" y="304">③ 직접 회수</text>
+  <text class="t-code end" x="552" y="304">__alloc_pages_direct_reclaim()</text>
+
+  <rect class="box" x="196" y="322" width="368" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="210" y="344">④ 컴팩션</text>
+  <text class="t-code end" x="552" y="344">__alloc_pages_direct_compact()</text>
+
+  <rect class="box red" x="196" y="362" width="368" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="210" y="384">⑤ OOM 킬러</text>
+  <text class="t-code end" x="552" y="384">__alloc_pages_may_oom()</text>
+
+  <!-- 왼쪽: 잠들 수 없는 요청 -->
+  <path class="ln blue" d="M166 178 H156 V246 H166"/>
+  <text class="t-code end" x="148" y="204">GFP_ATOMIC</text>
+  <text class="t-code end" x="148" y="222">GFP_NOWAIT</text>
+  <text class="t-xs end" x="148" y="240">②까지만</text>
+
+  <!-- 오른쪽: 잠들 수 있는 요청 -->
+  <path class="ln green" d="M594 178 H604 V392 H594"/>
+  <text class="t-code" x="612" y="280">GFP_KERNEL</text>
+  <text class="t-xs" x="612" y="298">끝까지 내려간다</text>
+  <text class="t-xs" x="612" y="314">③부터는 잠들 수 있다</text>
+</svg>

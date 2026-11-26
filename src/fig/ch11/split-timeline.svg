@@ -1,0 +1,58 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>인터럽트 하나가 만든 일이 hardirq 핸들러, softirq, kworker 세 컨텍스트로 나뉘어 차례로 실행되는 한 CPU의 시간선</title>
+
+  <text class="t-xs mid" x="240" y="20">인터럽트 발생</text>
+  <text class="t-xs mid" x="440" y="20">태스크로 복귀</text>
+  <text class="t-xs mid" x="620" y="20">kworker가 스케줄됨</text>
+  <path class="ln thin muted dash" d="M240 26 V84"/>
+  <path class="ln thin muted dash" d="M440 26 V40"/>
+  <path class="ln thin muted dash" d="M560 26 V40"/>
+
+  <!-- 태스크 A -->
+  <text class="t-s t-ink t-b" x="20" y="60">태스크 A</text>
+  <rect class="box gray" x="150" y="40" width="90" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="195" y="60">A 실행</text>
+  <rect class="box gray" x="440" y="40" width="120" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="500" y="60">A 이어서 실행</text>
+  <rect class="box gray" x="680" y="40" width="60" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="710" y="60">A</text>
+
+  <!-- hardirq -->
+  <text class="t-s t-ink t-b" x="20" y="104">hardirq</text>
+  <text class="t-xs" x="76" y="104">top half</text>
+  <rect class="box warm" x="240" y="84" width="50" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="265" y="104">핸들러</text>
+  <text class="t-xs" x="300" y="104">장치 확인 · 인터럽트 원인 지우기 · 뒷일 예약</text>
+
+  <!-- softirq -->
+  <text class="t-s t-ink t-b" x="20" y="148">softirq</text>
+  <text class="t-xs" x="72" y="148">bottom half</text>
+  <rect class="box purple" x="290" y="128" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="365" y="148">softirq 핸들러</text>
+  <text class="t-xs" x="450" y="148">프로토콜 처리, 타이머 콜백처럼 잠들지 않는 일</text>
+
+  <!-- 프로세스 컨텍스트 -->
+  <text class="t-s t-ink t-b" x="20" y="192">커널 스레드</text>
+  <rect class="box blue" x="560" y="172" width="120" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="192">워크 함수</text>
+  <text class="t-xs end" x="550" y="192">뮤텍스, 메모리 할당 대기처럼 잠들 수 있는 일</text>
+
+  <!-- 성질 -->
+  <text class="t-s t-ink t-b" x="20" y="242">인터럽트</text>
+  <rect class="box" x="150" y="228" width="90" height="20" rx="4"/>
+  <text class="t-xs mid" x="195" y="242">켜짐</text>
+  <rect class="box red" x="240" y="228" width="50" height="20" rx="4"/>
+  <text class="t-xs tc-red mid" x="265" y="242">꺼짐</text>
+  <rect class="box" x="290" y="228" width="450" height="20" rx="4"/>
+  <text class="t-xs mid" x="515" y="242">켜짐</text>
+
+  <text class="t-s t-ink t-b" x="20" y="272">잠들기</text>
+  <rect class="box" x="150" y="258" width="90" height="20" rx="4"/>
+  <text class="t-xs mid" x="195" y="272">가능</text>
+  <rect class="box red" x="240" y="258" width="200" height="20" rx="4"/>
+  <text class="t-xs tc-red mid" x="340" y="272">불가 (원자적 컨텍스트)</text>
+  <rect class="box" x="440" y="258" width="300" height="20" rx="4"/>
+  <text class="t-xs mid" x="590" y="272">가능</text>
+
+  <text class="t-s mid" x="380" y="304">급한 일만 인터럽트를 끈 채 하고, 나머지는 인터럽트를 켠 뒤의 softirq나 스레드로 미룬다</text>
+</svg>

@@ -1,0 +1,1136 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>시스템 콜 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="유저에서 커널로 들어오는 정문">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="시스템 콜 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="유저에서 커널로 들어오는 정문">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch19" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html" aria-current="page"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">6부 시스템 콜과 I/O › <b>19장 시스템 콜</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-teal">
+<div class="ch-kicker"><span class="ch-no">19</span><span class="part">6부 · 시스템 콜과 I/O</span></div>
+<h1>시스템 콜</h1>
+<p class="ch-sub">유저에서 커널로 들어오는 정문</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 55분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/entry_64.S" target="_blank" rel="noopener">arch/x86/entry/entry_64.S</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/syscall_64.c" target="_blank" rel="noopener">arch/x86/entry/syscall_64.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/entry-common.h" target="_blank" rel="noopener">include/linux/entry-common.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/syscalls/syscall_64.tbl" target="_blank" rel="noopener">arch/x86/entry/syscalls/syscall_64.tbl</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/fs/read_write.c" target="_blank" rel="noopener">fs/read_write.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/syscall_wrapper.h" target="_blank" rel="noopener">arch/x86/include/asm/syscall_wrapper.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/uaccess.h" target="_blank" rel="noopener">include/linux/uaccess.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/uaccess_64.h" target="_blank" rel="noopener">arch/x86/include/asm/uaccess_64.h</a></div>
+</header><div class="lead">
+<p>유저 프로그램은 혼자서는 파일 하나 열지 못합니다. 디스크도, 네트워크도, 다른 프로세스도 CPU가 유저 모드에서는 건드리지 못하게 막아 두었기 때문입니다. 무엇이든 하려면 커널에 부탁해야 하고, 그 부탁이 드나드는 문이 시스템 콜입니다. 이 문은 쉴 새 없이 열리므로 빨라야 하고, 문밖에서 오는 값은 하나도 믿을 수 없으므로 꼼꼼해야 하며, 한 번 내준 번호와 인자는 수십 년 뒤의 프로그램도 그대로 쓰므로 바꿀 수 없습니다. 세 요구가 진입 코드, 유저 메모리 접근 함수, 인터페이스 설계 규칙에 각각 어떻게 새겨져 있는지 봅니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li><code>syscall</code> 명령어 한 번에 CPU가 하는 일과 커널이 하는 일은 어디서 나뉘는가?</li>
+<li>시스템 콜 번호는 어디에 적혀 있고, v7.3에서는 어떻게 함수 호출로 바뀌는가?</li>
+<li><code>SYSCALL_DEFINE3(read, ...)</code> 한 줄은 어떤 함수들로 펼쳐지는가?</li>
+<li>커널은 유저가 준 포인터를 어떻게 읽고, 그 포인터가 엉터리면 어떻게 되는가?</li>
+<li><code>clock_gettime()</code>은 왜 커널에 들어오지 않고도 답을 얻는가?</li>
+<li>새 시스템 콜에 <code>flags</code> 인자와 구조체 크기를 넣으라고 하는 까닭은 무엇인가?</li>
+</ul>
+</div>
+<section class="level2" id="boundary">
+<h2><span class="sec-n">19.1</span>경계를 넘는 방법<a aria-label="이 절의 링크" class="anchor" href="#boundary">#</a></h2>
+<p>x86 CPU에는 권한 수준이 있습니다. 유저 프로그램은 링 3에서, 커널은 링 0에서 돕니다. 링 3에서는 I/O 포트, 제어 레지스터, 인터럽트 설정을 건드리는 명령어가 예외를 일으키고, 페이지 테이블의 <code>USER</code> 비트가 꺼진 메모리에는 접근하지 못합니다(<a href="ch17.html">17장</a>). 링 3의 코드가 링 0으로 넘어가는 길은 CPU가 정해 둔 몇 가지뿐이고, 어느 길이든 도착 지점은 커널이 미리 등록해 둔 주소입니다. 유저가 커널의 아무 주소로나 뛰어들 수는 없습니다.</p>
+<p><strong>시스템 콜</strong>(system call)은 그 길 가운데 프로그램이 스스로 부르는 것입니다. x86에는 역사적으로 세 가지 명령어가 있었습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>명령어</th>
+<th>쓰이는 곳</th>
+<th>방식</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>int $0x80</code></td>
+<td>32비트 프로그램</td>
+<td>소프트웨어 인터럽트. 가장 오래되고 가장 느립니다.</td>
+</tr>
+<tr>
+<td><code>sysenter</code></td>
+<td>32비트 프로그램 (Intel)</td>
+<td>전용 MSR에 적어 둔 주소로 곧장 진입</td>
+</tr>
+<tr>
+<td><code>syscall</code></td>
+<td>64비트 프로그램</td>
+<td>MSR <code>LSTAR</code>에 적어 둔 주소로 곧장 진입</td>
+</tr>
+</tbody>
+</table></div>
+<p>64비트 프로그램이 쓰는 것은 <code>syscall</code> 하나입니다. 커널은 부팅할 때 <code>wrmsrq(MSR_LSTAR, entry_SYSCALL_64)</code>로 도착 주소를 CPU에 알려 둡니다. 호출 규약도 정해져 있습니다. 번호는 <code>rax</code>에, 인자는 순서대로 <code>rdi</code>, <code>rsi</code>, <code>rdx</code>, <code>r10</code>, <code>r8</code>, <code>r9</code>에 넣고, 결과는 <code>rax</code>로 받습니다. 인자는 최대 여섯 개입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>C 라이브러리의 래퍼를 거치지 않고 번호로 직접 부를 수 있습니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-file">rawcall.c</span><span class="code-ver">C</span></div><div class="sourceCode" id="cb1" name="rawcall.c"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="pp">#define </span><span class="ot">_GNU_SOURCE</span></span>
+<span id="cb1-2"><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb1-3"><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
+<span id="cb1-4"><span class="pp">#include </span><span class="im">&lt;sys/syscall.h&gt;</span></span>
+<span id="cb1-5"></span>
+<span id="cb1-6"><span class="dt">int</span> main<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb1-7"><span class="op">{</span></span>
+<span id="cb1-8">    <span class="dt">long</span> pid <span class="op">=</span> syscall<span class="op">(</span>SYS_getpid<span class="op">);</span></span>
+<span id="cb1-9"></span>
+<span id="cb1-10">    printf<span class="op">(</span><span class="st">"</span><span class="sc">%ld</span><span class="st"> </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> pid<span class="op">,</span> getpid<span class="op">());</span></span>
+<span id="cb1-11">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-12"><span class="op">}</span></span></code></pre></div></div>
+<p><code>SYS_getpid</code>는 x86-64에서 39입니다. <code>strace ./rawcall</code>로 보면 <code>getpid()</code>가 두 번 찍힙니다. <code>getpid()</code>라는 C 함수는 이 번호를 <code>rax</code>에 넣고 <code>syscall</code> 명령어를 실행하는 몇 줄짜리 래퍼입니다.</p>
+</div>
+<p>다른 아키텍처도 모양은 같습니다. arm64는 <code>svc</code> 명령어를 쓰고 번호를 <code>x8</code>에, 인자를 <code>x0</code>–<code>x5</code>에 넣습니다. 새 x86 CPU의 FRED는 <code>syscall</code>을 포함해 유저 모드에서 오는 모든 진입을 진입점 하나와 스택 프레임 형식 하나로 통일합니다(<a href="ch09.html">9장</a>). FRED에서도 C 코드에 들어오면 아래에서 볼 <code>do_syscall_64()</code>로 합류합니다.</p>
+</section>
+<section class="level2" id="entry">
+<h2><span class="sec-n">19.2</span>entry_SYSCALL_64: 처음 서른 줄<a aria-label="이 절의 링크" class="anchor" href="#entry">#</a></h2>
+<p><code>syscall</code> 명령어가 하는 일은 놀랄 만큼 적습니다. 돌아갈 주소(<code>rip</code>)를 <code>rcx</code>에, 플래그를 <code>r11</code>에 복사하고, 권한을 링 0으로 올리고, <code>LSTAR</code>의 주소로 뜁니다. 스택은 바꾸지 않습니다. 메모리에 아무것도 저장하지 않습니다. 그래서 커널 코드의 첫 명령어는 유저의 스택 포인터를 쥔 채, 쓸 수 있는 레지스터가 하나도 없는 상태에서 시작합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/entry_64.S#L87" rel="noopener" target="_blank">arch/x86/entry/entry_64.S</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/entry/entry_64.S" data-line="87" id="cb2"><pre class="sourceCode asm"><code class="sourceCode fasm"><span id="cb2-1">SYM_CODE_START<span class="op">(</span>entry_SYSCALL_64<span class="op">)</span></span>
+<span id="cb2-2">    UNWIND_HINT_ENTRY</span>
+<span id="cb2-3">    ENDBR</span>
+<span id="cb2-4"></span>
+<span id="cb2-5">    <span class="bu">swapgs</span></span>
+<span id="cb2-6">    /* tss<span class="op">.</span>sp2 is scratch space<span class="op">.</span> <span class="op">*/</span></span>
+<span id="cb2-7">    <span class="bu">movq</span>    <span class="op">%</span><span class="kw">rsp</span><span class="op">,</span> PER_CPU_VAR<span class="op">(</span>cpu_tss_rw <span class="op">+</span> TSS_sp2<span class="op">)</span></span>
+<span id="cb2-8">    SWITCH_TO_KERNEL_CR3 scratch_reg<span class="op">=%</span><span class="kw">rsp</span></span>
+<span id="cb2-9">    <span class="bu">movq</span>    PER_CPU_VAR<span class="op">(</span>cpu_current_top_of_stack<span class="op">),</span> <span class="op">%</span><span class="kw">rsp</span></span>
+<span id="cb2-10"></span>
+<span id="cb2-11">SYM_INNER_LABEL<span class="op">(</span>entry_SYSCALL_64_safe_stack<span class="op">,</span> SYM_L_GLOBAL<span class="op">)</span></span>
+<span id="cb2-12">    ANNOTATE_NOENDBR</span>
+<span id="cb2-13"></span>
+<span id="cb2-14">    /* Construct struct pt_regs on stack <span class="op">*/</span></span>
+<span id="cb2-15">    pushq   <span class="op">$</span>__USER_DS              <span class="op">/*</span> pt_regs<span class="op">-&gt;</span><span class="kw">ss</span> <span class="op">*/</span></span>
+<span id="cb2-16">    pushq   PER_CPU_VAR<span class="op">(</span>cpu_tss_rw <span class="op">+</span> TSS_sp2<span class="op">)</span>   <span class="op">/*</span> pt_regs<span class="op">-&gt;</span><span class="kw">sp</span> <span class="op">*/</span></span>
+<span id="cb2-17">    pushq   <span class="op">%</span><span class="kw">r11</span>                    <span class="op">/*</span> pt_regs<span class="op">-&gt;</span>flags <span class="op">*/</span></span>
+<span id="cb2-18">    pushq   <span class="op">$</span>__USER_CS              <span class="op">/*</span> pt_regs<span class="op">-&gt;</span><span class="kw">cs</span> <span class="op">*/</span></span>
+<span id="cb2-19">    pushq   <span class="op">%</span><span class="kw">rcx</span>                    <span class="op">/*</span> pt_regs<span class="op">-&gt;</span>ip <span class="op">*/</span></span>
+<span id="cb2-20">SYM_INNER_LABEL<span class="op">(</span>entry_SYSCALL_64_after_hwframe<span class="op">,</span> SYM_L_GLOBAL<span class="op">)</span></span>
+<span id="cb2-21">    pushq   <span class="op">%</span><span class="kw">rax</span>                    <span class="op">/*</span> pt_regs<span class="op">-&gt;</span>orig_ax <span class="op">*/</span></span>
+<span id="cb2-22"></span>
+<span id="cb2-23">    PUSH_AND_CLEAR_REGS <span class="kw">rax</span><span class="op">=$-</span>ENOSYS</span>
+<span id="cb2-24"></span>
+<span id="cb2-25">    /* IRQs are off<span class="op">.</span> <span class="op">*/</span></span>
+<span id="cb2-26">    <span class="bu">movq</span>    <span class="op">%</span><span class="kw">rsp</span><span class="op">,</span> <span class="op">%</span><span class="kw">rdi</span></span>
+<span id="cb2-27">    /* Sign extend the lower <span class="dv">32</span><span class="er">bit</span> as syscall numbers are treated as int <span class="op">*/</span></span>
+<span id="cb2-28">    movslq  <span class="op">%</span><span class="kw">eax</span><span class="op">,</span> <span class="op">%</span><span class="kw">rsi</span></span>
+<span id="cb2-29"></span>
+<span id="cb2-30">    /* clobbers <span class="op">%</span><span class="kw">rax</span><span class="op">,</span> make sure it is after saving the syscall nr <span class="op">*/</span></span>
+<span id="cb2-31">    IBRS_ENTER</span>
+<span id="cb2-32">    UNTRAIN_RET</span>
+<span id="cb2-33">    CLEAR_BRANCH_HISTORY</span>
+<span id="cb2-34"></span>
+<span id="cb2-35">    <span class="cf">call</span>    do_syscall_64       <span class="op">/*</span> returns with IRQs disabled <span class="op">*/</span></span></code></pre></div></div>
+<p>순서대로 읽습니다.</p>
+<ul>
+<li><strong><code>swapgs</code></strong>. <code>gs</code> 세그먼트의 베이스를 유저 값에서 커널 값으로 바꿉니다. 커널의 <code>gs</code>는 이 CPU의 CPU별 데이터 영역을 가리킵니다. 이 한 줄이 있어야 다음 줄의 <code>PER_CPU_VAR()</code>가 동작합니다.</li>
+<li><strong>스택 바꾸기</strong>. 유저의 <code>rsp</code>를 CPU별 임시 칸에 치워 두고, 현재 태스크의 커널 스택 꼭대기를 <code>rsp</code>에 넣습니다. 그 사이의 <code>SWITCH_TO_KERNEL_CR3</code>는 KPTI가 켜진 시스템에서 페이지 테이블을 커널용으로 바꿉니다.</li>
+<li><strong><code>pt_regs</code> 쌓기</strong>. 유저의 레지스터를 전부 커널 스택에 밀어 넣습니다. 쌓인 모양이 <code>struct pt_regs</code>와 일치합니다. <code>PUSH_AND_CLEAR_REGS</code>는 저장한 뒤 레지스터를 0으로 지웁니다. 유저가 넣어 둔 값이 커널 코드의 추측 실행에 쓰이지 않게 하려는 것입니다.</li>
+<li><strong>완화책</strong>. <code>IBRS_ENTER</code>, <code>UNTRAIN_RET</code>, <code>CLEAR_BRANCH_HISTORY</code>는 Spectre 계열 공격의 대응입니다. 유저 모드에서 학습시킨 분기 예측기 상태가 커널 안의 분기에 영향을 주지 못하게 합니다. CPU에 따라 아무 명령어도 아닌 것으로 바뀝니다.</li>
+</ul>
+<figure class="fig" id="fig-pt-regs-stack"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 404" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>syscall 진입 직후의 커널 스택: CPU는 rip와 rflags를 rcx와 r11에 옮기고 뛸 뿐이고, entry_SYSCALL_64가 커널 스택으로 바꾼 뒤 유저 레지스터를 struct pt_regs 배치대로 쌓는다</title>
+
+  <!-- 유저 레지스터 -->
+  <rect class="panel blue" x="20" y="36" width="190" height="176" rx="12"/>
+  <text class="t-s tc-blue t-b" x="32" y="60">유저 모드 · syscall 직전</text>
+  <text class="t-code" x="32" y="86">rax</text>
+  <text class="t-xs end" x="198" y="86">번호</text>
+  <text class="t-code" x="32" y="106">rdi rsi rdx</text>
+  <text class="t-xs end" x="198" y="106">인자 1–3</text>
+  <text class="t-code" x="32" y="126">r10 r8 r9</text>
+  <text class="t-xs end" x="198" y="126">인자 4–6</text>
+  <text class="t-code" x="32" y="146">rip</text>
+  <text class="t-xs end" x="198" y="146">다음 명령어</text>
+  <text class="t-code" x="32" y="166">rsp</text>
+  <text class="t-xs end" x="198" y="166">유저 스택</text>
+  <text class="t-code" x="32" y="186">rflags</text>
+  <path class="ln" d="M210 100 H236" marker-end="url(#ah)"/>
+
+  <!-- CPU가 하는 일 -->
+  <rect class="box gray" x="240" y="36" width="200" height="128" rx="10"/>
+  <text class="t-s t-ink t-b" x="252" y="58">① CPU · syscall 명령어</text>
+  <text class="t-code" x="252" y="80">rcx ← rip</text>
+  <text class="t-code" x="252" y="98">r11 ← rflags</text>
+  <text class="t-code" x="252" y="116">rip ← MSR_LSTAR</text>
+  <text class="t-xs" x="252" y="136">링 3에서 링 0으로</text>
+  <text class="t-xs" x="252" y="152">스택은 바꾸지 않는다</text>
+  <path class="ln" d="M340 164 V180" marker-end="url(#ah)"/>
+
+  <!-- 진입 코드가 하는 일 -->
+  <rect class="box yellow" x="240" y="184" width="200" height="128" rx="10"/>
+  <text class="t-s t-ink t-b" x="252" y="206">② entry_SYSCALL_64</text>
+  <text class="t-code" x="252" y="228">swapgs</text>
+  <text class="t-code" x="252" y="246">rsp ← 커널 스택</text>
+  <text class="t-code" x="252" y="264">pushq … (pt_regs)</text>
+  <text class="t-xs" x="252" y="284">레지스터를 0으로 지운다</text>
+  <text class="t-code" x="252" y="302">call do_syscall_64</text>
+  <path class="ln" d="M440 248 H466" marker-end="url(#ah)"/>
+
+  <!-- 커널 스택 -->
+  <text class="t-xs mid" x="555" y="46">높은 주소 · 커널 스택 꼭대기</text>
+  <rect class="box gray" x="470" y="56" width="170" height="26"/>
+  <text class="t-code mid" x="555" y="74">ss</text>
+  <rect class="box gray" x="470" y="82" width="170" height="26"/>
+  <text class="t-code mid" x="555" y="100">sp</text>
+  <rect class="box gray" x="470" y="108" width="170" height="26"/>
+  <text class="t-code mid" x="555" y="126">flags</text>
+  <rect class="box gray" x="470" y="134" width="170" height="26"/>
+  <text class="t-code mid" x="555" y="152">cs</text>
+  <rect class="box gray" x="470" y="160" width="170" height="26"/>
+  <text class="t-code mid" x="555" y="178">ip</text>
+  <rect class="box warm" x="470" y="186" width="170" height="26"/>
+  <text class="t-code t-b mid" x="555" y="204">orig_ax</text>
+  <rect class="box yellow" x="470" y="212" width="170" height="26"/>
+  <text class="t-code mid" x="555" y="230">di · si · dx</text>
+  <rect class="box yellow" x="470" y="238" width="170" height="26"/>
+  <text class="t-code mid" x="555" y="256">cx</text>
+  <rect class="box yellow" x="470" y="264" width="170" height="26"/>
+  <text class="t-code t-b mid" x="555" y="282">ax</text>
+  <rect class="box yellow" x="470" y="290" width="170" height="26"/>
+  <text class="t-code mid" x="555" y="308">r8 · r9 · r10</text>
+  <rect class="box yellow" x="470" y="316" width="170" height="26"/>
+  <text class="t-code mid" x="555" y="334">r11</text>
+  <rect class="box yellow" x="470" y="342" width="170" height="26"/>
+  <text class="t-code mid" x="555" y="360">bx · bp · r12–r15</text>
+  <text class="t-code mid" x="555" y="390">↑ rsp = struct pt_regs *</text>
+
+  <!-- 칸 설명 -->
+  <text class="t-xs" x="648" y="100">유저의 rsp</text>
+  <text class="t-xs" x="648" y="126">r11에 있던 값</text>
+  <text class="t-xs" x="648" y="178">rcx에 있던 값</text>
+  <text class="t-xs tc-warm" x="648" y="204">시스템 콜 번호</text>
+  <text class="t-xs" x="648" y="230">인자 1–3</text>
+  <text class="t-xs" x="648" y="282">반환값 자리</text>
+  <text class="t-xs" x="648" y="308">인자 5·6·4</text>
+</svg></div><figcaption><b>그림 19-1</b><code>do_syscall_64()</code>가 불리는 순간의 커널 스택. 유저의 레지스터 전부가 <code>struct pt_regs</code>의 배치대로 쌓여 있고, 이후의 C 코드는 이 구조체로 인자를 읽고 반환값을 씁니다.</figcaption></figure>
+<p><code>pt_regs</code>가 이 장의 중심에 있는 자료구조입니다. 시스템 콜의 인자는 <code>regs-&gt;di</code>, <code>regs-&gt;si</code>에 있고, 번호는 <code>regs-&gt;orig_ax</code>에 있으며, 반환값은 <code>regs-&gt;ax</code>에 써 두면 복귀할 때 <code>rax</code>로 되돌아갑니다. ptrace가 다른 프로세스의 레지스터를 읽고 고치는 것도, 시그널 핸들러에서 돌아온 뒤 원래 하던 일을 잇는 것도 모두 이 구조체를 통해서입니다.</p>
+</section>
+<section class="level2" id="path">
+<h2><span class="sec-n">19.3</span>진입에서 복귀까지<a aria-label="이 절의 링크" class="anchor" href="#path">#</a></h2>
+<p>어셈블리가 부르는 C 함수는 짧습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/syscall_64.c#L79" rel="noopener" target="_blank">arch/x86/entry/syscall_64.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/entry/syscall_64.c" data-line="79" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1">__visible noinstr <span class="dt">bool</span> do_syscall_64<span class="op">(</span><span class="kw">struct</span> pt_regs <span class="op">*</span>regs<span class="op">,</span> <span class="dt">long</span> nr<span class="op">)</span></span>
+<span id="cb3-2"><span class="op">{</span></span>
+<span id="cb3-3">    <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(</span>syscall_enter_from_user_mode_randomize_stack<span class="op">(</span>regs<span class="op">,</span> <span class="op">&amp;</span>nr<span class="op">)))</span> <span class="op">{</span></span>
+<span id="cb3-4">        instrumentation_begin<span class="op">();</span></span>
+<span id="cb3-5"></span>
+<span id="cb3-6">        <span class="cf">if</span> <span class="op">(!</span>do_syscall_x64<span class="op">(</span>regs<span class="op">,</span> nr<span class="op">))</span></span>
+<span id="cb3-7">            do_syscall_x32<span class="op">(</span>regs<span class="op">,</span> nr<span class="op">);</span></span>
+<span id="cb3-8"></span>
+<span id="cb3-9">        instrumentation_end<span class="op">();</span></span>
+<span id="cb3-10">    <span class="op">}</span></span>
+<span id="cb3-11">    syscall_exit_to_user_mode<span class="op">(</span>regs<span class="op">);</span></span>
+<span id="cb3-12">    <span class="co">/* ... */</span></span>
+<span id="cb3-13">    <span class="co">/* SYSRET requires RCX == RIP and R11 == EFLAGS */</span></span>
+<span id="cb3-14">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>regs<span class="op">-&gt;</span>cx <span class="op">!=</span> regs<span class="op">-&gt;</span>ip <span class="op">||</span> regs<span class="op">-&gt;</span>r11 <span class="op">!=</span> regs<span class="op">-&gt;</span>flags<span class="op">))</span></span>
+<span id="cb3-15">        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb3-16">    <span class="co">/* ... */</span></span>
+<span id="cb3-17">    <span class="co">/* Use SYSRET to exit to userspace */</span></span>
+<span id="cb3-18">    <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb3-19"><span class="op">}</span></span></code></pre></div></div>
+<p>세 단계입니다. <strong>진입 작업</strong>을 하고, 시스템 콜 함수를 부르고, <strong>복귀 작업</strong>을 합니다. 진입과 복귀 작업은 x86만의 코드가 아니라 <code>include/linux/entry-common.h</code>와 <code>kernel/entry/</code>에 있는 공용 코드이고, 여러 아키텍처가 같이 씁니다.</p>
+<figure class="fig" id="fig-syscall-path"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>read() 시스템 콜 한 번의 경로: 유저 모드의 syscall 명령어에서 entry_SYSCALL_64, do_syscall_64의 진입 작업, 디스패치와 본체, 복귀 작업을 거쳐 sysretq나 iretq로 유저 모드에 돌아온다</title>
+
+  <!-- 유저 모드 -->
+  <rect class="panel blue" x="20" y="14" width="720" height="70" rx="12"/>
+  <text class="t-b tc-blue" x="34" y="54">유저</text>
+  <rect class="box" x="120" y="26" width="200" height="46" rx="8"/>
+  <text class="t-mono t-b mid" x="220" y="46">read(fd, buf, n)</text>
+  <text class="t-code mid" x="220" y="64">rax = 0 · syscall</text>
+  <rect class="box" x="500" y="26" width="200" height="46" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="600" y="46">다음 명령어</text>
+  <text class="t-code mid" x="600" y="64">rax = 읽은 바이트 수</text>
+
+  <!-- 커널 모드 -->
+  <rect class="panel yellow" x="20" y="104" width="720" height="302" rx="12"/>
+  <text class="t-b tc-yellow" x="34" y="150">커널</text>
+
+  <path class="ln" d="M220 72 V114" marker-end="url(#ah)"/>
+  <path class="ln" d="M600 118 V76" marker-end="url(#ah)"/>
+
+  <rect class="box" x="120" y="118" width="200" height="56" rx="8"/>
+  <text class="t-mono t-b mid" x="220" y="140">entry_SYSCALL_64</text>
+  <text class="t-xs mid" x="220" y="160">swapgs · 스택 전환 · pt_regs</text>
+
+  <rect class="box" x="500" y="118" width="200" height="56" rx="8"/>
+  <text class="t-mono t-b mid" x="600" y="140">sysretq 또는 iretq</text>
+  <text class="t-xs mid" x="600" y="160">레지스터 복원 · swapgs</text>
+
+  <rect class="ghost dash" x="40" y="192" width="680" height="200" rx="10"/>
+  <text class="t-mono t-b" x="54" y="216">do_syscall_64()</text>
+
+  <path class="ln" d="M220 174 V224" marker-end="url(#ah)"/>
+  <rect class="box" x="120" y="228" width="200" height="64" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="220" y="250">진입 작업</text>
+  <text class="t-xs mid" x="220" y="268">ptrace → seccomp</text>
+  <text class="t-xs mid" x="220" y="284">→ 추적점 → 감사</text>
+
+  <path class="ln" d="M220 292 V347 H256" marker-end="url(#ah)"/>
+  <rect class="box green" x="260" y="318" width="240" height="58" rx="8"/>
+  <text class="t-mono t-b mid" x="380" y="340">x64_sys_call()</text>
+  <text class="t-xs mid" x="380" y="360">switch → __x64_sys_read()</text>
+
+  <path class="ln" d="M500 347 H600 V296" marker-end="url(#ah)"/>
+  <rect class="box" x="500" y="228" width="200" height="64" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="600" y="250">복귀 작업</text>
+  <text class="t-xs mid" x="600" y="268">감사 · 추적점 · ptrace</text>
+  <text class="t-xs mid" x="600" y="284">스케줄 · 시그널 전달</text>
+  <path class="ln" d="M600 228 V178" marker-end="url(#ah)"/>
+</svg></div><figcaption><b>그림 19-2</b><code>read()</code> 한 번이 지나는 길. 어셈블리 진입 코드, 공용 진입 작업, 디스패치, 시스템 콜 본체, 공용 복귀 작업, 어셈블리 복귀 코드 순입니다.</figcaption></figure>
+<p>진입 쪽 매크로 <code>syscall_enter_from_user_mode_randomize_stack()</code>은 이름대로 세 가지를 합니다. 커널에 들어왔음을 RCU와 컨텍스트 추적에 알리고, 커널 스택에 시스템 콜마다 달라지는 임의의 오프셋을 더하고(<code>CONFIG_RANDOMIZE_KSTACK_OFFSET</code>. 스택의 위치를 맞혀야 하는 공격을 어렵게 합니다), 인터럽트를 켠 뒤, 이 태스크에 걸려 있는 진입 작업이 있으면 처리합니다. 작업의 순서가 중요합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/entry-common.h#L65" rel="noopener" target="_blank">include/linux/entry-common.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/entry-common.h" data-line="65" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="dt">static</span> __always_inline <span class="dt">long</span> syscall_trace_enter<span class="op">(</span><span class="kw">struct</span> pt_regs <span class="op">*</span>regs<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">long</span> work<span class="op">,</span></span>
+<span id="cb4-2">                        <span class="dt">long</span> syscall<span class="op">)</span></span>
+<span id="cb4-3"><span class="op">{</span></span>
+<span id="cb4-4">    <span class="co">/* ... */</span></span>
+<span id="cb4-5">    <span class="co">/* Handle ptrace */</span></span>
+<span id="cb4-6">    <span class="cf">if</span> <span class="op">(</span>work <span class="op">&amp;</span> <span class="op">(</span>SYSCALL_WORK_SYSCALL_TRACE <span class="op">|</span> SYSCALL_WORK_SYSCALL_EMU<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb4-7">        <span class="cf">if</span> <span class="op">(!</span>arch_ptrace_report_syscall_permit_entry<span class="op">(</span>regs<span class="op">)</span> <span class="op">||</span></span>
+<span id="cb4-8">            <span class="op">(</span>work <span class="op">&amp;</span> SYSCALL_WORK_SYSCALL_EMU<span class="op">))</span></span>
+<span id="cb4-9">            <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb4-10"></span>
+<span id="cb4-11">        <span class="co">/* ptrace might have changed work flags */</span></span>
+<span id="cb4-12">        work <span class="op">=</span> READ_ONCE<span class="op">(</span>current_thread_info<span class="op">()-&gt;</span>syscall_work<span class="op">);</span></span>
+<span id="cb4-13">    <span class="op">}</span></span>
+<span id="cb4-14"></span>
+<span id="cb4-15">    <span class="co">/* Do seccomp after ptrace, to catch any tracer changes. */</span></span>
+<span id="cb4-16">    <span class="cf">if</span> <span class="op">(</span>work <span class="op">&amp;</span> SYSCALL_WORK_SECCOMP<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-17">        <span class="cf">if</span> <span class="op">(!</span>__seccomp_permit_syscall<span class="op">())</span></span>
+<span id="cb4-18">            <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb4-19">    <span class="op">}</span></span>
+<span id="cb4-20"></span>
+<span id="cb4-21">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>work <span class="op">&amp;</span> SYSCALL_WORK_SYSCALL_TRACEPOINT<span class="op">))</span></span>
+<span id="cb4-22">        trace_syscall_enter<span class="op">(</span>regs<span class="op">);</span></span>
+<span id="cb4-23">    <span class="co">/* ... */</span></span>
+<span id="cb4-24">    <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb4-25"><span class="op">}</span></span></code></pre></div></div>
+<p>ptrace가 먼저, seccomp가 그다음입니다. 주석이 이유를 말합니다. 추적하는 쪽(디버거)은 멈춰 있는 태스크의 레지스터를 고쳐 시스템 콜 번호나 인자를 바꿀 수 있습니다. seccomp가 먼저 검사하면 허용된 호출로 통과한 뒤 금지된 호출로 바꿔치기할 수 있으므로, 검사는 바뀐 뒤의 값에 대해 해야 합니다. 대부분의 태스크는 <code>syscall_work</code>가 0이어서 이 함수 전체를 건너뜁니다.</p>
+<p>복귀 쪽 <code>syscall_exit_to_user_mode()</code>는 감사와 추적점, ptrace의 종료 보고를 처리하고, 인터럽트를 끈 뒤, 유저 모드로 돌아가기 전의 마지막 점검을 합니다. 재스케줄 요청이 있으면 여기서 <code>schedule()</code>을 부르고, 대기 중인 시그널이 있으면 여기서 전달합니다. <a href="ch06.html">6장</a>에서 본 <code>__exit_to_user_mode_loop()</code>가 이 자리입니다.</p>
+<p>마지막 반환값은 어셈블리에게 주는 답입니다. <code>sysret</code> 명령어는 <code>rcx</code>의 주소로, <code>r11</code>의 플래그로 돌아가는 빠른 복귀입니다. 그런데 시스템 콜 도중 <code>pt_regs</code>가 고쳐졌다면(시그널 핸들러로 가게 되었거나, ptrace가 레지스터를 바꿨거나, <code>execve()</code>로 새 프로그램이 되었거나) 그 조건이 깨집니다. 그때는 <code>false</code>를 돌려주고 어셈블리는 느리지만 무엇이든 복원할 수 있는 <code>iret</code>을 씁니다.</p>
+</section>
+<section class="level2" id="table">
+<h2><span class="sec-n">19.4</span>번호에서 함수로<a aria-label="이 절의 링크" class="anchor" href="#table">#</a></h2>
+<p>번호와 함수의 짝은 텍스트 파일 하나에 적혀 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/syscalls/syscall_64.tbl#L12" rel="noopener" target="_blank">arch/x86/entry/syscalls/syscall_64.tbl</a><span class="code-ver">v7.3</span></div><pre class="text" data-file="arch/x86/entry/syscalls/syscall_64.tbl" data-line="12"><code>0   common  read            sys_read
+1   common  write           sys_write
+2   common  open            sys_open
+3   common  close           sys_close</code></pre></div>
+<p>v7.3의 이 표에서 64비트 프로그램이 쓰는 줄은 0번 <code>read</code>부터 472번 <code>fchroot</code>까지 386개이고, 그 가운데 실제 함수가 연결된 것은 370개입니다. 나머지는 예전에 번호만 받고 구현이 사라진 자리입니다. 번호는 <strong>다시 쓰지 않습니다</strong>. 2번이 <code>open</code>이라는 사실은 정적으로 링크된 30년 전의 바이너리가 믿고 있는 약속이기 때문입니다.</p>
+<p>빌드할 때 <code>scripts/syscalltbl.sh</code>가 이 표를 <code>__SYSCALL(0, sys_read)</code> 꼴의 줄이 나열된 헤더로 바꿉니다. 디스패치 코드는 그 헤더를 <code>__SYSCALL</code>의 정의를 바꿔 가며 세 번 포함합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/syscall_64.c#L34" rel="noopener" target="_blank">arch/x86/entry/syscall_64.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/entry/syscall_64.c" data-line="34" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="pp">#define __SYSCALL</span><span class="op">(</span><span class="pp">nr</span><span class="op">,</span><span class="pp"> sym</span><span class="op">)</span><span class="pp"> </span><span class="cf">case</span><span class="pp"> nr</span><span class="op">:</span><span class="pp"> </span><span class="cf">return</span><span class="pp"> __x64_</span><span class="op">##</span><span class="pp">sym</span><span class="op">(</span><span class="pp">regs</span><span class="op">);</span></span>
+<span id="cb6-2"></span>
+<span id="cb6-3"><span class="co">/* The unsigned int @nr argument is intentional as it creates denser code */</span></span>
+<span id="cb6-4"><span class="dt">static</span> noinline <span class="dt">long</span> x64_sys_call<span class="op">(</span><span class="dt">const</span> <span class="kw">struct</span> pt_regs <span class="op">*</span>regs<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span> nr<span class="op">)</span></span>
+<span id="cb6-5"><span class="op">{</span></span>
+<span id="cb6-6">    <span class="cf">switch</span> <span class="op">(</span>nr<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb6-7">    <span class="pp">#include </span><span class="im">&lt;asm/syscalls_64.h&gt;</span></span>
+<span id="cb6-8">    <span class="cf">default</span><span class="op">:</span> <span class="cf">return</span> __x64_sys_ni_syscall<span class="op">(</span>regs<span class="op">);</span></span>
+<span id="cb6-9">    <span class="op">}</span></span>
+<span id="cb6-10"><span class="op">}</span></span>
+<span id="cb6-11"><span class="co">/* ... */</span></span>
+<span id="cb6-12"><span class="dt">static</span> __always_inline <span class="dt">bool</span> do_syscall_x64<span class="op">(</span><span class="kw">struct</span> pt_regs <span class="op">*</span>regs<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">long</span> nr<span class="op">)</span></span>
+<span id="cb6-13"><span class="op">{</span></span>
+<span id="cb6-14">    <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(</span>nr <span class="op">&lt;</span> NR_syscalls<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb6-15">        nr <span class="op">=</span> array_index_nospec<span class="op">(</span>nr<span class="op">,</span> NR_syscalls<span class="op">);</span></span>
+<span id="cb6-16">        regs<span class="op">-&gt;</span>ax <span class="op">=</span> x64_sys_call<span class="op">(</span>regs<span class="op">,</span> <span class="op">(</span><span class="dt">unsigned</span> <span class="dt">int</span><span class="op">)</span>nr<span class="op">);</span></span>
+<span id="cb6-17">        <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb6-18">    <span class="op">}</span></span>
+<span id="cb6-19">    <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb6-20"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li>디스패치는 <strong><code>switch</code> 문</strong>입니다. 헤더의 각 줄이 <code>case 0: return __x64_sys_read(regs);</code>로 펼쳐집니다. 함수 포인터 배열을 색인해 간접 호출하는 것이 아니라, 컴파일러가 만든 분기와 직접 호출입니다.</li>
+<li>없는 번호는 <code>default</code>로 가서 <code>__x64_sys_ni_syscall()</code>이 <code>-ENOSYS</code>를 돌려줍니다.</li>
+<li><code>array_index_nospec()</code>은 범위 검사 뒤에 한 번 더 번호를 눌러 줍니다. 까닭은 <a href="#uaccess">유저 메모리 절</a>에서 봅니다.</li>
+</ul>
+<figure class="fig" id="fig-dispatch"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 352" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>시스템 콜 표에서 디스패치까지: syscall_64.tbl의 한 줄이 생성된 헤더의 __SYSCALL() 한 줄이 되고, 그 헤더가 함수 선언, 추적용 배열, switch의 case로 세 번 포함된다</title>
+
+  <text class="t-mono t-b" x="20" y="28">syscall_64.tbl</text>
+  <rect class="box code" x="20" y="38" width="200" height="150" rx="8"/>
+  <text class="t-code" x="32" y="64">0 common read sys_read</text>
+  <text class="t-code" x="32" y="82">1 common write sys_write</text>
+  <text class="t-code" x="32" y="100">2 common open sys_open</text>
+  <text class="t-code" x="32" y="118">⋮</text>
+  <text class="t-code" x="32" y="136">472 common fchroot …</text>
+  <text class="t-xs" x="32" y="170">번호 · ABI · 이름 · 함수</text>
+
+  <path class="ln" d="M220 113 H296" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="258" y="103">빌드할 때</text>
+
+  <text class="t-mono t-b" x="300" y="28">asm/syscalls_64.h</text>
+  <rect class="box code" x="300" y="38" width="200" height="150" rx="8"/>
+  <text class="t-code" x="312" y="64">__SYSCALL(0, sys_read)</text>
+  <text class="t-code" x="312" y="82">__SYSCALL(1, sys_write)</text>
+  <text class="t-code" x="312" y="100">__SYSCALL(2, sys_open)</text>
+  <text class="t-code" x="312" y="118">⋮</text>
+  <text class="t-xs" x="312" y="152">scripts/syscalltbl.sh가</text>
+  <text class="t-xs" x="312" y="170">만들어 내는 헤더</text>
+
+  <text class="t-s" x="540" y="78">0번이 오면</text>
+  <text class="t-code t-ink" x="540" y="100">__x64_sys_read(regs)</text>
+  <text class="t-s" x="540" y="122">를 직접 호출한다</text>
+
+  <path class="ln" d="M400 188 V212 H134 V230" marker-end="url(#ah)"/>
+  <path class="ln" d="M400 212 V230" marker-end="url(#ah)"/>
+  <path class="ln" d="M400 212 H626 V230" marker-end="url(#ah)"/>
+  <text class="t-xs" x="412" y="206">__SYSCALL의 정의를 바꿔 가며 세 번 포함한다</text>
+
+  <rect class="box" x="20" y="234" width="228" height="104" rx="10"/>
+  <text class="t-s t-ink t-b" x="32" y="256">① 함수 선언</text>
+  <text class="t-code" x="32" y="278">extern long</text>
+  <text class="t-code" x="32" y="296">__x64_##sym(…);</text>
+  <text class="t-xs" x="32" y="322">컴파일러에 이름을 알린다</text>
+
+  <rect class="box" x="266" y="234" width="228" height="104" rx="10"/>
+  <text class="t-s t-ink t-b" x="278" y="256">② sys_call_table[]</text>
+  <text class="t-code" x="278" y="278">__x64_##sym,</text>
+  <text class="t-xs" x="278" y="304">추적 코드가 함수 주소를</text>
+  <text class="t-xs" x="278" y="322">찾는 데만 쓴다</text>
+
+  <rect class="box green" x="512" y="234" width="228" height="104" rx="10"/>
+  <text class="t-s t-ink t-b" x="524" y="256">③ x64_sys_call()의 switch</text>
+  <text class="t-code" x="524" y="278">case nr:</text>
+  <text class="t-code" x="524" y="296">return __x64_##sym(regs);</text>
+  <text class="t-xs" x="524" y="322">실제 디스패치</text>
+</svg></div><figcaption><b>그림 19-3</b>표 한 줄이 헤더 한 줄이 되고, 같은 헤더가 <code>__SYSCALL</code>의 정의에 따라 함수 선언, 추적용 배열, <code>switch</code>의 <code>case</code>로 세 번 쓰입니다.</figcaption></figure>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>거의 모든 자료가 시스템 콜 디스패치를 <code>sys_call_table[nr](regs)</code> 한 줄, 곧 함수 포인터 표의 간접 호출로 설명합니다. v7.3의 x86에서는 그렇지 않습니다. <code>sys_call_table[]</code>은 남아 있지만 위에 붙은 주석대로 "더 이상 시스템 콜에 쓰이지 않고" 추적 코드가 함수 주소를 알아내는 데만 씁니다. 2024년에 나온 6.9에서 바뀌었습니다. 유저가 고른 번호로 간접 분기를 하는 자리는 분기 예측기를 속이는 Spectre 계열 공격(BHI)의 좋은 표적이고, 간접 분기를 보호하는 완화책은 느립니다. <code>switch</code>로 바꾸면 컴파일러가 직접 호출을 만들 수 있습니다. 이 표를 덮어써서 시스템 콜을 가로채던 옛 루트킷과 일부 보안 모듈의 수법도 함께 통하지 않게 되었습니다. arm64는 v7.3에서도 <code>sys_call_table[]</code>을 <code>array_index_nospec()</code>과 함께 색인합니다.</p>
+</div>
+<p>아키텍처마다 표가 따로 있고 번호도 다릅니다. <code>read</code>는 x86-64에서 0번, arm64에서 63번입니다. 이 차이는 역사의 흔적입니다. 새로 생기는 아키텍처는 <code>scripts/syscall.tbl</code> 하나를 같이 쓰고, 모든 아키텍처에서 424번 이후의 새 시스템 콜은 같은 번호를 받습니다.</p>
+</section>
+<section class="level2" id="define">
+<h2><span class="sec-n">19.5</span>SYSCALL_DEFINE가 펼쳐지는 모습<a aria-label="이 절의 링크" class="anchor" href="#define">#</a></h2>
+<p>표의 <code>sys_read</code>는 소스 어디에도 그 이름으로 정의되어 있지 않습니다. 시스템 콜의 본체는 매크로로 씁니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/fs/read_write.c#L723" rel="noopener" target="_blank">fs/read_write.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="fs/read_write.c" data-line="723" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1">SYSCALL_DEFINE3<span class="op">(</span>read<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span><span class="op">,</span> fd<span class="op">,</span> <span class="dt">char</span> __user <span class="op">*,</span> buf<span class="op">,</span> <span class="dt">size_t</span><span class="op">,</span> count<span class="op">)</span></span>
+<span id="cb7-2"><span class="op">{</span></span>
+<span id="cb7-3">    <span class="cf">return</span> ksys_read<span class="op">(</span>fd<span class="op">,</span> buf<span class="op">,</span> count<span class="op">);</span></span>
+<span id="cb7-4"><span class="op">}</span></span></code></pre></div></div>
+<p><code>3</code>은 인자의 수이고, 타입과 이름을 쉼표로 번갈아 적습니다. x86에서 이 매크로는 함수 셋을 만듭니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/syscall_wrapper.h#L223" rel="noopener" target="_blank">arch/x86/include/asm/syscall_wrapper.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/include/asm/syscall_wrapper.h" data-line="223" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="pp">#define __SYSCALL_DEFINEx</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp"> name</span><span class="op">,</span><span class="pp"> </span><span class="op">...)</span><span class="pp">                 </span><span class="op">\</span></span>
+<span id="cb8-2"><span class="pp">    </span><span class="dt">static</span><span class="pp"> </span><span class="dt">long</span><span class="pp"> __se_sys</span><span class="op">##</span><span class="pp">name</span><span class="op">(</span><span class="pp">__MAP</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp">__SC_LONG</span><span class="op">,</span><span class="pp">__VA_ARGS__</span><span class="op">));</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb8-3"><span class="pp">    </span><span class="dt">static</span><span class="pp"> </span><span class="kw">inline</span><span class="pp"> </span><span class="dt">long</span><span class="pp"> __do_sys</span><span class="op">##</span><span class="pp">name</span><span class="op">(</span><span class="pp">__MAP</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp">__SC_DECL</span><span class="op">,</span><span class="pp">__VA_ARGS__</span><span class="op">));\</span></span>
+<span id="cb8-4"><span class="pp">    __X64_SYS_STUBx</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp"> name</span><span class="op">,</span><span class="pp"> __VA_ARGS__</span><span class="op">)</span><span class="pp">               </span><span class="op">\</span></span>
+<span id="cb8-5"><span class="pp">    __IA32_SYS_STUBx</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp"> name</span><span class="op">,</span><span class="pp"> __VA_ARGS__</span><span class="op">)</span><span class="pp">              </span><span class="op">\</span></span>
+<span id="cb8-6"><span class="pp">    </span><span class="dt">static</span><span class="pp"> </span><span class="dt">long</span><span class="pp"> __se_sys</span><span class="op">##</span><span class="pp">name</span><span class="op">(</span><span class="pp">__MAP</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp">__SC_LONG</span><span class="op">,</span><span class="pp">__VA_ARGS__</span><span class="op">))</span><span class="pp">  </span><span class="op">\</span></span>
+<span id="cb8-7"><span class="pp">    </span><span class="op">{</span><span class="pp">                               </span><span class="op">\</span></span>
+<span id="cb8-8"><span class="pp">        </span><span class="dt">long</span><span class="pp"> ret </span><span class="op">=</span><span class="pp"> __do_sys</span><span class="op">##</span><span class="pp">name</span><span class="op">(</span><span class="pp">__MAP</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp">__SC_CAST</span><span class="op">,</span><span class="pp">__VA_ARGS__</span><span class="op">));\</span></span>
+<span id="cb8-9"><span class="pp">        __MAP</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp">__SC_TEST</span><span class="op">,</span><span class="pp">__VA_ARGS__</span><span class="op">);</span><span class="pp">             </span><span class="op">\</span></span>
+<span id="cb8-10"><span class="pp">        __PROTECT</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp"> ret</span><span class="op">,</span><span class="pp">__MAP</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp">__SC_ARGS</span><span class="op">,</span><span class="pp">__VA_ARGS__</span><span class="op">));</span><span class="pp">   </span><span class="op">\</span></span>
+<span id="cb8-11"><span class="pp">        </span><span class="cf">return</span><span class="pp"> ret</span><span class="op">;</span><span class="pp">                     </span><span class="op">\</span></span>
+<span id="cb8-12"><span class="pp">    </span><span class="op">}</span><span class="pp">                               </span><span class="op">\</span></span>
+<span id="cb8-13"><span class="pp">    </span><span class="dt">static</span><span class="pp"> </span><span class="kw">inline</span><span class="pp"> </span><span class="dt">long</span><span class="pp"> __do_sys</span><span class="op">##</span><span class="pp">name</span><span class="op">(</span><span class="pp">__MAP</span><span class="op">(</span><span class="pp">x</span><span class="op">,</span><span class="pp">__SC_DECL</span><span class="op">,</span><span class="pp">__VA_ARGS__</span><span class="op">))</span></span></code></pre></div></div>
+<figure class="fig" id="fig-define-expansion"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 336" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>SYSCALL_DEFINE3(read, ...)가 만드는 세 함수: pt_regs에서 인자를 꺼내는 __x64_sys_read, long을 선언된 타입으로 바꾸는 __se_sys_read, 본문인 __do_sys_read, 그리고 추적용 메타데이터</title>
+
+  <rect class="box code" x="20" y="16" width="720" height="40" rx="8"/>
+  <text class="t-code" x="34" y="41">SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count) { … }</text>
+  <path class="ln" d="M380 56 V80" marker-end="url(#ah)"/>
+  <text class="t-xs" x="390" y="73">매크로가 펼친다</text>
+
+  <rect class="box yellow" x="20" y="84" width="226" height="130" rx="10"/>
+  <text class="t-code t-b" x="32" y="108">__x64_sys_read</text>
+  <text class="t-code" x="32" y="126">(const struct pt_regs *)</text>
+  <text class="t-xs" x="32" y="152">switch의 case가 부른다</text>
+  <text class="t-xs" x="32" y="170">regs의 di, si, dx를 꺼내</text>
+  <text class="t-xs" x="32" y="188">다음 함수에 넘긴다</text>
+  <path class="ln" d="M246 149 H263" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="267" y="84" width="226" height="130" rx="10"/>
+  <text class="t-code t-b" x="279" y="108">__se_sys_read</text>
+  <text class="t-code" x="279" y="126">(long, long, long)</text>
+  <text class="t-xs" x="279" y="152">인자를 모두 long으로 받아</text>
+  <text class="t-xs" x="279" y="170">선언된 타입으로 바꾼다</text>
+  <text class="t-xs" x="279" y="188">너무 큰 타입은 빌드 오류</text>
+  <path class="ln" d="M493 149 H510" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="514" y="84" width="226" height="130" rx="10"/>
+  <text class="t-code t-b" x="526" y="108">__do_sys_read</text>
+  <text class="t-code" x="526" y="126">(fd, buf, count)</text>
+  <text class="t-xs" x="526" y="152">중괄호 안에 쓴 본문</text>
+  <text class="t-code" x="526" y="170">ksys_read(fd, buf, count)</text>
+  <text class="t-xs" x="526" y="188">inline이라 앞 함수에 합쳐진다</text>
+
+  <rect class="box gray" x="20" y="240" width="720" height="80" rx="10"/>
+  <text class="t-mono t-b" x="34" y="264">SYSCALL_METADATA</text>
+  <text class="t-s" x="34" y="286">인자의 이름과 타입을 문자열 표로 남긴다</text>
+  <text class="t-s" x="34" y="306">추적점 syscalls:sys_enter_read가 fd, buf, count를 이름 붙여 보여 주는 근거</text>
+</svg></div><figcaption><b>그림 19-4</b><code>SYSCALL_DEFINE3(read, ...)</code>가 만드는 세 함수. 바깥 둘은 매크로가 만들고, 프로그래머가 쓴 중괄호 안의 코드는 가장 안쪽 함수의 본문이 됩니다.</figcaption></figure>
+<ul>
+<li><strong><code>__x64_sys_read(const struct pt_regs *regs)</code></strong>. <code>switch</code>가 부르는 함수입니다. <code>regs-&gt;di</code>, <code>regs-&gt;si</code>, <code>regs-&gt;dx</code>를 꺼내 다음 함수에 넘깁니다. 인자가 셋인 시스템 콜은 레지스터 셋만 읽습니다. 유저가 <code>r10</code>, <code>r8</code>, <code>r9</code>에 넣어 둔 값은 본체에 닿지 않습니다.</li>
+<li><strong><code>__se_sys_read(long, long, long)</code></strong>. 인자를 모두 <code>long</code>으로 받아 선언된 타입으로 변환합니다. 32비트 값의 윗비트에 쓰레기가 남아 있어도 여기서 잘립니다. <code>__SC_TEST</code>는 <code>long</code>보다 큰 타입을 인자로 쓰면 빌드가 깨지게 합니다.</li>
+<li><strong><code>__do_sys_read(unsigned int fd, char __user *buf, size_t count)</code></strong>. 중괄호 안의 본문입니다. <code>inline</code>이므로 실제로는 위 함수에 합쳐집니다.</li>
+</ul>
+<p>매크로는 <code>SYSCALL_METADATA</code>도 만듭니다. 인자의 이름과 타입을 문자열로 담은 표이고, 추적점 <code>syscalls:sys_enter_read</code>가 <code>fd</code>, <code>buf</code>, <code>count</code>를 이름 붙여 보여 줄 수 있는 것이 이 덕분입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>시스템 콜이 370개이면 "레지스터에서 인자를 꺼내 타입을 맞추고 추적 정보를 등록하는" 코드도 370번 필요합니다. 손으로 쓰면 그 가운데 몇 개는 틀립니다. 2009년에는 일부 64비트 아키텍처에서 32비트 인자의 부호 확장이 빠져 있던 것이 보안 문제(CVE-2009-0029)로 드러났고, 인자를 감싸는 래퍼를 매크로로 만들어 내는 방식이 그 대응으로 들어왔습니다. 매크로로 생성하면 규칙이 한곳에 있고, 규칙을 바꿀 때도 한곳만 고칩니다. 2018년에 x86이 "인자를 레지스터로 직접 받는" 방식에서 "<code>pt_regs</code> 포인터 하나만 받는" 방식으로 바꿨을 때, 수백 개의 시스템 콜 본체는 한 줄도 고치지 않았습니다. 반복되는 경계 코드를 생성하고 검사를 생성기에 넣는 것은 커널 밖에서도 통하는 방법입니다. 대가는 <code>grep sys_read</code>로 정의를 찾을 수 없다는 것입니다. <code>SYSCALL_DEFINE.*read</code>로 찾아야 합니다.</p>
+</div>
+</section>
+<section class="level2" id="uaccess">
+<h2><span class="sec-n">19.6</span>유저 메모리 접근<a aria-label="이 절의 링크" class="anchor" href="#uaccess">#</a></h2>
+<p><code>read()</code>의 둘째 인자 <code>buf</code>는 유저가 준 주소입니다. 커널은 그 값을 믿을 수 없습니다. 매핑되지 않은 주소일 수도 있고, 커널 영역의 주소를 넣어 커널이 제 손으로 자기 메모리를 덮어쓰게 하려는 것일 수도 있습니다. 그래서 타입에 <code>__user</code>가 붙은 포인터는 직접 역참조하지 않고 정해진 함수로만 다룹니다. <code>__user</code>는 평소에는 아무 뜻이 없고, 정적 검사 도구 sparse로 빌드할 때 "다른 주소 공간의 포인터"로 취급되어 직접 역참조하는 코드를 잡아냅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/uaccess.h#L165" rel="noopener" target="_blank">include/linux/uaccess.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/uaccess.h" data-line="165" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="dt">static</span> <span class="kw">inline</span> __must_check <span class="dt">unsigned</span> <span class="dt">long</span></span>
+<span id="cb9-2">_inline_copy_from_user<span class="op">(</span><span class="dt">void</span> <span class="op">*</span>to<span class="op">,</span> <span class="dt">const</span> <span class="dt">void</span> __user <span class="op">*</span>from<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">long</span> n<span class="op">)</span></span>
+<span id="cb9-3"><span class="op">{</span></span>
+<span id="cb9-4">    <span class="dt">unsigned</span> <span class="dt">long</span> res <span class="op">=</span> n<span class="op">;</span></span>
+<span id="cb9-5">    might_fault<span class="op">();</span></span>
+<span id="cb9-6">    <span class="cf">if</span> <span class="op">(</span>should_fail_usercopy<span class="op">())</span></span>
+<span id="cb9-7">        <span class="cf">goto</span> fail<span class="op">;</span></span>
+<span id="cb9-8">    <span class="cf">if</span> <span class="op">(</span>can_do_masked_user_access<span class="op">())</span></span>
+<span id="cb9-9">        from <span class="op">=</span> mask_user_address<span class="op">(</span>from<span class="op">);</span></span>
+<span id="cb9-10">    <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb9-11">        <span class="cf">if</span> <span class="op">(!</span>access_ok<span class="op">(</span>from<span class="op">,</span> n<span class="op">))</span></span>
+<span id="cb9-12">            <span class="cf">goto</span> fail<span class="op">;</span></span>
+<span id="cb9-13">        <span class="co">/* ... */</span></span>
+<span id="cb9-14">        barrier_nospec<span class="op">();</span></span>
+<span id="cb9-15">    <span class="op">}</span></span>
+<span id="cb9-16">    instrument_copy_from_user_before<span class="op">(</span>to<span class="op">,</span> from<span class="op">,</span> n<span class="op">);</span></span>
+<span id="cb9-17">    res <span class="op">=</span> raw_copy_from_user<span class="op">(</span>to<span class="op">,</span> from<span class="op">,</span> n<span class="op">);</span></span>
+<span id="cb9-18">    instrument_copy_from_user_after<span class="op">(</span>to<span class="op">,</span> from<span class="op">,</span> n<span class="op">,</span> res<span class="op">);</span></span>
+<span id="cb9-19">    <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(!</span>res<span class="op">))</span></span>
+<span id="cb9-20">        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb9-21">fail<span class="op">:</span></span>
+<span id="cb9-22">    memset<span class="op">(</span>to <span class="op">+</span> <span class="op">(</span>n <span class="op">-</span> res<span class="op">),</span> <span class="dv">0</span><span class="op">,</span> res<span class="op">);</span></span>
+<span id="cb9-23">    <span class="cf">return</span> res<span class="op">;</span></span>
+<span id="cb9-24"><span class="op">}</span></span></code></pre></div></div>
+<p><code>copy_from_user()</code>의 본체입니다. 세 가지를 합니다.</p>
+<p><strong>주소가 유저 영역인지 확인합니다.</strong> 고전적인 방법은 <code>access_ok()</code>로 <code>from + n</code>이 유저 주소의 상한을 넘지 않는지 비교하는 것입니다. x86-64는 그 대신 <code>mask_user_address()</code>를 씁니다. 비교하고 분기하는 대신, 주소가 상한보다 크면 조건부 이동 명령어로 상한값으로 <strong>바꿔 버립니다</strong>. 분기가 없으므로 CPU가 잘못 추측해 커널 주소를 읽는 일이 없고, 바뀐 주소는 매핑되지 않은 자리라 폴트로 끝납니다.</p>
+<p><strong>복사합니다.</strong> <code>raw_copy_from_user()</code>는 x86-64에서 이렇게 생겼습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/uaccess_64.h#L118" rel="noopener" target="_blank">arch/x86/include/asm/uaccess_64.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/include/asm/uaccess_64.h" data-line="118" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="dt">static</span> __always_inline __must_check <span class="dt">unsigned</span> <span class="dt">long</span></span>
+<span id="cb10-2">copy_user_generic<span class="op">(</span><span class="dt">void</span> <span class="op">*</span>to<span class="op">,</span> <span class="dt">const</span> <span class="dt">void</span> <span class="op">*</span>from<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">long</span> len<span class="op">)</span></span>
+<span id="cb10-3"><span class="op">{</span></span>
+<span id="cb10-4">    stac<span class="op">();</span></span>
+<span id="cb10-5">    <span class="co">/* ... */</span></span>
+<span id="cb10-6">    asm <span class="dt">volatile</span><span class="op">(</span></span>
+<span id="cb10-7">        <span class="st">"1:</span><span class="sc">\n\t</span><span class="st">"</span></span>
+<span id="cb10-8">        ALTERNATIVE<span class="op">(</span><span class="st">"rep movsb"</span><span class="op">,</span></span>
+<span id="cb10-9">                <span class="st">"call rep_movs_alternative"</span><span class="op">,</span> ALT_NOT<span class="op">(</span>X86_FEATURE_FSRM<span class="op">))</span></span>
+<span id="cb10-10">        <span class="st">"2:</span><span class="sc">\n</span><span class="st">"</span></span>
+<span id="cb10-11">        _ASM_EXTABLE_UA<span class="op">(</span><span class="dv">1</span><span class="er">b</span><span class="op">,</span> <span class="dv">2</span><span class="er">b</span><span class="op">)</span></span>
+<span id="cb10-12">        <span class="op">:</span><span class="st">"+c"</span> <span class="op">(</span>len<span class="op">),</span> <span class="st">"+D"</span> <span class="op">(</span>to<span class="op">),</span> <span class="st">"+S"</span> <span class="op">(</span>from<span class="op">),</span> ASM_CALL_CONSTRAINT</span>
+<span id="cb10-13">        <span class="op">:</span> <span class="op">:</span> <span class="st">"memory"</span><span class="op">,</span> <span class="st">"rax"</span><span class="op">);</span></span>
+<span id="cb10-14">    clac<span class="op">();</span></span>
+<span id="cb10-15">    <span class="cf">return</span> len<span class="op">;</span></span>
+<span id="cb10-16"><span class="op">}</span></span></code></pre></div></div>
+<p>복사 자체는 <code>rep movsb</code> 한 줄입니다. 그 앞뒤의 <code>stac()</code>과 <code>clac()</code>은 <strong>SMAP</strong>을 잠깐 풉니다. SMAP은 커널 모드에서 유저 페이지에 접근하면 폴트를 내는 CPU 기능입니다. 커널이 버그로 유저 포인터를 역참조하는 사고를 하드웨어가 막아 줍니다. 정말로 유저 메모리를 읽어야 하는 이 몇 줄에서만 플래그 하나(<code>AC</code>)를 세워 허용합니다. 짝이 되는 SMEP은 커널 모드에서 유저 페이지의 코드를 <strong>실행</strong>하지 못하게 합니다.</p>
+<p><strong>폴트에 대비합니다.</strong> 주소가 유저 영역이어도 매핑되어 있지 않을 수 있습니다. <code>_ASM_EXTABLE_UA(1b, 2b)</code>가 그 대비입니다. "1번 레이블의 명령어에서 폴트가 나면 2번 레이블로 가라"는 한 쌍을 <strong>예외 테이블</strong>이라는 별도의 섹션에 적어 둡니다.</p>
+<figure class="fig" id="fig-uaccess-fixup"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>copy_from_user 도중의 페이지 폴트 처리: 주소가 VMA 안이면 페이지를 채우고 같은 명령어를 다시 실행하고, 아니면 예외 테이블이 가리키는 곳으로 건너뛰어 남은 바이트 수를 돌려준다</title>
+
+  <rect class="box yellow" x="20" y="20" width="160" height="50" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="100" y="41">주소 누르기</text>
+  <text class="t-code mid" x="100" y="59">mask_user_address()</text>
+  <path class="ln" d="M180 45 H196" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="200" y="20" width="160" height="50" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="280" y="41">SMAP 잠깐 풀기</text>
+  <text class="t-code mid" x="280" y="59">stac()</text>
+  <path class="ln" d="M360 45 H376" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="380" y="20" width="160" height="50" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="460" y="41">복사</text>
+  <text class="t-code mid" x="460" y="59">1: rep movsb</text>
+  <path class="ln" d="M540 45 H556" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="560" y="20" width="160" height="50" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="640" y="41">SMAP 다시 걸기</text>
+  <text class="t-code mid" x="640" y="59">2: clac()</text>
+
+  <path class="ln red" d="M480 70 V100" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="488" y="90">매핑이 없다</text>
+  <rect class="solid" x="360" y="104" width="200" height="34" rx="17"/>
+  <text class="t-b t-on mid" x="460" y="126">페이지 폴트</text>
+  <path class="ln" d="M460 138 V156" marker-end="url(#ah)"/>
+  <rect class="solid" x="340" y="160" width="240" height="34" rx="17"/>
+  <text class="t-b t-on mid" x="460" y="182">주소가 VMA 안인가</text>
+
+  <!-- 예 -->
+  <path class="ln green" d="M340 177 H180 V212" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="40" y="216" width="280" height="64" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="180" y="238">예 · 평소의 폴트</text>
+  <text class="t-xs mid" x="180" y="256">페이지를 채우고 같은 명령어를 다시 실행</text>
+  <text class="t-xs mid" x="180" y="272">복사 코드는 폴트가 났는지도 모른다</text>
+  <path class="ln green dash" d="M60 216 V86 H440 V74" marker-end="url(#ah-green)"/>
+
+  <!-- 아니오 -->
+  <path class="ln red" d="M580 177 H600 V212" marker-end="url(#ah-red)"/>
+  <rect class="box red" x="440" y="216" width="300" height="64" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="590" y="238">아니오 · fixup_exception()</text>
+  <text class="t-xs mid" x="590" y="256">예외 테이블에서 1:의 짝 2:를 찾아</text>
+  <text class="t-xs mid" x="590" y="272">regs-&gt;ip를 그 주소로 바꾼다</text>
+  <path class="ln red dash" d="M710 216 V74" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red end" x="702" y="150">2:에서 이어진다</text>
+
+  <path class="ln" d="M590 280 V302" marker-end="url(#ah)"/>
+  <rect class="box" x="440" y="306" width="300" height="52" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="590" y="328">반환값 = 못 복사한 바이트 수</text>
+  <text class="t-xs mid" x="590" y="346">0이 아니면 호출한 쪽이 −EFAULT를 돌려준다</text>
+</svg></div><figcaption><b>그림 19-5</b><code>copy_from_user()</code> 도중의 페이지 폴트가 가는 두 길. 유효한 주소면 페이지를 채우고 복사를 잇고, 아니면 예외 테이블이 가리키는 곳으로 건너뛰어 남은 바이트 수를 돌려줍니다.</figcaption></figure>
+<p><code>rep movsb</code>가 폴트를 내면 <a href="ch17.html">17장</a>의 페이지 폴트 핸들러가 돕니다. 주소가 VMA 안이면 평소처럼 페이지를 채우고 같은 명령어를 다시 실행합니다. 복사하는 코드는 폴트가 났는지도 모릅니다. VMA 밖이면 커널 코드에 시그널을 보낼 수는 없으므로 <code>fixup_exception()</code>이 예외 테이블에서 폴트 난 명령어의 주소를 찾고, <code>regs-&gt;ip</code>를 짝지어진 주소로 바꿉니다. 실행은 <code>2:</code>에서 이어지고, <code>rcx</code>에는 못 다 복사한 바이트 수가 남아 있습니다. 그것이 반환값이 되고, 호출한 쪽은 0이 아니면 <code>-EFAULT</code>를 돌려줍니다. 정상 경로에는 검사 명령어가 하나도 없고, 비용은 드물게 일어나는 실패 쪽이 다 집니다.</p>
+<div class="callout warn"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-warn"></use></svg>주의</div>
+<p>유저 메모리는 복사한 뒤에만 믿을 수 있습니다. 유저의 구조체에서 길이 필드를 <code>get_user()</code>로 읽어 검사한 다음 같은 구조체를 다시 <code>copy_from_user()</code>로 읽으면, 그 사이에 다른 스레드가 길이를 바꿔 놓을 수 있습니다. 검사한 값과 쓰는 값이 달라지는 <strong>이중 읽기</strong>(double fetch) 버그입니다. 한 번에 커널 버퍼로 복사하고, 검사도 사용도 그 사본으로 합니다.</p>
+</div>
+<p>추측 실행은 범위 검사도 믿지 못하게 만들었습니다. <code>if (nr &lt; NR_syscalls)</code>를 통과하지 못한 값이라도 CPU가 분기를 잘못 예측하면 그 뒤의 코드가 잠깐 실행되고, 흔적이 캐시에 남습니다(Spectre v1). <code>array_index_nospec(nr, NR_syscalls)</code>는 <code>nr</code>이 범위 밖이면 분기 없이 0으로 만드는 마스크 연산입니다. 유저가 준 값으로 배열을 색인하는 곳마다 범위 검사 뒤에 이것이 붙습니다.</p>
+</section>
+<section class="level2" id="return">
+<h2><span class="sec-n">19.7</span>반환값과 재시작<a aria-label="이 절의 링크" class="anchor" href="#return">#</a></h2>
+<p>시스템 콜 함수는 <code>long</code> 하나를 돌려줍니다. 0 이상이면 성공이고, −1에서 −4095(<code>MAX_ERRNO</code>) 사이면 오류 번호의 부호를 바꾼 것입니다. C 라이브러리의 래퍼가 이 범위의 값을 보면 부호를 뒤집어 <code>errno</code>에 넣고 −1을 돌려줍니다. <code>errno</code>는 커널이 아니라 C 라이브러리가 만든 변수입니다.</p>
+<p>유저에게 보이지 않는 오류 번호도 있습니다. <code>read()</code>가 데이터를 기다리며 잠든 사이에 시그널이 오면, 태스크는 깨어나 <code>-ERESTARTSYS</code>(512)를 들고 시스템 콜에서 빠져나옵니다(<a href="ch03.html">3장</a>). 이 값은 유저 모드에 닿기 전에 처리됩니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kernel/signal.c#L254" rel="noopener" target="_blank">arch/x86/kernel/signal.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/kernel/signal.c" data-line="254" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1"><span class="dt">static</span> <span class="dt">void</span></span>
+<span id="cb11-2">handle_signal<span class="op">(</span><span class="kw">struct</span> ksignal <span class="op">*</span>ksig<span class="op">,</span> <span class="kw">struct</span> pt_regs <span class="op">*</span>regs<span class="op">)</span></span>
+<span id="cb11-3"><span class="op">{</span></span>
+<span id="cb11-4">    <span class="co">/* ... */</span></span>
+<span id="cb11-5">    <span class="co">/* Are we from a system call? */</span></span>
+<span id="cb11-6">    <span class="cf">if</span> <span class="op">(</span>syscall_get_nr<span class="op">(</span>current<span class="op">,</span> regs<span class="op">)</span> <span class="op">!=</span> <span class="op">-</span><span class="dv">1</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb11-7">        <span class="co">/* If so, check system call restarting.. */</span></span>
+<span id="cb11-8">        <span class="cf">switch</span> <span class="op">(</span>syscall_get_error<span class="op">(</span>current<span class="op">,</span> regs<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb11-9">        <span class="cf">case</span> <span class="op">-</span>ERESTART_RESTARTBLOCK<span class="op">:</span></span>
+<span id="cb11-10">        <span class="cf">case</span> <span class="op">-</span>ERESTARTNOHAND<span class="op">:</span></span>
+<span id="cb11-11">            regs<span class="op">-&gt;</span>ax <span class="op">=</span> <span class="op">-</span>EINTR<span class="op">;</span></span>
+<span id="cb11-12">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb11-13"></span>
+<span id="cb11-14">        <span class="cf">case</span> <span class="op">-</span>ERESTARTSYS<span class="op">:</span></span>
+<span id="cb11-15">            <span class="cf">if</span> <span class="op">(!(</span>ksig<span class="op">-&gt;</span>ka<span class="op">.</span>sa<span class="op">.</span>sa_flags <span class="op">&amp;</span> SA_RESTART<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb11-16">                regs<span class="op">-&gt;</span>ax <span class="op">=</span> <span class="op">-</span>EINTR<span class="op">;</span></span>
+<span id="cb11-17">                <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb11-18">            <span class="op">}</span></span>
+<span id="cb11-19">            fallthrough<span class="op">;</span></span>
+<span id="cb11-20">        <span class="cf">case</span> <span class="op">-</span>ERESTARTNOINTR<span class="op">:</span></span>
+<span id="cb11-21">            regs<span class="op">-&gt;</span>ax <span class="op">=</span> regs<span class="op">-&gt;</span>orig_ax<span class="op">;</span></span>
+<span id="cb11-22">            regs<span class="op">-&gt;</span>ip <span class="op">-=</span> <span class="dv">2</span><span class="op">;</span></span>
+<span id="cb11-23">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb11-24">        <span class="op">}</span></span>
+<span id="cb11-25">    <span class="op">}</span></span>
+<span id="cb11-26">    <span class="co">/* ... */</span></span>
+<span id="cb11-27"><span class="op">}</span></span></code></pre></div></div>
+<p>시그널 핸들러를 <code>SA_RESTART</code> 없이 등록했다면 유저는 <code>EINTR</code>을 봅니다. <code>SA_RESTART</code>가 있으면 두 줄이 시스템 콜을 <strong>다시 걸어 둡니다</strong>. <code>regs-&gt;ax</code>에 원래 번호(<code>orig_ax</code>)를 되돌려 넣고, <code>regs-&gt;ip</code>를 2 줄입니다. <code>syscall</code> 명령어의 길이가 2바이트이므로, 핸들러가 끝나고 돌아가면 프로그램은 같은 <code>syscall</code> 명령어를 한 번 더 실행합니다. <code>pt_regs</code>에 <code>orig_ax</code>가 따로 있는 까닭이 이것입니다. <code>ax</code>는 반환값으로 덮였기 때문입니다.</p>
+</section>
+<section class="level2" id="vdso">
+<h2><span class="sec-n">19.8</span>커널에 들어오지 않는 시스템 콜: vDSO<a aria-label="이 절의 링크" class="anchor" href="#vdso">#</a></h2>
+<p>시스템 콜은 보통의 함수 호출보다 훨씬 비쌉니다. 모드 전환, 레지스터 저장과 복원에 더해, KPTI가 켜져 있으면 <code>CR3</code>를 두 번 바꾸고, 진입할 때마다 분기 예측기를 다독이는 완화책이 돕니다. 로그 한 줄마다 시각을 찍는 프로그램에게 <code>clock_gettime()</code>의 이 비용은 큽니다.</p>
+<p><strong>vDSO</strong>(virtual dynamic shared object)는 커널이 모든 프로세스의 주소 공간에 매핑해 주는 작은 공유 라이브러리입니다. 코드는 커널 소스에서 빌드되지만 <strong>유저 모드에서 실행됩니다</strong>. 커널은 그 옆에 읽기 전용 데이터 페이지를 매핑하고, 틱마다 현재 시각을 계산하는 데 필요한 값을 거기에 갱신합니다(<a href="ch08.html">8장</a>).</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/lib/vdso/gettimeofday.c#L170" rel="noopener" target="_blank">lib/vdso/gettimeofday.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="lib/vdso/gettimeofday.c" data-line="170" id="cb12"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb12-1"><span class="dt">static</span> __always_inline</span>
+<span id="cb12-2"><span class="dt">bool</span> do_hres<span class="op">(</span><span class="dt">const</span> <span class="kw">struct</span> vdso_time_data <span class="op">*</span>vd<span class="op">,</span> <span class="dt">const</span> <span class="kw">struct</span> vdso_clock <span class="op">*</span>vc<span class="op">,</span></span>
+<span id="cb12-3">         clockid_t clk<span class="op">,</span> <span class="kw">struct</span> __kernel_timespec <span class="op">*</span>ts<span class="op">)</span></span>
+<span id="cb12-4"><span class="op">{</span></span>
+<span id="cb12-5">    u64 sec<span class="op">,</span> ns<span class="op">;</span></span>
+<span id="cb12-6">    u32 seq<span class="op">;</span></span>
+<span id="cb12-7">    <span class="co">/* ... */</span></span>
+<span id="cb12-8">    <span class="cf">do</span> <span class="op">{</span></span>
+<span id="cb12-9">        <span class="cf">if</span> <span class="op">(</span>vdso_read_begin_timens<span class="op">(</span>vc<span class="op">,</span> <span class="op">&amp;</span>seq<span class="op">))</span></span>
+<span id="cb12-10">            <span class="cf">return</span> do_hres_timens<span class="op">(</span>vd<span class="op">,</span> vc<span class="op">,</span> clk<span class="op">,</span> ts<span class="op">);</span></span>
+<span id="cb12-11"></span>
+<span id="cb12-12">        <span class="cf">if</span> <span class="op">(!</span>vdso_get_timestamp<span class="op">(</span>vd<span class="op">,</span> vc<span class="op">,</span> clk<span class="op">,</span> <span class="op">&amp;</span>sec<span class="op">,</span> <span class="op">&amp;</span>ns<span class="op">))</span></span>
+<span id="cb12-13">            <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb12-14">    <span class="op">}</span> <span class="cf">while</span> <span class="op">(</span>vdso_read_retry<span class="op">(</span>vc<span class="op">,</span> seq<span class="op">));</span></span>
+<span id="cb12-15"></span>
+<span id="cb12-16">    vdso_set_timespec<span class="op">(</span>ts<span class="op">,</span> sec<span class="op">,</span> ns<span class="op">);</span></span>
+<span id="cb12-17"></span>
+<span id="cb12-18">    <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb12-19"><span class="op">}</span></span></code></pre></div></div>
+<p>락이 없습니다. 커널이 데이터를 고치는 동안 순번을 홀수로 만들어 두므로, 읽는 쪽은 순번을 읽고, 값을 읽고, 순번이 그대로인지 확인해 달라졌으면 다시 읽습니다. <a href="ch14.html">14장</a>의 seqlock과 같은 방법입니다. <code>vdso_get_timestamp()</code>는 CPU의 타임스탬프 카운터를 유저 모드에서 직접 읽어 마지막 갱신 이후 흐른 시간을 더합니다. vDSO가 처리할 수 없는 경우(시계 종류를 지원하지 않거나 클럭 소스를 유저 모드에서 읽을 수 없을 때)에는 <code>false</code>가 돌아오고 진짜 시스템 콜로 넘어갑니다.</p>
+<figure class="fig" id="fig-vdso-vs-syscall"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 344" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>clock_gettime의 두 경로: vDSO 경로는 유저 모드에서 커널이 갱신해 둔 데이터 페이지를 읽어 끝내고, 시스템 콜 경로는 커널에 들어갔다 나온다</title>
+
+  <text class="t-b" x="20" y="26">vDSO 경로 · 유저 모드를 떠나지 않는다</text>
+  <rect class="panel blue" x="20" y="36" width="720" height="96" rx="12"/>
+  <rect class="box" x="34" y="54" width="150" height="60" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="109" y="78">프로그램</text>
+  <text class="t-code mid" x="109" y="98">clock_gettime()</text>
+  <path class="ln" d="M184 84 H236" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="210" y="74">호출</text>
+  <rect class="box" x="240" y="54" width="230" height="60" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="355" y="78">vDSO의 코드</text>
+  <text class="t-code mid" x="355" y="98">__vdso_clock_gettime()</text>
+  <path class="ln" d="M470 84 H526" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="498" y="74">읽기</text>
+  <rect class="box yellow" x="530" y="54" width="196" height="60" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="628" y="78">데이터 페이지 [vvar]</text>
+  <text class="t-xs mid" x="628" y="98">읽기 전용 · 순번으로 보호</text>
+
+  <path class="ln yellow" d="M628 146 V118" marker-end="url(#ah-yellow)"/>
+  <rect class="box yellow" x="530" y="146" width="196" height="32" rx="8"/>
+  <text class="t-xs t-ink mid" x="628" y="167">커널이 시각 정보를 갱신</text>
+  <text class="t-xs" x="34" y="158">TSC는 vDSO 코드가 직접 읽는다. 커널 진입은 없다</text>
+
+  <path class="ln thin muted dash" d="M20 196 H740"/>
+
+  <text class="t-b" x="20" y="224">시스템 콜 경로 · 같은 답을 커널에 들어가서 얻는다</text>
+  <rect class="box blue" x="34" y="240" width="150" height="60" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="109" y="264">프로그램</text>
+  <text class="t-code mid" x="109" y="284">syscall</text>
+  <path class="ln" d="M184 262 H256" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="220" y="254">모드 전환</text>
+
+  <rect class="panel yellow" x="260" y="234" width="466" height="72" rx="12"/>
+  <rect class="box" x="274" y="248" width="110" height="44" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="329" y="267">진입 코드</text>
+  <text class="t-xs mid" x="329" y="284">pt_regs · 완화책</text>
+  <path class="ln" d="M384 270 H394" marker-end="url(#ah)"/>
+  <rect class="box" x="398" y="248" width="186" height="44" rx="8"/>
+  <text class="t-code t-b mid" x="491" y="267">sys_clock_gettime()</text>
+  <text class="t-xs mid" x="491" y="284">같은 계산</text>
+  <path class="ln" d="M584 270 H594" marker-end="url(#ah)"/>
+  <rect class="box" x="598" y="248" width="114" height="44" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="655" y="267">복귀 코드</text>
+  <text class="t-xs mid" x="655" y="284">레지스터 복원</text>
+  <path class="ln" d="M655 292 V320 H109 V304" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="380" y="336">모드 전환 두 번, 레지스터 저장과 복원, 진입마다 도는 완화책</text>
+</svg></div><figcaption><b>그림 19-6</b>같은 <code>clock_gettime()</code> 호출의 두 경로. vDSO 경로는 유저 모드를 떠나지 않습니다.</figcaption></figure>
+<p>v7.3의 x86-64 vDSO가 내보내는 것은 <code>clock_gettime</code>, <code>gettimeofday</code>, <code>time</code>, <code>clock_getres</code>, <code>getcpu</code>, <code>getrandom</code> 등입니다. <code>getrandom</code>은 6.11에 들어왔습니다. 난수 생성기의 상태를 프로세스 쪽 메모리에 두되, 커널이 그 메모리를 <code>fork()</code>나 메모리 압박 때 지워 버릴 수 있게 표시해 두는 방식입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>vDSO가 어디에 매핑되어 있는지, 시각을 읽는 호출이 정말 시스템 콜을 건너뛰는지 확인합니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ grep -E 'vdso|vvar' /proc/self/maps
+7ffc3a5f2000-7ffc3a5f6000 r--p 00000000 00:00 0   [vvar]
+7ffc3a5f6000-7ffc3a5f8000 r-xp 00000000 00:00 0   [vdso]
+
+$ strace -c date &gt; /dev/null
+% time     seconds  usecs/call     calls    errors syscall
+...</code></pre></div>
+<p><code>strace -c</code>의 표에 <code>clock_gettime</code>은 나오지 않습니다. <code>date</code>는 시각을 읽었지만 커널에 들어오지 않았기 때문입니다. 시스템 전체에서 누가 시스템 콜을 많이 부르는지는 추적점으로 셉니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># bpftrace -e 'tracepoint:raw_syscalls:sys_enter { @[comm] = count(); }'
+# perf trace -s sleep 1</code></pre></div>
+</div>
+<p>vDSO로 옮길 수 없는 시스템 콜의 비용은 횟수를 줄여서 낮춥니다. <code>readv()</code>·<code>sendmmsg()</code>처럼 여러 건을 한 번에 넘기는 호출이 그렇고, 요청과 완료를 공유 메모리의 링에 쌓아 두고 한 번의 진입으로 처리하는 io_uring이 그 끝에 있습니다(<a href="ch21.html">21장</a>).</p>
+</section>
+<section class="level2" id="seccomp">
+<h2><span class="sec-n">19.9</span>문 앞의 검문소: seccomp와 ptrace<a aria-label="이 절의 링크" class="anchor" href="#seccomp">#</a></h2>
+<p>진입 작업의 두 손님을 조금 더 봅니다.</p>
+<p><strong>seccomp</strong>는 프로세스가 스스로에게 거는 시스템 콜 필터입니다. 필터는 작은 BPF 프로그램이고, 입력은 시스템 콜 번호, 아키텍처, 명령어 주소, 인자 여섯 개를 담은 <code>struct seccomp_data</code>입니다. 포인터 인자는 값만 볼 수 있고 가리키는 내용은 읽지 못합니다. 필터의 반환값이 처분을 정합니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>반환값</th>
+<th>처분</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SECCOMP_RET_ALLOW</code></td>
+<td>통과</td>
+</tr>
+<tr>
+<td><code>SECCOMP_RET_ERRNO</code></td>
+<td>시스템 콜을 실행하지 않고 지정한 오류를 돌려줌</td>
+</tr>
+<tr>
+<td><code>SECCOMP_RET_TRAP</code></td>
+<td><code>SIGSYS</code>를 보냄</td>
+</tr>
+<tr>
+<td><code>SECCOMP_RET_USER_NOTIF</code></td>
+<td>태스크를 멈추고 감독 프로세스에 알림. 감독 쪽이 대신 처리하고 결과를 정함</td>
+</tr>
+<tr>
+<td><code>SECCOMP_RET_KILL_PROCESS</code></td>
+<td>프로세스를 죽임</td>
+</tr>
+</tbody>
+</table></div>
+<p>한 번 건 필터는 풀 수 없고 <code>fork()</code>와 <code>execve()</code>를 넘어 이어집니다. 컨테이너 런타임, 브라우저의 렌더러 프로세스, systemd의 서비스 격리가 이것으로 "이 프로세스가 부를 수 있는 시스템 콜"의 목록을 좁힙니다. 커널의 공격 표면은 시스템 콜 전체이므로, 쓰지 않는 문을 닫아 두는 것입니다.</p>
+<figure class="fig" id="fig-entry-work"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>시스템 콜 진입 작업의 순서와 seccomp의 처분: ptrace 보고, seccomp 필터, 추적점과 감사를 거쳐 본체로 가며, 필터의 반환값에 따라 통과, 오류 반환, SIGSYS, 감독 프로세스 통지, 프로세스 종료로 갈린다</title>
+
+  <rect class="box" x="20" y="24" width="120" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="80" y="48">진입</text>
+  <text class="t-xs mid" x="80" y="66">syscall_work 확인</text>
+  <path class="ln" d="M140 52 H156" marker-end="url(#ah)"/>
+
+  <rect class="box" x="160" y="24" width="130" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="225" y="48">ptrace</text>
+  <text class="t-xs mid" x="225" y="66">추적자에게 보고</text>
+  <path class="ln" d="M290 52 H306" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="225" y="98">번호와 인자를 바꿀 수 있다</text>
+
+  <rect class="box warm" x="310" y="24" width="150" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="385" y="48">seccomp</text>
+  <text class="t-xs mid" x="385" y="66">BPF 필터 실행</text>
+  <path class="ln" d="M460 52 H476" marker-end="url(#ah)"/>
+
+  <rect class="box" x="480" y="24" width="120" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="540" y="48">추적점 · 감사</text>
+  <text class="t-xs mid" x="540" y="66">기록만 한다</text>
+  <path class="ln" d="M600 52 H616" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="620" y="24" width="120" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="680" y="48">시스템 콜 본체</text>
+  <text class="t-code mid" x="680" y="66">x64_sys_call()</text>
+
+  <!-- 필터 입력 -->
+  <text class="t-code t-ink" x="400" y="118">입력 · struct seccomp_data</text>
+  <text class="t-code" x="400" y="136">nr · arch · instruction_pointer · args[6]</text>
+  <text class="t-xs" x="400" y="156">포인터 인자는 값만 본다. 가리키는 내용은 읽지 못한다</text>
+
+  <!-- 처분 -->
+  <path class="ln warm" d="M385 80 V186 H88 V200" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M234 186 V200" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M380 186 V200" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M385 186 H526 V200" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M526 186 H672 V200" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm end" x="377" y="176">필터의 반환값</text>
+
+  <rect class="box green" x="20" y="204" width="136" height="54" rx="8"/>
+  <text class="t-code t-b mid" x="88" y="226">RET_ALLOW</text>
+  <text class="t-xs mid" x="88" y="246">통과</text>
+
+  <rect class="box yellow" x="166" y="204" width="136" height="54" rx="8"/>
+  <text class="t-code t-b mid" x="234" y="226">RET_ERRNO</text>
+  <text class="t-xs mid" x="234" y="246">실행 없이 오류 반환</text>
+
+  <rect class="box yellow" x="312" y="204" width="136" height="54" rx="8"/>
+  <text class="t-code t-b mid" x="380" y="226">RET_TRAP</text>
+  <text class="t-xs mid" x="380" y="246">SIGSYS를 보낸다</text>
+
+  <rect class="box blue" x="458" y="204" width="136" height="54" rx="8"/>
+  <text class="t-code t-b mid" x="526" y="226">RET_USER_NOTIF</text>
+  <text class="t-xs mid" x="526" y="246">감독 프로세스가 결정</text>
+
+  <rect class="box red" x="604" y="204" width="136" height="54" rx="8"/>
+  <text class="t-code t-b mid" x="672" y="226">RET_KILL_PROCESS</text>
+  <text class="t-xs mid" x="672" y="246">프로세스 종료</text>
+
+  <text class="t-s mid" x="380" y="284">ALLOW가 아니면 본체는 실행되지 않는다. ptrace 다음에 검사하므로 추적자가 바꾼 값도 걸러진다</text>
+</svg></div><figcaption><b>그림 19-7</b>진입 작업의 순서와 seccomp의 처분. 필터가 통과시키지 않으면 시스템 콜 본체는 실행되지 않습니다.</figcaption></figure>
+<p><strong>ptrace</strong>는 한 프로세스가 다른 프로세스를 멈추고 들여다보는 장치입니다. <code>strace</code>는 대상에 <code>PTRACE_SYSCALL</code>을 걸어 둡니다. 그러면 대상의 <code>syscall_work</code>에 <code>SYSCALL_WORK_SYSCALL_TRACE</code>가 서고, 대상은 시스템 콜에 들어올 때와 나갈 때마다 멈춰 <code>strace</code>를 깨웁니다. <code>strace</code>는 대상의 <code>pt_regs</code>를 읽어 번호와 인자를 출력하고 대상을 다시 보냅니다. 시스템 콜 한 번에 컨텍스트 스위치가 네 번 끼어드는 셈이라, <code>strace</code>를 붙인 프로그램은 눈에 띄게 느려집니다. 운영 중인 시스템에서는 추적점이나 <code>perf trace</code>가 낫습니다.</p>
+</section>
+<section class="level2" id="design">
+<h2><span class="sec-n">19.10</span>새 시스템 콜을 설계하는 법<a aria-label="이 절의 링크" class="anchor" href="#design">#</a></h2>
+<p>시스템 콜은 한 번 릴리스에 들어가면 <strong>영원히</strong> 지원해야 합니다. 번호만이 아니라 인자의 뜻, 구조체의 배치, 오류 번호까지입니다(<a href="ch26.html">26장</a>). 고칠 수 없다면 처음부터 늘릴 자리를 마련해 두어야 합니다. <code>Documentation/process/adding-syscalls.rst</code>는 지난 실수에서 얻은 규칙을 적어 둔 문서입니다. 문서는 <code>dup2</code>/<code>dup3</code>, <code>pipe</code>/<code>pipe2</code>, <code>renameat</code>/<code>renameat2</code>를 "그렇게 하지 않아서 뒤따라 생긴 시스템 콜"의 예로 듭니다.</p>
+<p><strong><code>flags</code> 인자를 두고, 모르는 비트는 거절한다.</strong> v7.3에서 가장 번호가 큰 시스템 콜이 본보기입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/fs/open.c#L621" rel="noopener" target="_blank">fs/open.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="fs/open.c" data-line="621" id="cb15"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb15-1">SYSCALL_DEFINE2<span class="op">(</span>fchroot<span class="op">,</span> <span class="dt">int</span><span class="op">,</span> fd<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span><span class="op">,</span> flags<span class="op">)</span></span>
+<span id="cb15-2"><span class="op">{</span></span>
+<span id="cb15-3">    <span class="kw">struct</span> path path<span class="op">;</span></span>
+<span id="cb15-4">    <span class="dt">int</span> error<span class="op">;</span></span>
+<span id="cb15-5"></span>
+<span id="cb15-6">    <span class="cf">if</span> <span class="op">(</span>flags<span class="op">)</span></span>
+<span id="cb15-7">        <span class="cf">return</span> <span class="op">-</span>EINVAL<span class="op">;</span></span>
+<span id="cb15-8">    <span class="co">/* ... */</span></span>
+<span id="cb15-9"><span class="op">}</span></span></code></pre></div></div>
+<p>지금은 쓰는 플래그가 하나도 없는데도 인자를 두고, 0이 아니면 <code>-EINVAL</code>입니다. 거절이 핵심입니다. 모르는 비트를 조용히 무시하면, 프로그램들이 쓰레기 값을 넣은 채로 굳어져 나중에 그 비트에 뜻을 줄 수 없게 됩니다. <code>open()</code>의 플래그가 이 실수를 했습니다.</p>
+<p><strong>인자가 많으면 크기를 실은 구조체로 받는다.</strong> 구조체에 필드를 덧붙일 수 있게, 유저가 자기가 아는 구조체의 크기를 함께 넘깁니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/uaccess.h#L392" rel="noopener" target="_blank">include/linux/uaccess.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/uaccess.h" data-line="392" id="cb16"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb16-1"><span class="dt">static</span> __always_inline __must_check <span class="dt">int</span></span>
+<span id="cb16-2">copy_struct_from_user<span class="op">(</span><span class="dt">void</span> <span class="op">*</span>dst<span class="op">,</span> <span class="dt">size_t</span> ksize<span class="op">,</span> <span class="dt">const</span> <span class="dt">void</span> __user <span class="op">*</span>src<span class="op">,</span></span>
+<span id="cb16-3">              <span class="dt">size_t</span> usize<span class="op">)</span></span>
+<span id="cb16-4"><span class="op">{</span></span>
+<span id="cb16-5">    <span class="dt">size_t</span> size <span class="op">=</span> min<span class="op">(</span>ksize<span class="op">,</span> usize<span class="op">);</span></span>
+<span id="cb16-6">    <span class="dt">size_t</span> rest <span class="op">=</span> max<span class="op">(</span>ksize<span class="op">,</span> usize<span class="op">)</span> <span class="op">-</span> size<span class="op">;</span></span>
+<span id="cb16-7">    <span class="co">/* ... */</span></span>
+<span id="cb16-8">    <span class="co">/* Deal with trailing bytes. */</span></span>
+<span id="cb16-9">    <span class="cf">if</span> <span class="op">(</span>usize <span class="op">&lt;</span> ksize<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb16-10">        memset<span class="op">(</span>dst <span class="op">+</span> size<span class="op">,</span> <span class="dv">0</span><span class="op">,</span> rest<span class="op">);</span></span>
+<span id="cb16-11">    <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>usize <span class="op">&gt;</span> ksize<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb16-12">        <span class="dt">int</span> ret <span class="op">=</span> check_zeroed_user<span class="op">(</span>src <span class="op">+</span> size<span class="op">,</span> rest<span class="op">);</span></span>
+<span id="cb16-13">        <span class="cf">if</span> <span class="op">(</span>ret <span class="op">&lt;=</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb16-14">            <span class="cf">return</span> ret <span class="op">?:</span> <span class="op">-</span>E2BIG<span class="op">;</span></span>
+<span id="cb16-15">    <span class="op">}</span></span>
+<span id="cb16-16">    <span class="co">/* Copy the interoperable parts of the struct. */</span></span>
+<span id="cb16-17">    <span class="cf">if</span> <span class="op">(</span>copy_from_user<span class="op">(</span>dst<span class="op">,</span> src<span class="op">,</span> size<span class="op">))</span></span>
+<span id="cb16-18">        <span class="cf">return</span> <span class="op">-</span>EFAULT<span class="op">;</span></span>
+<span id="cb16-19">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb16-20"><span class="op">}</span></span></code></pre></div></div>
+<p>옛 프로그램이 새 커널을 부르면(<code>usize &lt; ksize</code>) 모자란 뒷부분을 0으로 채웁니다. 새 필드는 0이 "예전과 같은 동작"을 뜻하도록 설계합니다. 새 프로그램이 옛 커널을 부르면(<code>usize &gt; ksize</code>) 커널이 모르는 뒷부분이 전부 0인지 확인하고, 아니면 <code>-E2BIG</code>입니다. 어느 방향으로 버전이 어긋나도 동작합니다. <code>clone3()</code>와 <code>openat2()</code>가 이 함수로 인자를 받습니다.</p>
+<p><strong>커널 객체는 파일 디스크립터로 가리킨다.</strong> 새 종류의 핸들을 만들지 않습니다. fd는 <code>poll()</code>로 기다릴 수 있고, 다른 프로세스에 넘길 수 있고, 닫으면 정리된다는 의미가 이미 정해져 있습니다. PID 대신 <code>pidfd</code>를 쓰는 최근의 API가 이 규칙을 따른 것입니다. fd를 새로 돌려준다면 <code>O_CLOEXEC</code>에 해당하는 플래그도 함께 받습니다.</p>
+<p><strong>경로를 받는다면 <code>*at()</code> 꼴로 만든다.</strong> 기준 디렉터리의 fd를 함께 받으면 "현재 디렉터리"라는 프로세스 전역 상태에 기대지 않아도 됩니다.</p>
+<figure class="fig" id="fig-open-evolution"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 286" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>파일을 여는 시스템 콜의 세 세대: open은 기준 디렉터리가 없고, openat은 dfd를 더했지만 늘릴 자리가 없고, openat2는 크기가 실린 구조체를 받아 확장할 수 있다</title>
+
+  <rect class="box gray" x="20" y="24" width="226" height="208" rx="12"/>
+  <text class="t-xs" x="32" y="46">번호 2</text>
+  <text class="t-l" x="32" y="72">open()</text>
+  <text class="t-code" x="32" y="94">(path, flags, mode)</text>
+  <text class="t-xs tc-red t-b" x="32" y="124">남은 문제</text>
+  <text class="t-s t-ink" x="32" y="144">기준 디렉터리를 못 정한다</text>
+  <text class="t-s t-ink" x="32" y="164">모르는 플래그를 무시한다</text>
+  <path class="ln" d="M246 128 H263" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="267" y="24" width="226" height="208" rx="12"/>
+  <text class="t-xs" x="279" y="46">번호 257 · 2.6.16</text>
+  <text class="t-l" x="279" y="72">openat()</text>
+  <text class="t-code" x="279" y="94">(dfd, path, flags, mode)</text>
+  <text class="t-xs tc-green t-b" x="279" y="124">더한 것</text>
+  <text class="t-s t-ink" x="279" y="144">dfd · 기준 디렉터리의 fd</text>
+  <text class="t-xs tc-red t-b" x="279" y="174">남은 문제</text>
+  <text class="t-s t-ink" x="279" y="194">인자를 더 붙일 자리가 없다</text>
+  <text class="t-s t-ink" x="279" y="214">모르는 플래그를 여전히 무시</text>
+  <path class="ln" d="M493 128 H510" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="514" y="24" width="226" height="208" rx="12"/>
+  <text class="t-xs" x="526" y="46">번호 437 · 5.6</text>
+  <text class="t-l" x="526" y="72">openat2()</text>
+  <text class="t-code" x="526" y="94">(dfd, path, how, size)</text>
+  <text class="t-xs tc-green t-b" x="526" y="124">더한 것</text>
+  <text class="t-s t-ink" x="526" y="144">how · struct open_how</text>
+  <text class="t-s t-ink" x="526" y="164">size · 구조체의 크기</text>
+  <text class="t-s t-ink" x="526" y="184">모르는 플래그는 EINVAL</text>
+  <text class="t-s t-ink" x="526" y="204">resolve · 경로 해석 제한</text>
+
+  <text class="t-s mid" x="380" y="264">세 번호 모두 v7.3의 표에 남아 있다. 옛 프로그램은 옛 번호를 그대로 부른다</text>
+</svg></div><figcaption><b>그림 19-8</b>파일을 여는 시스템 콜의 세 세대. 앞 세대에 빠진 것이 다음 세대의 인자로 붙었고, 셋째에 이르러 더 늘릴 수 있는 꼴이 되었습니다.</figcaption></figure>
+<p><code>open()</code>의 역사가 이 규칙들의 요약입니다. <code>open(path, flags, mode)</code>은 기준 디렉터리를 정할 수 없어 2.6.16에 <code>openat(dfd, path, flags, mode)</code>가 생겼습니다. <code>openat()</code>은 모르는 플래그를 거절하지 않고 인자를 더 붙일 자리도 없어, 경로 해석을 제한하는 옵션(<code>RESOLVE_BENEATH</code> 등)을 넣으려 했을 때 또 새 번호가 필요했습니다. 5.6의 <code>openat2(dfd, path, how, size)</code>는 구조체 <code>open_how</code>와 그 크기를 받고, 모르는 플래그를 거절합니다. 세 번호 모두 v7.3의 표에 살아 있습니다(2, 257, 437).</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>이 규칙들은 "내보낸 인터페이스는 못 바꾼다"는 전제 하나에서 나옵니다. 못 바꾼다면 두 가지를 처음부터 넣어야 합니다. 하나는 <strong>늘릴 자리</strong>(쓰지 않는 플래그 비트, 크기가 실린 구조체)이고, 다른 하나는 <strong>엄격한 거절</strong>(모르는 입력은 오류)입니다. 뒤쪽이 덜 직관적이지만 더 중요합니다. 관대한 인터페이스는 잘못된 입력에 의존하는 사용자를 만들고, 그 사용자가 생기는 순간 그 잘못된 입력도 지켜야 할 약속이 됩니다. 네트워크 프로토콜, 파일 형식, 라이브러리 API처럼 양쪽을 동시에 고칠 수 없는 모든 경계에 같은 규칙이 통합니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.6.16 · 2006</dt>
+<dd>
+<code>openat()</code>을 비롯한 <code>*at()</code> 계열.
+</dd>
+<dt>2.6.27 · 2008</dt>
+<dd>
+<code>pipe2()</code>, <code>dup3()</code> 등 플래그 인자를 덧붙인 변종들.
+</dd>
+<dt>3.5 · 2012</dt>
+<dd>
+seccomp 필터 모드.
+</dd>
+<dt>5.0 · 2019</dt>
+<dd>
+seccomp 유저 통지(<code>SECCOMP_RET_USER_NOTIF</code>).
+</dd>
+<dt>5.3 · 2019</dt>
+<dd>
+<code>clone3()</code>. 크기를 실은 구조체로 인자를 받습니다.
+</dd>
+<dt>5.6 · 2020</dt>
+<dd>
+<code>openat2()</code>.
+</dd>
+<dt>6.9 · 2024</dt>
+<dd>
+x86의 디스패치가 함수 포인터 표에서 <code>switch</code> 문으로 바뀝니다.
+</dd>
+<dt>6.11 · 2024</dt>
+<dd>
+vDSO의 <code>getrandom()</code>.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>64비트 x86의 시스템 콜은 <code>syscall</code> 명령어로 들어옵니다. CPU는 <code>rip</code>와 플래그를 레지스터에 옮기고 뛸 뿐이고, 스택 전환과 레지스터 저장은 <code>entry_SYSCALL_64</code>가 합니다.</li>
+<li>유저의 레지스터는 커널 스택에 <code>struct pt_regs</code>로 쌓입니다. 인자 읽기, 반환값 쓰기, ptrace, 재시작이 모두 이 구조체를 통합니다.</li>
+<li><code>do_syscall_64()</code>는 공용 진입 작업(ptrace, seccomp, 추적), 디스패치, 공용 복귀 작업(스케줄, 시그널)의 세 단계입니다.</li>
+<li>v7.3의 x86은 번호를 <code>switch</code> 문으로 함수에 연결합니다. 표는 <code>syscall_64.tbl</code>이고 번호는 다시 쓰지 않습니다.</li>
+<li><code>SYSCALL_DEFINEn</code>은 <code>pt_regs</code>에서 인자를 꺼내는 함수, 타입을 맞추는 함수, 본체를 만들어 냅니다.</li>
+<li>유저 메모리는 <code>copy_from_user()</code> 계열로만 읽습니다. 주소를 유저 영역으로 누르고, SMAP을 잠깐 풀고, 폴트는 예외 테이블로 복구합니다.</li>
+<li>vDSO는 일부 시스템 콜을 유저 모드에서 끝냅니다.</li>
+<li>새 시스템 콜에는 <code>flags</code>와 크기가 실린 구조체를 넣고 모르는 입력은 거절합니다. 한 번 내보내면 바꿀 수 없기 때문입니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p><code>entry_SYSCALL_64</code>의 첫 명령어가 <code>swapgs</code>여야 하는 까닭은 무엇입니까? 이 명령어 전에 커널이 할 수 없는 일은 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>syscall</code> 명령어는 스택도 바꾸지 않고 레지스터도 저장하지 않으므로, 진입 직후에는 유저의 <code>rsp</code>를 쥐고 있고 자유롭게 쓸 레지스터가 없습니다. 커널 스택의 위치는 CPU별 변수에 있고, CPU별 변수는 <code>gs</code> 베이스를 기준으로 접근합니다. <code>swapgs</code>로 <code>gs</code>를 커널 값으로 바꾸기 전에는 CPU별 데이터에 접근할 수 없으므로, 유저의 <code>rsp</code>를 치워 둘 곳도 커널 스택 주소를 읽을 곳도 없습니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>x86-64에서 존재하지 않는 번호 9999로 <code>syscall</code>을 부르면 <code>-ENOSYS</code>가 돌아옵니다. v7.3의 코드에서 이 값이 만들어질 수 있는 자리 두 곳을 찾아보세요.</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>첫째, 어셈블리 진입 코드의 <code>PUSH_AND_CLEAR_REGS rax=$-ENOSYS</code>가 <code>pt_regs-&gt;ax</code>를 미리 <code>-ENOSYS</code>로 채워 둡니다. <code>do_syscall_x64()</code>는 <code>nr &lt; NR_syscalls</code>가 거짓이면 아무것도 하지 않으므로(x32 범위에도 들지 않으면) 이 값이 그대로 유저에게 돌아갑니다. 9999가 이 경우입니다. 둘째, 번호가 범위 안이지만 표에 함수가 없는 경우에는 <code>x64_sys_call()</code>의 <code>default</code>가 <code>__x64_sys_ni_syscall()</code>을 불러 <code>-ENOSYS</code>를 돌려줍니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>인자가 둘인 시스템 콜을 부르면서 <code>rdx</code>, <code>r10</code>에 임의의 값을 넣어 두었습니다. 이 값은 시스템 콜 본체(<code>__do_sys_*</code>)에 전달됩니까? 어느 코드가 그것을 정합니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>전달되지 않습니다. <code>SYSCALL_DEFINE2</code>가 만든 <code>__x64_sys_*()</code> 스텁은 <code>SC_X86_64_REGS_TO_ARGS</code>로 <code>regs-&gt;di</code>와 <code>regs-&gt;si</code>만 꺼내 <code>__se_sys_*()</code>에 넘깁니다. 나머지 레지스터 값은 <code>pt_regs</code>에 저장되어 있을 뿐 어떤 함수의 인자로도 쓰이지 않습니다. 게다가 진입 코드의 <code>PUSH_AND_CLEAR_REGS</code>가 실제 레지스터를 0으로 지웠으므로, 추측 실행으로도 그 값이 커널 코드에 흘러들지 않습니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>copy_from_user(kbuf, ubuf, 4096)</code>에서 <code>ubuf</code>의 앞 100바이트만 매핑되어 있고 그 뒤는 어떤 VMA에도 속하지 않습니다. 반환값은 얼마이고, <code>kbuf</code>의 내용은 어떻게 됩니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>100바이트를 복사한 뒤 <code>rep movsb</code>가 폴트를 냅니다. 주소가 VMA 밖이므로 페이지 폴트 핸들러는 <code>fixup_exception()</code>으로 가고, 예외 테이블이 가리키는 <code>2:</code> 레이블에서 실행이 이어집니다. <code>rcx</code>에 남은 3996이 반환값입니다. <code>_inline_copy_from_user()</code>는 <code>res</code>가 0이 아니므로 <code>memset(to + (n - res), 0, res)</code>로 <code>kbuf</code>의 나머지 3996바이트를 0으로 채웁니다. 커널 스택이나 힙에 있던 이전 내용이 유저에게 새어 나가지 않게 하려는 것입니다. 호출한 쪽은 보통 반환값이 0이 아니면 <code>-EFAULT</code>를 돌려줍니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>openat2()</code>를 아는 새 프로그램이 <code>open_how</code>에 커널이 모르는 새 필드를 채워 옛 커널을 불렀습니다. 커널은 어떻게 반응하고, 이 동작이 "조용히 무시"보다 나은 까닭은 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>usize &gt; ksize</code>이므로 <code>copy_struct_from_user()</code>가 <code>check_zeroed_user()</code>로 커널이 모르는 뒷부분을 검사하고, 0이 아닌 바이트가 있으므로 <code>-E2BIG</code>를 돌려줍니다. 프로그램은 이 커널이 그 기능을 지원하지 않는다는 것을 알고 다른 방법을 쓸 수 있습니다. 조용히 무시했다면 프로그램은 요청이 받아들여졌다고 믿습니다. 그 필드가 "이 디렉터리 밖으로 나가지 마라" 같은 보안 제약이었다면, 제약 없이 파일이 열리는 사고가 됩니다.</p>
+</div></details></div></div>
+
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>시스템 콜<small>system call</small></dt>
+<dd>
+유저 프로그램이 커널에 일을 요청하는 진입 수단. 번호로 구분한다.
+</dd>
+<dt>pt_regs</dt>
+<dd>
+커널 진입 시점의 유저 레지스터를 커널 스택에 저장한 구조체.
+</dd>
+<dt>swapgs</dt>
+<dd>
+<code>gs</code> 세그먼트 베이스를 유저 값과 커널 값 사이에서 맞바꾸는 x86-64 명령어.
+</dd>
+<dt>진입 작업 / 복귀 작업<small>entry / exit work</small></dt>
+<dd>
+시스템 콜 본체 앞뒤에서 공용 코드가 처리하는 일. ptrace, seccomp, 추적, 스케줄, 시그널 전달.
+</dd>
+<dt>SYSCALL_DEFINEn</dt>
+<dd>
+시스템 콜 본체와 그 래퍼, 추적용 메타데이터를 함께 만들어 내는 매크로.
+</dd>
+<dt>__user</dt>
+<dd>
+유저 공간 주소임을 표시하는 포인터 주석. sparse가 직접 역참조를 잡아낸다.
+</dd>
+<dt>SMAP</dt>
+<dd>
+커널 모드에서 유저 페이지에 접근하면 폴트를 내는 CPU 기능. <code>stac</code>/<code>clac</code>으로 잠깐 푼다.
+</dd>
+<dt>예외 테이블<small>exception table</small></dt>
+<dd>
+폴트가 나도 되는 커널 명령어의 주소와, 폴트 시 이어서 실행할 주소의 쌍을 모아 둔 표.
+</dd>
+<dt>vDSO</dt>
+<dd>
+커널이 모든 프로세스에 매핑하는 작은 공유 라이브러리. 일부 시스템 콜을 유저 모드에서 처리한다.
+</dd>
+<dt>seccomp</dt>
+<dd>
+프로세스가 스스로에게 거는 시스템 콜 필터. BPF 프로그램으로 쓴다.
+</dd>
+<dt>-ERESTARTSYS</dt>
+<dd>
+시그널로 끊긴 시스템 콜을 다시 걸 수 있음을 뜻하는 커널 내부 오류 번호. 유저에게는 보이지 않는다.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/process/adding-syscalls.html" rel="noopener" target="_blank"><code>Documentation/process/adding-syscalls.rst</code></a>: 새 시스템 콜의 설계 규칙과 추가 절차.</li>
+<li><a href="https://docs.kernel.org/userspace-api/seccomp_filter.html" rel="noopener" target="_blank"><code>Documentation/userspace-api/seccomp_filter.rst</code></a>: seccomp 필터의 반환값과 유저 통지.</li>
+<li><a href="https://docs.kernel.org/arch/x86/x86_64/fred.html" rel="noopener" target="_blank"><code>Documentation/arch/x86/x86_64/fred.rst</code></a>: FRED의 진입과 복귀.</li>
+<li><a href="https://docs.kernel.org/arch/x86/exception-tables.html" rel="noopener" target="_blank"><code>Documentation/arch/x86/exception-tables.rst</code></a>: 예외 테이블이 만들어지고 쓰이는 과정.</li>
+<li><a href="https://man7.org/linux/man-pages/man2/syscall.2.html" rel="noopener" target="_blank">syscall(2)</a>: 아키텍처별 호출 규약 표.</li>
+<li><a href="https://man7.org/linux/man-pages/man2/openat2.2.html" rel="noopener" target="_blank">openat2(2)</a>: 확장 가능한 구조체 인자의 본보기.</li>
+<li><a href="https://man7.org/linux/man-pages/man7/vdso.7.html" rel="noopener" target="_blank">vdso(7)</a>: 아키텍처별로 vDSO가 내보내는 함수.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch18.html"><small>← 18장</small><b>물리 메모리와 회수</b></a><a class="next" href="ch20.html"><small>20장 →</small><b>VFS와 파일시스템</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#boundary">경계를 넘는 방법</a><a href="#entry">entry_SYSCALL_64: 처음 서른 줄</a><a href="#path">진입에서 복귀까지</a><a href="#table">번호에서 함수로</a><a href="#define">SYSCALL_DEFINE가 펼쳐지는 모습</a><a href="#uaccess">유저 메모리 접근</a><a href="#return">반환값과 재시작</a><a href="#vdso">커널에 들어오지 않는 시스템 콜: vDSO</a><a href="#seccomp">문 앞의 검문소: seccomp와 ptrace</a><a href="#design">새 시스템 콜을 설계하는 법</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

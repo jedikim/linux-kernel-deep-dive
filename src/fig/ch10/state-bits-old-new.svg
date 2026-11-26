@@ -1,0 +1,48 @@
+<svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg">
+  <title>IRQ 상태 비트의 분할: 예전에 desc-&gt;status 한 워드에 있던 IRQ_DISABLED, IRQ_INPROGRESS는 칩 드라이버도 읽는 IRQD_* 로, IRQ_PENDING, IRQ_WAITING은 코어 전용 IRQS_* 로 갈라졌다</title>
+
+  <!-- 예전 -->
+  <text class="t-b" x="20" y="26">예전</text>
+  <text class="t-mono" x="60" y="26">desc-&gt;status</text>
+  <text class="t-xs" x="20" y="46">모든 상태가 한 워드에. 누구나 읽고 썼다</text>
+  <rect class="box gray" x="20" y="70" width="230" height="34"/>
+  <text class="t-code" x="32" y="92">IRQ_DISABLED</text>
+  <rect class="box gray" x="20" y="104" width="230" height="34"/>
+  <text class="t-code" x="32" y="126">IRQ_INPROGRESS</text>
+  <rect class="box gray" x="20" y="244" width="230" height="34"/>
+  <text class="t-code" x="32" y="266">IRQ_PENDING</text>
+  <rect class="box gray" x="20" y="278" width="230" height="34"/>
+  <text class="t-code" x="32" y="300">IRQ_WAITING</text>
+  <rect class="ghost dash" x="20" y="162" width="230" height="58"/>
+  <text class="t-code" x="32" y="186">IRQ_LEVEL  IRQ_MASKED</text>
+  <text class="t-xs" x="32" y="206">그 밖의 설정 비트들</text>
+
+  <!-- IRQD -->
+  <rect class="panel warm" x="400" y="16" width="340" height="162" rx="12"/>
+  <text class="t-b tc-warm" x="414" y="40">IRQD_*</text>
+  <text class="t-xs end" x="728" y="40">칩 드라이버도 읽을 수 있다</text>
+  <text class="t-code" x="414" y="60">irq_common_data.state_use_accessors</text>
+  <rect class="box" x="414" y="70" width="312" height="30"/>
+  <text class="t-code" x="426" y="90">IRQD_IRQ_DISABLED</text>
+  <rect class="box" x="414" y="104" width="312" height="30"/>
+  <text class="t-code" x="426" y="124">IRQD_IRQ_INPROGRESS</text>
+  <rect class="box" x="414" y="138" width="312" height="30"/>
+  <text class="t-code" x="426" y="158">IRQD_IRQ_MASKED  IRQD_LEVEL  …</text>
+
+  <!-- IRQS -->
+  <rect class="panel red" x="400" y="194" width="340" height="162" rx="12"/>
+  <text class="t-b tc-red" x="414" y="218">IRQS_*</text>
+  <text class="t-xs end" x="728" y="218">kernel/irq/ 안에서만 쓴다</text>
+  <text class="t-code" x="414" y="238">core_internal_state__do_not_mess_with_it</text>
+  <rect class="box" x="414" y="248" width="312" height="30"/>
+  <text class="t-code" x="426" y="268">IRQS_PENDING</text>
+  <rect class="box" x="414" y="282" width="312" height="30"/>
+  <text class="t-code" x="426" y="302">IRQS_WAITING</text>
+  <rect class="box" x="414" y="316" width="312" height="30"/>
+  <text class="t-code" x="426" y="336">IRQS_REPLAY  IRQS_ONESHOT  …</text>
+
+  <path class="ln warm" d="M250 86 H409" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M250 120 H409" marker-end="url(#ah-warm)"/>
+  <path class="ln red" d="M250 262 H409" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M250 296 H409" marker-end="url(#ah-red)"/>
+</svg>

@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>멀티코어 스케줄링 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="어느 CPU에서 깨울 것인가, 언제 옮길 것인가">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="멀티코어 스케줄링 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="어느 CPU에서 깨울 것인가, 언제 옮길 것인가">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch07" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html" aria-current="page"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">2부 스케줄러 › <b>7장 멀티코어 스케줄링</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-green">
+<div class="ch-kicker"><span class="ch-no">07</span><span class="part">2부 · 스케줄러</span></div>
+<h1>멀티코어 스케줄링</h1>
+<p class="ch-sub">어느 CPU에서 깨울 것인가, 언제 옮길 것인가</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 50분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/topology.c" target="_blank" rel="noopener">kernel/sched/topology.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c" target="_blank" rel="noopener">kernel/sched/fair.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/pelt.c" target="_blank" rel="noopener">kernel/sched/pelt.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/cpufreq_schedutil.c" target="_blank" rel="noopener">kernel/sched/cpufreq_schedutil.c</a></div>
+</header><div class="lead">
+<p>CPU가 하나라면 스케줄러의 질문은 "다음에 누구를 돌릴까" 하나입니다. CPU가 여럿이면 질문이 하나 더 생깁니다. "이 태스크를 <strong>어디에서</strong> 돌릴까." 놀고 있는 CPU로 보내면 당장은 빨리 돌지만, 방금까지 쓰던 캐시를 버리게 됩니다. 캐시가 따뜻한 CPU에서 기다리게 하면 그 사이 다른 CPU가 놉니다. 코어마다 크기가 다르고 메모리가 노드마다 흩어진 하드웨어에서는 답이 더 복잡해집니다. 이 장은 그 판단이 내려지는 두 자리, 깨울 때와 균형을 맞출 때를 따라갑니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>스케줄러는 CPU들의 배치(SMT, 캐시, 소켓, NUMA)를 어떤 자료구조로 알고 있는가?</li>
+<li>깨어난 태스크가 들어갈 CPU는 어떤 순서로 정해지는가?</li>
+<li>"부하"와 "이용률"은 어떻게 재는가?</li>
+<li>부하 분산은 언제 일어나고, 어떤 태스크는 옮기지 않는가?</li>
+<li>크기가 다른 코어, NUMA, 공유 캐시는 배치에 각각 어떻게 반영되는가?</li>
+</ul>
+</div>
+<section class="level2" id="two-decisions">
+<h2><span class="sec-n">7.1</span>두 번의 결정<a aria-label="이 절의 링크" class="anchor" href="#two-decisions">#</a></h2>
+<p>런큐는 CPU마다 하나입니다(<a href="ch04.html">4장</a>). 태스크는 한 번에 런큐 하나에만 들어 있고, 그 런큐의 CPU에서만 실행됩니다. 그래서 "어디에서 돌릴까"는 "어느 런큐에 넣을까"와 같은 말입니다. 이 결정은 두 번 내려집니다.</p>
+<ul>
+<li><strong>깨울 때.</strong> 잠들었던 태스크가 깨어나거나 새 태스크가 만들어질 때, 넣을 런큐를 고릅니다. 태스크가 아직 어느 큐에도 없으므로 옮기는 비용이 없습니다. 가장 싸고 가장 자주 일어나는 결정입니다.</li>
+<li><strong>균형을 맞출 때.</strong> 이미 런큐에 있는 태스크를 다른 런큐로 옮깁니다. 깨울 때의 결정은 그 순간의 정보로 내린 것이라 시간이 지나면 어긋납니다. 한 CPU에 태스크가 쌓이고 옆 CPU가 놀면 <strong>부하 분산</strong>(load balancing)이 바로잡습니다.</li>
+</ul>
+<figure class="fig" id="fig-two-decisions"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>태스크의 CPU가 정해지는 두 자리: 깨울 때 넣을 런큐를 고르고, 부하 분산은 바쁜 런큐의 태스크를 한가한 런큐로 끌어온다.</title>
+
+  <!-- 깨어난 태스크 -->
+  <rect class="solid blue" x="20" y="116" width="100" height="44" rx="8"/>
+  <text class="t-s t-b t-on mid" x="70" y="143">깨어난 태스크</text>
+  <path class="ln blue" d="M120 138 H176" marker-end="url(#ah-blue)"/>
+  <text class="t-s tc-blue t-b" x="20" y="100">① 깨울 때</text>
+
+  <!-- CPU 0 -->
+  <rect class="panel yellow" x="180" y="64" width="170" height="150" rx="12"/>
+  <text class="t-b" x="194" y="88">CPU 0의 런큐</text>
+  <rect class="solid green" x="194" y="100" width="64" height="24" rx="5"/>
+  <text class="t-xs t-on mid" x="226" y="117">태스크</text>
+  <rect class="ghost blue dash" x="194" y="130" width="64" height="24" rx="5"/>
+  <text class="t-xs" x="194" y="200">여유가 있다</text>
+
+  <!-- CPU 1 -->
+  <rect class="panel yellow" x="370" y="64" width="170" height="150" rx="12"/>
+  <text class="t-b" x="384" y="88">CPU 1의 런큐</text>
+  <rect class="solid green" x="384" y="100" width="64" height="24" rx="5"/>
+  <text class="t-xs t-on mid" x="416" y="117">태스크</text>
+  <rect class="solid green" x="384" y="130" width="64" height="24" rx="5"/>
+  <text class="t-xs t-on mid" x="416" y="147">태스크</text>
+  <rect class="solid green" x="384" y="160" width="64" height="24" rx="5"/>
+  <text class="t-xs t-on mid" x="416" y="177">태스크</text>
+  <rect class="solid warm" x="462" y="100" width="64" height="24" rx="5"/>
+  <text class="t-xs t-on mid" x="494" y="117">태스크</text>
+  <text class="t-xs tc-red" x="384" y="204">쌓여 있다</text>
+
+  <!-- CPU 2 -->
+  <rect class="panel yellow" x="560" y="64" width="180" height="150" rx="12"/>
+  <text class="t-b" x="574" y="88">CPU 2의 런큐</text>
+  <rect class="ghost warm dash" x="574" y="100" width="64" height="24" rx="5"/>
+  <text class="t-xs" x="574" y="200">비어 있다</text>
+
+  <!-- 부하 분산 -->
+  <path class="ln warm" d="M526 112 H570" marker-end="url(#ah-warm)"/>
+  <text class="t-s tc-warm t-b mid" x="550" y="50">② 부하 분산</text>
+
+  <text class="t-s t-ink" x="20" y="250">① 넣을 런큐를 고른다. 아직 어느 큐에도 없으므로 옮기는 비용이 없다. 가장 자주 일어난다</text>
+  <text class="t-s t-ink" x="20" y="274">② 이미 들어 있는 태스크를 끌어온다. 놀던 CPU를 쓰는 대신 따뜻한 캐시를 버린다</text>
+</svg></div><figcaption><b>그림 7-1</b>태스크의 CPU가 정해지는 두 자리. 깨울 때는 넣을 런큐를 고르고, 부하 분산은 이미 들어 있는 태스크를 바쁜 런큐에서 한가한 런큐로 끌어옵니다.</figcaption></figure>
+<p>두 결정 모두 같은 긴장 위에 있습니다. 태스크를 <strong>퍼뜨리면</strong> 놀고 있는 CPU가 줄고, <strong>모아 두면</strong> 캐시와 메모리가 가까이 있습니다. 어느 쪽이 나은지는 CPU들이 서로 얼마나 가까운지에 달려 있습니다. 스케줄러가 그 거리를 아는 방법부터 봅니다.</p>
+</section>
+<section class="level2" id="domains">
+<h2><span class="sec-n">7.2</span>스케줄 도메인<a aria-label="이 절의 링크" class="anchor" href="#domains">#</a></h2>
+<p>CPU들은 평평하게 놓여 있지 않습니다. 한 코어의 두 하드웨어 스레드(SMT)는 연산 장치를 같이 쓰고, 한 칩의 코어들은 마지막 단계 캐시(LLC, 보통 L3)를 같이 쓰고, 소켓이 다르면 메모리까지 멀어집니다. 스케줄러는 이 구조를 <strong>스케줄 도메인</strong>(scheduling domain)의 계층으로 가지고 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/topology.c#L2089" rel="noopener" target="_blank">kernel/sched/topology.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/topology.c" data-line="2089" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="dt">static</span> <span class="kw">struct</span> sched_domain_topology_level default_topology<span class="op">[]</span> <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb1-2"><span class="pp">#ifdef CONFIG_SCHED_SMT</span></span>
+<span id="cb1-3">    SDTL_INIT<span class="op">(</span>tl_smt_mask<span class="op">,</span> cpu_smt_flags<span class="op">,</span> SMT<span class="op">),</span></span>
+<span id="cb1-4"><span class="pp">#endif</span></span>
+<span id="cb1-5"></span>
+<span id="cb1-6"><span class="pp">#ifdef CONFIG_SCHED_CLUSTER</span></span>
+<span id="cb1-7">    SDTL_INIT<span class="op">(</span>tl_cls_mask<span class="op">,</span> cpu_cluster_flags<span class="op">,</span> CLS<span class="op">),</span></span>
+<span id="cb1-8"><span class="pp">#endif</span></span>
+<span id="cb1-9"></span>
+<span id="cb1-10"><span class="pp">#ifdef CONFIG_SCHED_MC</span></span>
+<span id="cb1-11">    SDTL_INIT<span class="op">(</span>tl_mc_mask<span class="op">,</span> cpu_core_flags<span class="op">,</span> MC<span class="op">),</span></span>
+<span id="cb1-12"><span class="pp">#endif</span></span>
+<span id="cb1-13">    SDTL_INIT<span class="op">(</span>tl_pkg_mask<span class="op">,</span> NULL<span class="op">,</span> PKG<span class="op">),</span></span>
+<span id="cb1-14">    <span class="op">{</span> NULL<span class="op">,</span> <span class="op">},</span></span>
+<span id="cb1-15"><span class="op">};</span></span></code></pre></div></div>
+<p>아래에서 위로 SMT(같은 코어), CLS(L2 등을 같이 쓰는 클러스터), MC(같은 LLC), PKG(같은 패키지)입니다. NUMA 머신에서는 그 위에 노드 사이의 거리마다 NUMA 단계가 더 쌓입니다. 하드웨어에 없는 단계나 아래 단계와 범위가 같은 단계는 만들어지지 않습니다.</p>
+<figure class="fig" id="fig-domain-hierarchy"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 350" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>2소켓, 소켓당 4코어, 코어당 2스레드 머신에서 CPU 0의 스케줄 도메인: SMT 도메인은 CPU 0과 8, MC 도메인은 소켓 0의 여덟 CPU, NUMA 도메인은 전체 열여섯 CPU를 덮고, 각 도메인은 아래 단계의 덩어리를 그룹으로 가진다.</title>
+
+  <!-- 표 -->
+  <text class="t-xs" x="20" y="18">CPU 0의 도메인 (rq->sd에서 parent를 따라 위로)</text>
+  <text class="t-xs" x="270" y="18">범위</text>
+  <text class="t-xs" x="430" y="18">그룹</text>
+
+  <rect class="box purple" x="20" y="26" width="720" height="30" rx="6"/>
+  <text class="t-mono t-b" x="32" y="46">domain2 · NUMA</text>
+  <text class="t-code" x="270" y="46">0-15</text>
+  <text class="t-code" x="430" y="46">{0-3,8-11} {4-7,12-15}</text>
+
+  <rect class="box green" x="20" y="62" width="720" height="30" rx="6"/>
+  <text class="t-mono t-b" x="32" y="82">domain1 · MC</text>
+  <text class="t-code" x="270" y="82">0-3,8-11</text>
+  <text class="t-code" x="430" y="82">{0,8} {1,9} {2,10} {3,11}</text>
+
+  <rect class="box blue" x="20" y="98" width="720" height="30" rx="6"/>
+  <text class="t-mono t-b" x="32" y="118">domain0 · SMT</text>
+  <text class="t-code" x="270" y="118">0,8</text>
+  <text class="t-code" x="430" y="118">{0} {8}</text>
+
+  <!-- 배치 -->
+  <rect class="ghost purple" x="10" y="150" width="740" height="156" rx="12"/>
+  <text class="t-s tc-purple t-b" x="24" y="172">NUMA</text>
+  <text class="t-xs" x="74" y="172">소켓 사이. 메모리가 멀다</text>
+
+  <rect class="panel green" x="18" y="184" width="358" height="112" rx="10"/>
+  <text class="t-s tc-green t-b" x="32" y="206">MC</text>
+  <text class="t-xs" x="60" y="206">소켓 0 · L3를 같이 쓴다</text>
+  <rect class="panel gray" x="388" y="184" width="352" height="112" rx="10"/>
+  <text class="t-xs" x="402" y="206">소켓 1</text>
+
+  <rect class="ghost blue" x="24" y="216" width="84" height="72" rx="8"/>
+  <text class="t-xs tc-blue t-b mid" x="66" y="280">SMT</text>
+
+  <!-- CPU 상자: 소켓 0 -->
+  <rect class="solid blue" x="28" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code t-b t-on mid" x="46" y="246">0</text>
+  <rect class="box blue" x="68" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="86" y="246">8</text>
+
+  <rect class="box" x="116" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="134" y="246">1</text>
+  <rect class="box" x="156" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="174" y="246">9</text>
+
+  <rect class="box" x="204" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="222" y="246">2</text>
+  <rect class="box" x="244" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="262" y="246">10</text>
+
+  <rect class="box" x="292" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="310" y="246">3</text>
+  <rect class="box" x="332" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="350" y="246">11</text>
+
+  <!-- 소켓 1 -->
+  <rect class="box" x="396" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="414" y="246">4</text>
+  <rect class="box" x="436" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="454" y="246">12</text>
+
+  <rect class="box" x="484" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="502" y="246">5</text>
+  <rect class="box" x="524" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="542" y="246">13</text>
+
+  <rect class="box" x="572" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="590" y="246">6</text>
+  <rect class="box" x="612" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="630" y="246">14</text>
+
+  <rect class="box" x="660" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="678" y="246">7</text>
+  <rect class="box" x="700" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="718" y="246">15</text>
+
+  <text class="t-xs" x="118" y="280">코어 하나에 CPU 둘</text>
+
+  <text class="t-s mid" x="380" y="332">이 머신은 소켓 하나가 LLC 하나라 PKG 단계가 MC와 범위가 같다. 같은 범위의 단계는 만들어지지 않는다</text>
+</svg></div><figcaption><b>그림 7-2</b>2소켓, 소켓당 4코어, 코어당 2스레드인 머신에서 CPU 0이 보는 도메인 계층. 위로 갈수록 범위가 넓어지고, 각 도메인은 한 단계 아래의 덩어리들을 그룹으로 가집니다.</figcaption></figure>
+<p>자료구조는 둘입니다.</p>
+<ul>
+<li><strong><code>struct sched_domain</code></strong>: CPU마다, 단계마다 하나씩 있습니다. <code>rq-&gt;sd</code>가 가장 아래 도메인을 가리키고 <code>sd-&gt;parent</code>로 올라갑니다. 범위(<code>span</code>), 성질을 나타내는 플래그(<code>SD_SHARE_LLC</code>, <code>SD_NUMA</code> 등), 균형 주기 같은 매개변수를 가집니다.</li>
+<li><strong><code>struct sched_group</code></strong>: 한 도메인을 나눈 조각입니다. 그림의 MC 도메인은 코어 네 개가 그룹 네 개이고, NUMA 도메인은 소켓 둘이 그룹 둘입니다. 부하 분산은 <strong>같은 도메인 안의 그룹끼리</strong> 견줍니다.</li>
+</ul>
+<p>자주 쓰는 도메인은 CPU별 포인터로 따로 꺼내 둡니다. <code>sd_llc</code>는 이 CPU가 LLC를 같이 쓰는 가장 넓은 도메인이고, 깨울 CPU를 찾는 범위가 됩니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>토폴로지를 확인합니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ lscpu -e
+CPU NODE SOCKET CORE L1d:L1i:L2:L3 ONLINE
+  0    0      0    0 0:0:0:0          yes
+  1    0      0    1 1:1:1:0          yes
+...
+$ cat /sys/devices/system/cpu/cpu0/topology/core_cpus_list
+0,8
+$ cat /sys/devices/system/cpu/cpu0/cache/index3/shared_cpu_list
+0-3,8-11</code></pre></div>
+<p><code>core_cpus_list</code>가 SMT 형제이고, <code>index3/shared_cpu_list</code>가 L3를 같이 쓰는 CPU, 곧 MC 도메인의 범위입니다. 커널이 실제로 만든 도메인은 debugfs에 있습니다. 디렉터리가 비어 있으면 먼저 <code>verbose</code>를 켭니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># echo Y &gt; /sys/kernel/debug/sched/verbose
+# grep . /sys/kernel/debug/sched/domains/cpu0/domain*/name
+/sys/kernel/debug/sched/domains/cpu0/domain0/name:SMT
+/sys/kernel/debug/sched/domains/cpu0/domain1/name:MC
+/sys/kernel/debug/sched/domains/cpu0/domain2/name:NUMA</code></pre></div>
+<p>같은 디렉터리의 <code>flags</code>, <code>min_interval</code>, <code>imbalance_pct</code>가 이 장에서 나오는 매개변수입니다.</p>
+</div>
+</section>
+<section class="level2" id="wakeup">
+<h2><span class="sec-n">7.3</span>깨울 CPU 고르기<a aria-label="이 절의 링크" class="anchor" href="#wakeup">#</a></h2>
+<p>태스크를 깨우는 <code>try_to_wake_up()</code>은 클래스의 <code>select_task_rq()</code> 콜백으로 CPU를 묻습니다. fair 클래스의 답은 이렇습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L9925" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="9925" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1">select_task_rq_fair<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="dt">int</span> prev_cpu<span class="op">,</span> <span class="dt">int</span> wake_flags<span class="op">)</span></span>
+<span id="cb4-2"><span class="op">{</span></span>
+<span id="cb4-3">    <span class="co">/* ... */</span></span>
+<span id="cb4-4">    <span class="cf">if</span> <span class="op">(</span>wake_flags <span class="op">&amp;</span> WF_TTWU<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-5">        record_wakee<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb4-6">        <span class="co">/* ... */</span></span>
+<span id="cb4-7">        <span class="cf">if</span> <span class="op">(!</span>is_rd_overutilized<span class="op">(</span>this_rq<span class="op">()-&gt;</span>rd<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb4-8">            new_cpu <span class="op">=</span> find_energy_efficient_cpu<span class="op">(</span>p<span class="op">,</span> prev_cpu<span class="op">);</span></span>
+<span id="cb4-9">            <span class="cf">if</span> <span class="op">(</span>new_cpu <span class="op">&gt;=</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb4-10">                <span class="cf">return</span> new_cpu<span class="op">;</span></span>
+<span id="cb4-11">            new_cpu <span class="op">=</span> prev_cpu<span class="op">;</span></span>
+<span id="cb4-12">        <span class="op">}</span></span>
+<span id="cb4-13"></span>
+<span id="cb4-14">        want_affine <span class="op">=</span> <span class="op">!</span>wake_wide<span class="op">(</span>p<span class="op">)</span> <span class="op">&amp;&amp;</span> cpumask_test_cpu<span class="op">(</span>cpu<span class="op">,</span> p<span class="op">-&gt;</span>cpus_ptr<span class="op">);</span></span>
+<span id="cb4-15">    <span class="op">}</span></span>
+<span id="cb4-16"></span>
+<span id="cb4-17">    for_each_domain<span class="op">(</span>cpu<span class="op">,</span> tmp<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-18">        <span class="co">/* ... */</span></span>
+<span id="cb4-19">        <span class="cf">if</span> <span class="op">(</span>want_affine <span class="op">&amp;&amp;</span> <span class="op">(</span>tmp<span class="op">-&gt;</span>flags <span class="op">&amp;</span> SD_WAKE_AFFINE<span class="op">)</span> <span class="op">&amp;&amp;</span></span>
+<span id="cb4-20">            cpumask_test_cpu<span class="op">(</span>prev_cpu<span class="op">,</span> sched_domain_span<span class="op">(</span>tmp<span class="op">)))</span> <span class="op">{</span></span>
+<span id="cb4-21">            <span class="cf">if</span> <span class="op">(</span>cpu <span class="op">!=</span> prev_cpu<span class="op">)</span></span>
+<span id="cb4-22">                new_cpu <span class="op">=</span> wake_affine<span class="op">(</span>tmp<span class="op">,</span> p<span class="op">,</span> cpu<span class="op">,</span> prev_cpu<span class="op">,</span> sync<span class="op">);</span></span>
+<span id="cb4-23"></span>
+<span id="cb4-24">            sd <span class="op">=</span> NULL<span class="op">;</span> <span class="co">/* Prefer wake_affine over balance flags */</span></span>
+<span id="cb4-25">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb4-26">        <span class="op">}</span></span>
+<span id="cb4-27">        <span class="co">/* ... */</span></span>
+<span id="cb4-28">    <span class="op">}</span></span>
+<span id="cb4-29"></span>
+<span id="cb4-30">    <span class="co">/* Slow path */</span></span>
+<span id="cb4-31">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>sd<span class="op">))</span></span>
+<span id="cb4-32">        <span class="cf">return</span> sched_balance_find_dst_cpu<span class="op">(</span>sd<span class="op">,</span> p<span class="op">,</span> cpu<span class="op">,</span> prev_cpu<span class="op">,</span> sd_flag<span class="op">);</span></span>
+<span id="cb4-33"></span>
+<span id="cb4-34">    <span class="co">/* Fast path */</span></span>
+<span id="cb4-35">    <span class="cf">if</span> <span class="op">(</span>wake_flags <span class="op">&amp;</span> WF_TTWU<span class="op">)</span></span>
+<span id="cb4-36">        <span class="cf">return</span> select_idle_sibling<span class="op">(</span>p<span class="op">,</span> prev_cpu<span class="op">,</span> new_cpu<span class="op">);</span></span>
+<span id="cb4-37"></span>
+<span id="cb4-38">    <span class="cf">return</span> new_cpu<span class="op">;</span></span>
+<span id="cb4-39"><span class="op">}</span></span></code></pre></div></div>
+<p><code>prev_cpu</code>는 태스크가 마지막으로 돌았던 CPU이고, <code>cpu</code>는 지금 깨우는 코드가 돌고 있는 CPU입니다. 읽을 곳은 네 군데입니다.</p>
+<ul>
+<li><strong>에너지 경로.</strong> 크기가 다른 코어가 섞인 시스템에서 여유가 있을 때는 <code>find_energy_efficient_cpu()</code>가 먼저 답합니다. <a href="#capacity">뒤의 절</a>에서 봅니다.</li>
+<li><strong>후보를 둘로 줄입니다.</strong> <code>wake_affine()</code>은 <code>prev_cpu</code>와 <code>cpu</code> 가운데 하나를 고릅니다. 깨우는 쪽과 깨어나는 쪽은 데이터를 주고받는 사이일 가능성이 크므로, 깨우는 CPU 쪽으로 당겨 오는 것이 이득일 수 있습니다. 다만 서버 하나가 클라이언트 수십 개를 깨우는 식이면 한 CPU에 몰리므로, <code>wake_wide()</code>가 그런 관계를 가려내 당기지 않습니다.</li>
+<li><strong>빠른 길.</strong> 일반적인 깨우기는 <code>select_idle_sibling()</code>으로 끝납니다. 고른 후보 CPU의 <strong>LLC 안에서</strong> 놀고 있는 CPU를 찾습니다.</li>
+<li><strong>느린 길.</strong> <code>fork</code>와 <code>exec</code>에서는 도메인을 위에서부터 내려가며 가장 한가한 그룹과 CPU를 찾습니다. 새 태스크는 따뜻한 캐시가 없으므로 넓게 찾을 가치가 있습니다.</li>
+</ul>
+<figure class="fig" id="fig-wakeup-flow"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 384" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>깨울 CPU를 고르는 흐름: select_task_rq_fair가 에너지 경로를 먼저 시도하고, wake_affine으로 후보를 prev_cpu와 깨우는 CPU 가운데 하나로 줄인 뒤, select_idle_sibling이 그 CPU의 LLC 안에서 놀고 있는 CPU를 싼 순서대로 찾는다.</title>
+
+  <!-- 왼쪽: 흐름 -->
+  <rect class="box blue" x="20" y="16" width="340" height="38" rx="8"/>
+  <text class="t-code t-b" x="34" y="40">try_to_wake_up(p)</text>
+  <text class="t-xs end" x="348" y="40">클래스에 CPU를 묻는다</text>
+  <path class="ln" d="M190 54 V68" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="20" y="72" width="340" height="38" rx="8"/>
+  <text class="t-mono t-b" x="34" y="96">select_task_rq_fair()</text>
+  <path class="ln" d="M190 110 V124" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="20" y="128" width="340" height="56" rx="8"/>
+  <text class="t-b" x="34" y="150">에너지 경로</text>
+  <text class="t-code end" x="348" y="150">find_energy_efficient_cpu()</text>
+  <text class="t-xs" x="34" y="172">크기가 다른 코어가 있고 시스템에 여유가 있을 때만</text>
+  <path class="ln" d="M190 184 V198" marker-end="url(#ah)"/>
+
+  <rect class="box" x="20" y="202" width="340" height="56" rx="8"/>
+  <text class="t-b" x="34" y="224">후보를 둘로 줄인다</text>
+  <text class="t-code end" x="348" y="224">wake_affine()</text>
+  <text class="t-xs" x="34" y="246">prev_cpu 아니면 깨우는 CPU. 고른 것이 target이다</text>
+  <path class="ln" d="M190 258 V272" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="20" y="276" width="340" height="38" rx="8"/>
+  <text class="t-mono t-b" x="34" y="300">select_idle_sibling()</text>
+  <text class="t-xs end" x="348" y="300">빠른 길</text>
+  <path class="ln green" d="M360 295 H396" marker-end="url(#ah-green)"/>
+
+  <rect class="box gray" x="20" y="330" width="340" height="38" rx="8"/>
+  <text class="t-s t-ink" x="34" y="354">fork · exec는 느린 길: 도메인 전체에서 찾는다</text>
+
+  <!-- 오른쪽: select_idle_sibling -->
+  <rect class="panel green" x="400" y="16" width="340" height="352" rx="14"/>
+  <text class="t-b" x="416" y="42">target의 LLC 안에서, 싼 것부터</text>
+
+  <rect class="box" x="416" y="56" width="308" height="44" rx="8"/>
+  <text class="t-s t-ink" x="428" y="83">① target이 놀고 있다</text>
+  <text class="t-xs tc-green end" x="712" y="83">→ target</text>
+
+  <rect class="box" x="416" y="108" width="308" height="44" rx="8"/>
+  <text class="t-s t-ink" x="428" y="135">② prev가 같은 캐시에서 놀고 있다</text>
+  <text class="t-xs tc-green end" x="712" y="135">→ prev</text>
+
+  <rect class="box" x="416" y="160" width="308" height="44" rx="8"/>
+  <text class="t-s t-ink" x="428" y="187">③ 최근에 쓴 CPU가 놀고 있다</text>
+  <text class="t-xs tc-green end" x="712" y="187">→ 그 CPU</text>
+
+  <rect class="box" x="416" y="212" width="308" height="62" rx="8"/>
+  <text class="t-s t-ink" x="428" y="236">④ LLC를 훑는다: 빈 코어, 그다음 빈 CPU</text>
+  <text class="t-xs" x="428" y="258">훑는 수에 상한이 있다 (nr_idle_scan)</text>
+
+  <rect class="box gray" x="416" y="282" width="308" height="44" rx="8"/>
+  <text class="t-s t-ink" x="428" y="309">⑤ 없다</text>
+  <text class="t-xs end" x="712" y="309">→ target의 런큐에서 기다린다</text>
+
+  <text class="t-xs" x="416" y="350">LLC 밖은 찾지 않는다. 멀리 가면 캐시를 잃는다</text>
+</svg></div><figcaption><b>그림 7-3</b>깨울 CPU를 고르는 순서. 후보를 <code>prev_cpu</code>와 깨우는 CPU 둘로 줄인 뒤, 그 CPU가 속한 LLC 안에서만 놀고 있는 CPU를 찾습니다.</figcaption></figure>
+<p><code>select_idle_sibling()</code>의 순서는 싼 것부터입니다. 후보 CPU가 놀고 있으면 그것, <code>prev_cpu</code>가 같은 캐시 안에서 놀고 있으면 그것, 최근에 썼던 CPU(<code>recent_used_cpu</code>)가 놀고 있으면 그것입니다. 다 아니면 LLC 도메인을 훑습니다. 어디에도 없으면 원래 후보를 돌려주고, 태스크는 그 런큐에서 차례를 기다립니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L8914" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="8914" id="cb5"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb5-1"><span class="dt">static</span> <span class="dt">int</span> select_idle_cpu<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="kw">struct</span> sched_domain <span class="op">*</span>sd<span class="op">,</span> <span class="dt">bool</span> has_idle_core<span class="op">,</span> <span class="dt">int</span> target<span class="op">)</span></span>
+<span id="cb5-2"><span class="op">{</span></span>
+<span id="cb5-3">    <span class="co">/* ... */</span></span>
+<span id="cb5-4">    <span class="cf">if</span> <span class="op">(</span>sched_feat<span class="op">(</span>SIS_UTIL<span class="op">)</span> <span class="op">&amp;&amp;</span> sd<span class="op">-&gt;</span>shared<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-5">        <span class="co">/* ... */</span></span>
+<span id="cb5-6">        nr <span class="op">=</span> READ_ONCE<span class="op">(</span>sd<span class="op">-&gt;</span>shared<span class="op">-&gt;</span>nr_idle_scan<span class="op">)</span> <span class="op">+</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb5-7">        <span class="co">/* overloaded LLC is unlikely to have idle cpu/core */</span></span>
+<span id="cb5-8">        <span class="cf">if</span> <span class="op">(</span>nr <span class="op">==</span> <span class="dv">1</span><span class="op">)</span></span>
+<span id="cb5-9">            <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
+<span id="cb5-10">    <span class="op">}</span></span>
+<span id="cb5-11">    <span class="co">/* ... */</span></span>
+<span id="cb5-12">    for_each_cpu_wrap<span class="op">(</span>cpu<span class="op">,</span> cpus<span class="op">,</span> target <span class="op">+</span> <span class="dv">1</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-13">        <span class="cf">if</span> <span class="op">(</span>has_idle_core<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-14">            i <span class="op">=</span> select_idle_core<span class="op">(</span>p<span class="op">,</span> cpu<span class="op">,</span> cpus<span class="op">,</span> <span class="op">&amp;</span>idle_cpu<span class="op">);</span></span>
+<span id="cb5-15">            <span class="cf">if</span> <span class="op">((</span><span class="dt">unsigned</span> <span class="dt">int</span><span class="op">)</span>i <span class="op">&lt;</span> nr_cpumask_bits<span class="op">)</span></span>
+<span id="cb5-16">                <span class="cf">return</span> i<span class="op">;</span></span>
+<span id="cb5-17"></span>
+<span id="cb5-18">        <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb5-19">            <span class="cf">if</span> <span class="op">(--</span>nr <span class="op">&lt;=</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb5-20">                <span class="cf">return</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
+<span id="cb5-21">            idle_cpu <span class="op">=</span> __select_idle_cpu<span class="op">(</span>cpu<span class="op">,</span> p<span class="op">);</span></span>
+<span id="cb5-22">            <span class="cf">if</span> <span class="op">((</span><span class="dt">unsigned</span> <span class="dt">int</span><span class="op">)</span>idle_cpu <span class="op">&lt;</span> nr_cpumask_bits<span class="op">)</span></span>
+<span id="cb5-23">                <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb5-24">        <span class="op">}</span></span>
+<span id="cb5-25">    <span class="op">}</span></span>
+<span id="cb5-26">    <span class="co">/* ... */</span></span>
+<span id="cb5-27"><span class="op">}</span></span></code></pre></div></div>
+<p>훑기는 <code>target</code>의 다음 CPU에서 시작해 한 바퀴 돕니다. SMT가 있고 통째로 빈 코어가 있다고 표시되어 있으면(<code>has_idle_core</code>) 형제까지 비어 있는 코어를 먼저 찾습니다. 형제가 바쁜 코어의 빈 스레드는 연산 장치를 나눠 써야 하기 때문입니다. 눈여겨볼 것은 <code>nr</code>입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>LLC를 훑는 일은 CPU 수에 비례하는 비용이 듭니다. 코어가 수십 개인 칩에서 깨울 때마다 전부 훑으면 탐색이 실행보다 비싸집니다. 그래서 <code>select_idle_cpu()</code>는 <strong>훑을 CPU 수에 상한</strong>을 둡니다. LLC의 이용률이 높을수록 상한(<code>nr_idle_scan</code>)이 줄고, 포화 상태면 위 코드의 <code>nr == 1</code>에 걸려 아예 훑지 않습니다. 놀고 있는 CPU가 있을 가망이 없기 때문입니다. 최선을 찾는 탐색에 예산을 두고, 예산을 그 탐색이 성공할 확률에 맞추는 방식입니다. 깨우기는 가장 뜨거운 경로이므로 "조금 덜 좋은 CPU를 빨리 고르는 것"이 "가장 좋은 CPU를 늦게 고르는 것"보다 낫습니다.</p>
+</div>
+</section>
+<section class="level2" id="pelt">
+<h2><span class="sec-n">7.4</span>부하를 재는 법: PELT<a aria-label="이 절의 링크" class="anchor" href="#pelt">#</a></h2>
+<p>"바쁜 CPU", "작은 태스크"를 말하려면 재는 방법이 있어야 합니다. 런큐에 있는 태스크 수는 좋은 척도가 아닙니다. 1%만 쓰는 태스크 열 개와 100%를 쓰는 태스크 하나는 다릅니다. 스케줄러는 <strong>PELT</strong>(Per-Entity Load Tracking)로 태스크마다 최근의 행동을 추적합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/pelt.c#L153" rel="noopener" target="_blank">kernel/sched/pelt.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/pelt.c" data-line="153" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"> <span class="op">*</span> We can represent the historical contribution to runnable average as the</span>
+<span id="cb6-2"> <span class="op">*</span> coefficients of a geometric series<span class="op">.</span>  To <span class="cf">do</span> this we sub<span class="op">-</span>divide our runnable</span>
+<span id="cb6-3"> <span class="op">*</span> history into segments of approximately <span class="dv">1</span><span class="er">ms</span> <span class="op">(</span><span class="dv">1024</span><span class="er">us</span><span class="op">);</span> label the segment that</span>
+<span id="cb6-4"> <span class="op">*</span> occurred N<span class="op">-</span>ms ago p_N<span class="op">,</span> with p_0 corresponding to the current period<span class="op">,</span> e<span class="op">.</span>g<span class="op">.</span></span>
+<span id="cb6-5"> <span class="co">/* ... */</span></span>
+<span id="cb6-6"> <span class="op">*</span> Let u_i denote the fraction of p_i that the entity was runnable<span class="op">.</span></span>
+<span id="cb6-7"> <span class="op">*</span></span>
+<span id="cb6-8"> <span class="op">*</span> We then designate the fractions u_i as our co<span class="op">-</span>efficients<span class="op">,</span> yielding the</span>
+<span id="cb6-9"> <span class="op">*</span> following representation of historical load<span class="op">:</span></span>
+<span id="cb6-10"> <span class="op">*</span>   u_0 <span class="op">+</span> u_1<span class="op">*</span>y <span class="op">+</span> u_2<span class="op">*</span>y<span class="op">^</span><span class="dv">2</span> <span class="op">+</span> u_3<span class="op">*</span>y<span class="op">^</span><span class="dv">3</span> <span class="op">+</span> <span class="op">...</span></span>
+<span id="cb6-11"> <span class="op">*</span></span>
+<span id="cb6-12"> <span class="op">*</span> We choose y based on the with of a reasonably scheduling period<span class="op">,</span> fixing<span class="op">:</span></span>
+<span id="cb6-13"> <span class="op">*</span>   y<span class="op">^</span><span class="dv">32</span> <span class="op">=</span> <span class="fl">0.5</span></span></code></pre></div></div>
+<p>시간을 약 1ms 구간으로 자르고, 구간마다 태스크가 활동한 비율을 구해, 오래된 구간일수록 작은 가중치로 더합니다. 가중치는 32ms마다 절반이 됩니다. 과거 전체를 저장할 필요가 없습니다. 구간이 넘어갈 때 기존 합에 <code>y</code>를 곱하고 새 구간을 더하면 됩니다.</p>
+<figure class="fig" id="fig-pelt-decay"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 310" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>PELT의 util_avg: 태스크가 계속 실행되는 동안 1024를 향해 차오르고, 잠들면 32ms마다 절반으로 줄어든다. util_est는 잠들기 직전의 값을 기억한다.</title>
+
+  <!-- 활동: 1ms = 3px, t=0은 x=100 -->
+  <text class="t-s t-ink t-b" x="20" y="48">태스크</text>
+  <rect class="box green" x="100" y="30" width="288" height="26" rx="5"/>
+  <text class="t-s t-ink mid" x="244" y="48">실행</text>
+  <rect class="ghost dash" x="388" y="30" width="192" height="26" rx="5"/>
+  <text class="t-s mid" x="484" y="48">잠듦</text>
+  <rect class="box green" x="580" y="30" width="96" height="26" rx="5"/>
+  <text class="t-s t-ink mid" x="628" y="48">실행</text>
+
+  <!-- 축: util 0은 y=250, 1024는 y=90 -->
+  <path class="ln thin muted" d="M100 250 H700"/>
+  <path class="ln thin muted" d="M100 250 V80"/>
+  <path class="ln thin muted dash" d="M100 90 H700"/>
+  <path class="ln thin muted dash" d="M100 170 H700"/>
+  <text class="t-code end" x="92" y="254">0</text>
+  <text class="t-code end" x="92" y="174">512</text>
+  <text class="t-code end" x="92" y="94">1024</text>
+  <text class="t-s t-ink t-b" x="20" y="134">util_avg</text>
+
+  <path class="ln thin muted dash" d="M388 60 V250"/>
+  <path class="ln thin muted dash" d="M580 60 V250"/>
+
+  <!-- 곡선 -->
+  <path class="ln thick blue" d="M100 250 L148 203 L196 170 L244 147 L292 130 L340 118 L388 110 L436 151 L484 180 L532 200 L580 215 L628 178 L676 152"/>
+
+  <!-- util_est -->
+  <path class="ln purple dash" d="M388 110 H676"/>
+  <text class="t-xs tc-purple end" x="572" y="104">util_est: 잠들기 직전의 값</text>
+
+  <!-- 반감기 -->
+  <path class="ln thin warm" d="M484 110 V180"/>
+  <text class="t-xs tc-warm" x="490" y="140">32ms 뒤</text>
+  <text class="t-xs tc-warm" x="490" y="156">절반</text>
+
+  <text class="t-code mid" x="100" y="270">0</text>
+  <text class="t-code mid" x="196" y="270">32</text>
+  <text class="t-code mid" x="292" y="270">64</text>
+  <text class="t-code mid" x="388" y="270">96</text>
+  <text class="t-code mid" x="484" y="270">128</text>
+  <text class="t-code mid" x="580" y="270">160</text>
+  <text class="t-code mid" x="676" y="270">192ms</text>
+
+  <text class="t-xs mid" x="400" y="296">1024는 가장 큰 CPU를 최고 주파수로 꽉 채운 양이다. 64ms를 자면 4분의 1만 남는다</text>
+</svg></div><figcaption><b>그림 7-4</b>계속 실행되던 태스크가 잠들면 <code>util_avg</code>는 32ms마다 절반으로 줄고, 다시 실행되면 같은 속도로 차오릅니다. <code>util_est</code>는 잠들기 직전의 값을 기억해 둡니다.</figcaption></figure>
+<p><code>struct sched_avg</code>에는 같은 방식으로 구한 신호가 셋 있습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>신호</th>
+<th>무엇의 비율인가</th>
+<th>쓰는 곳</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>util_avg</code></td>
+<td><strong>실행 중</strong>이었던 시간. 0–1024</td>
+<td>CPU가 얼마나 찼는지, 주파수 선택</td>
+</tr>
+<tr>
+<td><code>runnable_avg</code></td>
+<td>실행 중이거나 <strong>기다린</strong> 시간</td>
+<td>경쟁이 있는지</td>
+</tr>
+<tr>
+<td><code>load_avg</code></td>
+<td>위에 가중치를 곱한 것</td>
+<td>부하 분산에서 그룹끼리 견줄 때</td>
+</tr>
+</tbody>
+</table></div>
+<p>태스크의 값은 런큐(<code>cfs_rq-&gt;avg</code>)로 합산됩니다. 1024는 "가장 큰 CPU를 최고 주파수로 꽉 채운 양"입니다. 느린 코어나 낮은 주파수에서 돈 시간은 그만큼 줄여 셉니다. 4장에서 본 <code>rq-&gt;clock_pelt</code>가 그 환산을 맡습니다. 그래서 이용률은 CPU가 달라도 서로 견줄 수 있는 값이 됩니다.</p>
+<p>감쇠에는 부작용이 있습니다. 오래 잠든 태스크는 <code>util_avg</code>가 0에 가까워져, 깨어난 직후에는 작은 태스크로 보입니다. <strong><code>util_est</code></strong>는 잠들기 직전의 이용률을 따로 기억해 둔 값이고, 배치와 주파수 결정은 둘 가운데 큰 쪽을 씁니다.</p>
+<p>이 신호의 가장 직접적인 소비자가 CPU 주파수 조절기 <strong>schedutil</strong>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/cpufreq_schedutil.c#L189" rel="noopener" target="_blank">kernel/sched/cpufreq_schedutil.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/cpufreq_schedutil.c" data-line="189" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"> <span class="op">*</span> If the utilization is frequency<span class="op">-</span>invariant<span class="op">,</span> choose the new frequency to be</span>
+<span id="cb7-2"> <span class="op">*</span> proportional to it<span class="op">,</span> that is</span>
+<span id="cb7-3"> <span class="op">*</span></span>
+<span id="cb7-4"> <span class="op">*</span> next_freq <span class="op">=</span> C <span class="op">*</span> max_freq <span class="op">*</span> util <span class="op">/</span> max</span>
+<span id="cb7-5"> <span class="co">/* ... */</span></span>
+<span id="cb7-6"> <span class="op">*</span> Take C <span class="op">=</span> <span class="fl">1.25</span> <span class="cf">for</span> the frequency tipping point at <span class="op">(</span>util <span class="op">/</span> max<span class="op">)</span> <span class="op">=</span> <span class="fl">0.8</span><span class="er">.</span></span></code></pre></div></div>
+<p>이용률에 25%의 여유를 얹어 주파수를 고릅니다. 이용률이 용량의 80%에 닿으면 최고 주파수가 됩니다. 스케줄러가 이용률을 갱신할 때 조절기를 직접 부르므로, 따로 표본을 뜨는 조절기보다 빨리 반응합니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>PELT 신호는 한 곳에서 만들어 여러 결정이 같이 씁니다. 깨울 CPU, 부하 분산, 주파수, 뒤에 나올 에너지 계산이 모두 같은 <code>util_avg</code>를 봅니다. 결정마다 따로 재면 서로 어긋납니다. 스케줄러가 "이 CPU는 한가하다"며 태스크를 보냈는데 주파수 조절기는 "바쁘다"며 주파수를 올리는 식입니다. 측정을 하나로 모으면 그 측정이 틀릴 때 모두 같이 틀리지만, 고칠 곳도 하나입니다.</p>
+</div>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료는 CPU의 부하를 "런큐 길이"나 그것을 틱마다 평균한 <code>cpu_load[]</code> 배열로 설명합니다. v7.3에서 부하 분산이 보는 값은 PELT의 <code>load_avg</code>, <code>util_avg</code>, <code>runnable_avg</code>입니다. <code>uptime</code>이 보여 주는 load average는 이것과 다른 값입니다. 실행 가능하거나 중단할 수 없는 대기 상태에 있는 태스크 수를 1분, 5분, 15분으로 평균한 것이고 스케줄링 판단에는 쓰이지 않습니다.</p>
+</div>
+</section>
+<section class="level2" id="balance">
+<h2><span class="sec-n">7.5</span>부하 분산<a aria-label="이 절의 링크" class="anchor" href="#balance">#</a></h2>
+<p>부하 분산은 세 가지 계기로 일어납니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>계기</th>
+<th>누가 하나</th>
+<th>진입점</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>주기적</td>
+<td>틱을 받은 CPU 자신</td>
+<td><code>sched_tick()</code> → <code>sched_balance_trigger()</code> → <code>SCHED_SOFTIRQ</code></td>
+</tr>
+<tr>
+<td>막 한가해질 때</td>
+<td>런큐가 비려는 CPU</td>
+<td><code>pick_task_fair()</code> → <code>sched_balance_newidle()</code></td>
+</tr>
+<tr>
+<td>틱이 멈춘 CPU 대신</td>
+<td>깨워진 한가한 CPU 하나</td>
+<td><code>nohz_balancer_kick()</code> → <code>nohz_idle_balance()</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>주기적인 경우, 틱은 때가 되었는지만 보고 softirq를 올립니다(<a href="ch11.html">11장</a>).</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L15031" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="15031" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="dt">void</span> sched_balance_trigger<span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">)</span></span>
+<span id="cb8-2"><span class="op">{</span></span>
+<span id="cb8-3">    <span class="co">/* ... */</span></span>
+<span id="cb8-4">    <span class="cf">if</span> <span class="op">(</span>time_after_eq<span class="op">(</span>jiffies<span class="op">,</span> rq<span class="op">-&gt;</span>next_balance<span class="op">))</span></span>
+<span id="cb8-5">        raise_softirq<span class="op">(</span>SCHED_SOFTIRQ<span class="op">);</span></span>
+<span id="cb8-6"></span>
+<span id="cb8-7">    nohz_balancer_kick<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb8-8"><span class="op">}</span></span></code></pre></div></div>
+<p>softirq 핸들러 <code>sched_balance_softirq()</code>는 <code>sched_balance_domains()</code>를 부르고, 이 함수가 자기 CPU의 도메인을 아래에서 위로 올라가며 주기가 찬 도메인마다 <code>sched_balance_rq()</code>를 부릅니다. 주기는 도메인이 넓을수록 깁니다. 가까운 CPU 사이는 자주, 먼 CPU 사이는 드물게 맞춥니다. 멀리 옮길수록 잃는 것이 많기 때문입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L13734" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="13734" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="dt">static</span> <span class="dt">int</span> sched_balance_rq<span class="op">(</span><span class="dt">int</span> this_cpu<span class="op">,</span> <span class="kw">struct</span> rq <span class="op">*</span>this_rq<span class="op">,</span></span>
+<span id="cb9-2">            <span class="kw">struct</span> sched_domain <span class="op">*</span>sd<span class="op">,</span> <span class="kw">enum</span> cpu_idle_type idle<span class="op">,</span></span>
+<span id="cb9-3">            <span class="dt">int</span> <span class="op">*</span>continue_balancing<span class="op">)</span></span>
+<span id="cb9-4"><span class="op">{</span></span>
+<span id="cb9-5">    <span class="co">/* ... */</span></span>
+<span id="cb9-6">redo<span class="op">:</span></span>
+<span id="cb9-7">    <span class="cf">if</span> <span class="op">(!</span>should_we_balance<span class="op">(&amp;</span>env<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb9-8">        <span class="op">*</span>continue_balancing <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb9-9">        <span class="cf">goto</span> out_balanced<span class="op">;</span></span>
+<span id="cb9-10">    <span class="op">}</span></span>
+<span id="cb9-11">    <span class="co">/* ... */</span></span>
+<span id="cb9-12">    group <span class="op">=</span> sched_balance_find_src_group<span class="op">(&amp;</span>env<span class="op">);</span></span>
+<span id="cb9-13">    <span class="cf">if</span> <span class="op">(!</span>group<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb9-14">        schedstat_inc<span class="op">(</span>sd<span class="op">-&gt;</span>lb_nobusyg<span class="op">[</span>idle<span class="op">]);</span></span>
+<span id="cb9-15">        <span class="cf">goto</span> out_balanced<span class="op">;</span></span>
+<span id="cb9-16">    <span class="op">}</span></span>
+<span id="cb9-17"></span>
+<span id="cb9-18">    busiest <span class="op">=</span> sched_balance_find_src_rq<span class="op">(&amp;</span>env<span class="op">,</span> group<span class="op">);</span></span>
+<span id="cb9-19">    <span class="cf">if</span> <span class="op">(!</span>busiest<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb9-20">        schedstat_inc<span class="op">(</span>sd<span class="op">-&gt;</span>lb_nobusyq<span class="op">[</span>idle<span class="op">]);</span></span>
+<span id="cb9-21">        <span class="cf">goto</span> out_balanced<span class="op">;</span></span>
+<span id="cb9-22">    <span class="op">}</span></span>
+<span id="cb9-23">    <span class="co">/* ... */</span></span>
+<span id="cb9-24">        cur_ld_moved <span class="op">=</span> detach_tasks<span class="op">(&amp;</span>env<span class="op">);</span></span>
+<span id="cb9-25">    <span class="co">/* ... */</span></span>
+<span id="cb9-26">        <span class="cf">if</span> <span class="op">(</span>cur_ld_moved<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb9-27">            attach_tasks<span class="op">(&amp;</span>env<span class="op">);</span></span>
+<span id="cb9-28">            ld_moved <span class="op">+=</span> cur_ld_moved<span class="op">;</span></span>
+<span id="cb9-29">        <span class="op">}</span></span>
+<span id="cb9-30">    <span class="co">/* ... */</span></span>
+<span id="cb9-31"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 네 군데입니다.</p>
+<ul>
+<li><strong>끌어오기만 합니다.</strong> 이 함수는 <code>this_cpu</code>로 태스크를 <strong>가져올</strong> 뿐, 남에게 밀어내지 않습니다. 각 CPU가 자기 쪽으로만 당기므로 두 CPU가 같은 태스크를 서로 밀어내는 일이 없습니다.</li>
+<li><strong><code>should_we_balance()</code>.</strong> 한 그룹에서 한 CPU만 그 그룹을 대표해 균형을 맞춥니다. 놀고 있는 CPU가 있으면 그 CPU가 맡습니다. 같은 일을 여럿이 하지 않게 합니다.</li>
+<li><strong>가장 바쁜 그룹, 그 안의 가장 바쁜 런큐.</strong> <code>sched_balance_find_src_group()</code>은 도메인의 그룹마다 통계를 모아 상태(<code>enum group_type</code>)를 매깁니다. 여유 있음(<code>group_has_spare</code>), 꽉 참(<code>group_fully_busy</code>), 들어맞지 않는 태스크가 있음(<code>group_misfit_task</code>), 과부하(<code>group_overloaded</code>) 등이고, 뒤쪽일수록 먼저 덜어 줘야 할 그룹입니다. 자기 그룹보다 충분히 바쁜 그룹이 있을 때만 그 그룹을 돌려줍니다. "충분히"의 문턱이 도메인의 <code>imbalance_pct</code>입니다. 차이가 작으면 옮기는 비용이 더 큽니다.</li>
+<li><strong>떼어서 붙입니다.</strong> <code>detach_tasks()</code>가 바쁜 런큐의 락을 쥐고 태스크를 떼어 내고, 락을 푼 뒤 <code>attach_tasks()</code>가 자기 런큐에 붙입니다. 두 런큐의 락을 동시에 쥐지 않습니다.</li>
+</ul>
+<figure class="fig" id="fig-balance-pull"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 326" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>부하 분산의 세 단계: 한가한 CPU 0이 MC 도메인의 그룹들을 견주어 가장 바쁜 그룹을 찾고, 그 안의 가장 바쁜 런큐에서 실행 중이 아니고 친화성이 허락하며 캐시가 식은 태스크를 끌어온다.</title>
+
+  <!-- ① 그룹 비교 -->
+  <rect class="panel gray" x="20" y="14" width="340" height="190" rx="14"/>
+  <text class="t-b" x="36" y="38">① 도메인의 그룹을 견준다</text>
+
+  <text class="t-s t-ink" x="36" y="68">코어 0 · CPU 0, 8</text>
+  <rect class="solid blue" x="170" y="56" width="20" height="16" rx="3"/>
+  <text class="t-xs tc-blue" x="198" y="68">내 그룹</text>
+
+  <text class="t-s t-ink" x="36" y="102">코어 1 · CPU 1, 9</text>
+  <rect class="solid" x="170" y="90" width="70" height="16" rx="3"/>
+
+  <text class="t-s t-ink" x="36" y="136">코어 2 · CPU 2, 10</text>
+  <rect class="solid red" x="170" y="124" width="170" height="16" rx="3"/>
+
+  <text class="t-s t-ink" x="36" y="170">코어 3 · CPU 3, 11</text>
+  <rect class="solid" x="170" y="158" width="60" height="16" rx="3"/>
+
+  <text class="t-xs tc-red" x="170" y="192">가장 바쁜 그룹</text>
+  <path class="ln thin red" d="M180 181 V146 H185"/>
+
+  <!-- ② 런큐 -->
+  <rect class="panel red" x="390" y="14" width="350" height="190" rx="14"/>
+  <text class="t-b" x="406" y="38">② 가장 바쁜 런큐 · CPU 2</text>
+
+  <rect class="box" x="406" y="50" width="318" height="30" rx="6"/>
+  <text class="t-s t-ink" x="418" y="70">T1 · 지금 실행 중</text>
+  <text class="t-xs tc-red end" x="712" y="70">뗄 수 없다</text>
+
+  <rect class="box" x="406" y="86" width="318" height="30" rx="6"/>
+  <text class="t-s t-ink" x="418" y="106">T2 · cpus_ptr가 CPU 2뿐</text>
+  <text class="t-xs tc-red end" x="712" y="106">친화성</text>
+
+  <rect class="box" x="406" y="122" width="318" height="30" rx="6"/>
+  <text class="t-s t-ink" x="418" y="142">T3 · 0.1ms 전에 실행</text>
+  <text class="t-xs tc-red end" x="712" y="142">캐시가 따뜻하다</text>
+
+  <rect class="solid green" x="406" y="158" width="318" height="30" rx="6"/>
+  <text class="t-s t-b t-on" x="418" y="178">T4 · 3ms 전에 실행</text>
+  <text class="t-xs t-on end" x="712" y="178">옮긴다</text>
+
+  <path class="ln" d="M360 132 H386" marker-end="url(#ah)"/>
+
+  <!-- ③ 끌어오기 -->
+  <path class="ln green" d="M565 188 V253 H366" marker-end="url(#ah-green)"/>
+  <text class="t-code" x="380" y="272">detach_tasks() → attach_tasks()</text>
+
+  <rect class="box blue" x="20" y="226" width="340" height="54" rx="10"/>
+  <text class="t-b" x="36" y="250">③ CPU 0의 런큐로 끌어온다</text>
+  <text class="t-xs" x="36" y="268">균형을 맞추는 쪽은 언제나 받는 CPU다</text>
+
+  <text class="t-xs mid" x="380" y="310">옮길 것이 없어 실패가 거듭되면 nr_balance_failed가 올라가고, 따뜻한 태스크도 옮기게 된다</text>
+</svg></div><figcaption><b>그림 7-5</b>한가한 CPU가 자기 도메인의 그룹들을 견주어 가장 바쁜 그룹, 그 안의 가장 바쁜 런큐를 찾고, 옮길 수 있는 태스크를 끌어옵니다.</figcaption></figure>
+<p>모든 태스크를 옮길 수 있는 것은 아닙니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L11122" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="11122" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="dt">int</span> can_migrate_task<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="kw">struct</span> lb_env <span class="op">*</span>env<span class="op">)</span></span>
+<span id="cb10-2"><span class="op">{</span></span>
+<span id="cb10-3">    <span class="co">/* ... */</span></span>
+<span id="cb10-4">    <span class="co">/*</span></span>
+<span id="cb10-5"><span class="co">     * We do not migrate tasks that are:</span></span>
+<span id="cb10-6"><span class="co">     * 1) delayed dequeued unless we migrate load, or</span></span>
+<span id="cb10-7"><span class="co">     * 2) target cfs_rq is in throttled hierarchy, or</span></span>
+<span id="cb10-8"><span class="co">     * 3) cannot be migrated to this CPU due to cpus_ptr, or</span></span>
+<span id="cb10-9"><span class="co">     * 4) running (obviously), or</span></span>
+<span id="cb10-10"><span class="co">     * 5) are cache-hot on their current CPU, or</span></span>
+<span id="cb10-11"><span class="co">     * 6) are blocked on mutexes (if SCHED_PROXY_EXEC is enabled)</span></span>
+<span id="cb10-12"><span class="co">     */</span></span>
+<span id="cb10-13">    <span class="co">/* ... */</span></span>
+<span id="cb10-14">    <span class="cf">if</span> <span class="op">(!</span>hot <span class="op">||</span> env<span class="op">-&gt;</span>sd<span class="op">-&gt;</span>nr_balance_failed <span class="op">&gt;</span> env<span class="op">-&gt;</span>sd<span class="op">-&gt;</span>cache_nice_tries<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-15">        <span class="cf">if</span> <span class="op">(</span>hot<span class="op">)</span></span>
+<span id="cb10-16">            p<span class="op">-&gt;</span>sched_task_hot <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb10-17">        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb10-18">    <span class="op">}</span></span>
+<span id="cb10-19"></span>
+<span id="cb10-20">    schedstat_inc<span class="op">(</span>p<span class="op">-&gt;</span>stats<span class="op">.</span>nr_failed_migrations_hot<span class="op">);</span></span>
+<span id="cb10-21">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb10-22"><span class="op">}</span></span></code></pre></div></div>
+<p>3번이 친화성, 5번이 캐시입니다. <code>task_hot()</code>은 태스크가 마지막으로 실행된 지 <code>sysctl_sched_migration_cost</code>(기본 0.5ms)가 지나지 않았으면 캐시가 따뜻하다고 봅니다. 그런 태스크는 건너뛰되, 균형 시도가 거듭 실패하면(<code>nr_balance_failed</code>) 따뜻해도 옮깁니다. 4번도 예외가 있습니다. 바쁜 런큐에 실행 중인 태스크 하나뿐이라 뗄 것이 없는데도 불균형이 이어지면, 그 CPU의 stop 클래스 태스크(4장)를 깨워 실행 중인 태스크를 강제로 밀어냅니다. <strong>액티브 밸런싱</strong>입니다.</p>
+<p>막 한가해지는 CPU의 균형(<code>sched_balance_newidle()</code>)은 가장 효과가 큽니다. 어차피 놀 CPU이므로 끌어오면 바로 이득입니다. 다만 곧 깨어날 태스크가 있다면 헛일이므로, 이 CPU가 평균적으로 한가했던 시간(<code>avg_idle</code>)이 균형 작업에 드는 시간보다 짧으면 시도하지 않습니다.</p>
+<p>이미 잠든 CPU는 틱이 멈춰 있어(<a href="ch08.html">8장</a>) 스스로 주기적 균형을 하지 못합니다. 바쁜 CPU의 틱이 이것을 알아채면(<code>nohz_balancer_kick()</code>) 잠든 CPU 하나를 깨워, 그 CPU가 잠든 CPU들 모두의 몫으로 균형을 맞추게 합니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료의 함수 이름은 v7.3 소스에서 찾을 수 없습니다. <span class="v">v6.10</span>부터 부하 분산 함수들이 <code>sched_balance_</code> 접두사로 정리되었습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>옛 이름</th>
+<th>v7.3</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>trigger_load_balance()</code></td>
+<td><code>sched_balance_trigger()</code></td>
+</tr>
+<tr>
+<td><code>run_rebalance_domains()</code>, <code>rebalance_domains()</code></td>
+<td><code>sched_balance_softirq()</code>, <code>sched_balance_domains()</code></td>
+</tr>
+<tr>
+<td><code>load_balance()</code></td>
+<td><code>sched_balance_rq()</code></td>
+</tr>
+<tr>
+<td><code>find_busiest_group()</code>, <code>find_busiest_queue()</code></td>
+<td><code>sched_balance_find_src_group()</code>, <code>sched_balance_find_src_rq()</code></td>
+</tr>
+<tr>
+<td><code>idle_balance()</code></td>
+<td><code>sched_balance_newidle()</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>도메인 이름도 바뀌었습니다. 옛 자료의 <code>DIE</code> 도메인이 v7.3의 <code>PKG</code>입니다.</p>
+</div>
+</section>
+<section class="level2" id="affinity">
+<h2><span class="sec-n">7.6</span>친화성과 실시간 태스크<a aria-label="이 절의 링크" class="anchor" href="#affinity">#</a></h2>
+<p><strong>CPU 친화성</strong>(CPU affinity)은 태스크가 실행될 수 있는 CPU의 집합입니다. <code>task_struct</code>의 <code>cpus_ptr</code>가 가리키는 비트마스크이고, <code>sched_setaffinity()</code> 시스템 콜이나 <code>taskset</code> 명령으로 정합니다. 앞에서 본 두 결정 모두 이 마스크 안에서만 고릅니다. <code>select_task_rq_fair()</code>와 <code>can_migrate_task()</code>에 <code>p-&gt;cpus_ptr</code> 검사가 있었습니다. 커널 코드가 잠깐 CPU를 옮기지 못하게 하는 <code>migrate_disable()</code>(<a href="ch06.html">6장</a>)도 같은 장치를 씁니다. 그런 태스크가 CPU를 내줄 때 이 마스크를 현재 CPU 하나로 좁혀 둡니다.</p>
+<p>RT 클래스는 균형의 기준이 다릅니다. fair 클래스는 부하를 고르게 하려 하지만, RT 클래스의 목표는 <strong>시스템 전체에서 우선순위가 가장 높은 N개의 태스크가 N개의 CPU에서 도는 것</strong>입니다. 그래서 주기를 기다리지 않습니다. RT 태스크가 깨어났는데 자기 CPU에 더 높은 태스크가 돌고 있으면, 우선순위가 더 낮은 태스크를 돌리는 CPU를 찾아 그쪽으로 <strong>밀어냅니다</strong>(<code>push_rt_task()</code>). 반대로 CPU의 우선순위가 내려가면 다른 CPU에서 기다리는 RT 태스크를 <strong>끌어옵니다</strong>(<code>pull_rt_task()</code>). deadline 클래스도 같은 구조입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>태스크가 CPU를 옮겨 다니는 것을 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ taskset -cp $$
+pid 4127's current affinity list: 0-15
+$ perf stat -e migrations,context-switches -- make -j8
+...
+             1,204      migrations
+            98,331      context-switches
+$ grep se.nr_migrations /proc/$$/sched
+se.nr_migrations                             :                   37</code></pre></div>
+<p><code>taskset -c 0-3 명령</code>으로 범위를 좁혀 실행하면 <code>migrations</code>가 줄어듭니다. 어느 CPU에서 누가 돌았는지는 <code>perf sched record</code>로 기록한 뒤 <code>perf sched map</code>으로 봅니다. 도메인별 균형 시도와 성공 횟수는 <code>/proc/schedstat</code>의 <code>domain</code> 줄에 쌓입니다.</p>
+</div>
+</section>
+<section class="level2" id="capacity">
+<h2><span class="sec-n">7.7</span>크기가 다른 CPU<a aria-label="이 절의 링크" class="anchor" href="#capacity">#</a></h2>
+<p>스마트폰과 최근의 노트북 칩은 빠른 코어와 느리지만 전력을 덜 쓰는 코어를 섞습니다. 스케줄러는 CPU마다 <strong>용량</strong>(capacity)을 가집니다. 가장 큰 코어가 1024이고 작은 코어는 그보다 작습니다. arm64에서는 <code>/sys/devices/system/cpu/cpuN/cpu_capacity</code>로 볼 수 있습니다. 앞 절에서 본 대로 이용률도 같은 눈금이므로 둘을 직접 견줄 수 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L105" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="105" id="cb12"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb12-1"><span class="co">/*</span></span>
+<span id="cb12-2"><span class="co"> * The margin used when comparing utilization with CPU capacity.</span></span>
+<span id="cb12-3"><span class="co"> *</span></span>
+<span id="cb12-4"><span class="co"> * (default: ~20%)</span></span>
+<span id="cb12-5"><span class="co"> */</span></span>
+<span id="cb12-6"><span class="pp">#define fits_capacity</span><span class="op">(</span><span class="pp">cap</span><span class="op">,</span><span class="pp"> max</span><span class="op">)</span><span class="pp"> </span><span class="op">((</span><span class="pp">cap</span><span class="op">)</span><span class="pp"> </span><span class="op">*</span><span class="pp"> </span><span class="dv">1280</span><span class="pp"> </span><span class="op">&lt;</span><span class="pp"> </span><span class="op">(</span><span class="pp">max</span><span class="op">)</span><span class="pp"> </span><span class="op">*</span><span class="pp"> </span><span class="dv">1024</span><span class="op">)</span></span></code></pre></div></div>
+<p>태스크의 이용률이 CPU 용량의 80% 아래면 "들어맞는다"고 봅니다. 이 판정에서 세 가지가 나옵니다.</p>
+<ul>
+<li><strong>misfit.</strong> 작은 코어에서 도는 태스크의 이용률이 그 코어에 들어맞지 않게 되면 런큐에 <code>misfit_task_load</code>가 표시되고, 부하 분산이 그 태스크를 큰 코어로 올립니다.</li>
+<li><strong>EAS</strong>(Energy Aware Scheduling). 시스템에 여유가 있는 동안은 깨울 때 <code>find_energy_efficient_cpu()</code>가 먼저 답합니다. 태스크가 들어맞는 CPU들을 후보로 놓고, <strong>에너지 모델</strong>(주파수별 전력 표)로 각 후보에 태스크를 놓았을 때 시스템이 쓸 에너지를 추정해 가장 적은 쪽을 고릅니다. 어느 CPU든 80%를 넘겨 과이용 상태가 되면(<code>rd-&gt;overutilized</code>) 이 경로를 끄고 보통의 분산으로 돌아갑니다. 꽉 찬 시스템에서는 처리량이 먼저입니다.</li>
+<li><strong>uclamp.</strong> 이용률은 과거의 관찰이라 틀릴 수 있습니다. <code>sched_setattr()</code>의 <code>sched_util_min</code>과 <code>sched_util_max</code>로 태스크의 이용률을 "적어도 이만큼", "많아야 이만큼"으로 보게 할 수 있습니다. 화면을 그리는 스레드는 아래를 받쳐 큰 코어와 높은 주파수를 얻고, 백그라운드 작업은 위를 눌러 작은 코어에 머뭅니다.</li>
+</ul>
+<figure class="fig" id="fig-eas-placement"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>용량 400인 작은 코어 넷과 용량 1024인 큰 코어 넷. 이용률 100인 태스크는 작은 코어에 들어맞아 에너지가 덜 드는 작은 코어에 놓이고, 이용률 600인 태스크는 작은 코어에 들어맞지 않아 큰 코어로 간다.</title>
+
+  <rect class="solid blue" x="20" y="14" width="16" height="14" rx="3"/>
+  <text class="t-s t-ink" x="44" y="26">태스크 A · 이용률 100</text>
+  <rect class="solid warm" x="220" y="14" width="16" height="14" rx="3"/>
+  <text class="t-s t-ink" x="244" y="26">태스크 B · 이용률 600</text>
+
+  <!-- 눈금: 1024 = 160px, 바닥 y=220 -->
+  <path class="ln thin muted" d="M40 220 H720"/>
+
+  <!-- 작은 코어 -->
+  <rect class="box gray" x="60" y="158" width="44" height="62"/>
+  <rect class="solid blue" x="60" y="204" width="44" height="16"/>
+  <rect class="box gray" x="114" y="158" width="44" height="62"/>
+  <rect class="box gray" x="168" y="158" width="44" height="62"/>
+  <rect class="box gray" x="222" y="158" width="44" height="62"/>
+  <path class="ln thin red dash" d="M52 170 H274"/>
+  <text class="t-xs tc-red" x="282" y="174">용량의 80%</text>
+
+  <rect class="ghost red dash" x="114" y="126" width="44" height="94"/>
+  <text class="t-xs tc-red" x="100" y="118">B는 들어맞지 않는다</text>
+
+  <text class="t-b mid" x="163" y="244">작은 코어 넷</text>
+  <text class="t-xs mid" x="163" y="262">용량 400 · 전력이 적게 든다</text>
+
+  <!-- 큰 코어 -->
+  <rect class="box gray" x="440" y="60" width="44" height="160"/>
+  <rect class="solid warm" x="440" y="126" width="44" height="94"/>
+  <rect class="box gray" x="494" y="60" width="44" height="160"/>
+  <rect class="box gray" x="548" y="60" width="44" height="160"/>
+  <rect class="box gray" x="602" y="60" width="44" height="160"/>
+  <path class="ln thin red dash" d="M432 92 H654"/>
+  <text class="t-xs tc-red" x="662" y="96">용량의 80%</text>
+
+  <text class="t-b mid" x="543" y="244">큰 코어 넷</text>
+  <text class="t-xs mid" x="543" y="262">용량 1024 · 빠르다</text>
+
+  <text class="t-xs tc-blue" x="20" y="150">A</text>
+  <path class="ln thin blue" d="M30 154 L60 204"/>
+  <text class="t-xs tc-warm" x="412" y="118">B</text>
+  <path class="ln thin warm" d="M422 122 L440 134"/>
+
+  <text class="t-s t-ink mid" x="380" y="288">A는 어디에나 들어맞는다. 에너지 모델로 견주면 작은 코어가 싸다</text>
+  <text class="t-s t-ink mid" x="380" y="308">B는 600 &gt; 400 × 0.8이라 작은 코어에 들어맞지 않는다. 큰 코어로 간다</text>
+</svg></div><figcaption><b>그림 7-6</b>작은 코어 넷과 큰 코어 넷인 시스템. 이용률이 작은 태스크는 작은 코어에 들어맞고 거기가 에너지가 덜 듭니다. 들어맞지 않는 태스크는 큰 코어로 갑니다.</figcaption></figure>
+</section>
+<section class="level2" id="numa">
+<h2><span class="sec-n">7.8</span>NUMA 균형<a aria-label="이 절의 링크" class="anchor" href="#numa">#</a></h2>
+<p>소켓이 여럿인 서버에서는 메모리도 소켓마다 나뉘어 있습니다(NUMA 노드). 다른 노드의 메모리를 읽는 것은 자기 노드의 메모리보다 느립니다. 태스크와 그 태스크의 메모리가 다른 노드에 있으면 손해입니다. <strong>자동 NUMA 균형</strong>(automatic NUMA balancing)은 둘을 가까이 붙입니다.</p>
+<p>스케줄러는 태스크가 어느 노드의 메모리를 쓰는지 모릅니다. 그래서 물어봅니다.</p>
+<ol type="1">
+<li>틱이 주기적으로 <code>task_numa_work()</code>를 예약합니다. 이 함수는 태스크의 주소 공간 일부를 일부러 <strong>접근 불가</strong>로 바꿔 둡니다.</li>
+<li>태스크가 그 페이지를 건드리면 페이지 폴트가 납니다(NUMA 힌트 폴트). 실제 오류가 아니므로 커널은 권한을 되돌려 주고, <code>task_numa_fault()</code>가 "이 태스크가 어느 노드의 페이지를 건드렸다"를 기록합니다.</li>
+<li>기록이 쌓이면 <code>task_numa_placement()</code>가 폴트가 가장 많은 노드를 <strong>선호 노드</strong>(<code>numa_preferred_nid</code>)로 정합니다.</li>
+<li>태스크를 선호 노드의 CPU로 옮기려 하고(<code>task_numa_migrate()</code>), 폴트가 난 페이지가 다른 노드에 있으면 페이지를 태스크 쪽으로 옮깁니다.</li>
+</ol>
+<figure class="fig" id="fig-numa-balance"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 310" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>태스크 T는 노드 0의 CPU에서 돌지만 T의 페이지 대부분은 노드 1의 메모리에 있다. NUMA 힌트 폴트로 이것을 알아낸 뒤 태스크를 노드 1로 옮기거나 페이지를 노드 0으로 옮긴다.</title>
+
+  <!-- 노드 0 -->
+  <rect class="panel blue" x="20" y="14" width="340" height="216" rx="14"/>
+  <text class="t-b" x="36" y="38">노드 0</text>
+  <text class="t-xs" x="36" y="66">CPU</text>
+  <rect class="box" x="80" y="50" width="44" height="34" rx="6"/>
+  <circle class="solid blue" cx="102" cy="67" r="13"/>
+  <text class="t-s t-b t-on mid" x="102" y="72">T</text>
+  <rect class="box" x="132" y="50" width="44" height="34" rx="6"/>
+  <rect class="box" x="184" y="50" width="44" height="34" rx="6"/>
+  <rect class="box" x="236" y="50" width="44" height="34" rx="6"/>
+
+  <text class="t-xs" x="36" y="150">메모리</text>
+  <rect class="solid blue" x="80" y="124" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="108" y="124" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="136" y="124" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="164" y="124" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="192" y="124" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="80" y="152" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="108" y="152" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="136" y="152" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="164" y="152" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="192" y="152" width="22" height="22" rx="3"/>
+  <text class="t-xs" x="80" y="198">T의 페이지 2장</text>
+
+  <!-- 노드 1 -->
+  <rect class="panel warm" x="400" y="14" width="340" height="216" rx="14"/>
+  <text class="t-b end" x="724" y="40">노드 1</text>
+  <text class="t-xs" x="416" y="66">CPU</text>
+  <rect class="ghost green dash" x="460" y="50" width="44" height="34" rx="6"/>
+  <rect class="box" x="512" y="50" width="44" height="34" rx="6"/>
+  <rect class="box" x="564" y="50" width="44" height="34" rx="6"/>
+  <rect class="box" x="616" y="50" width="44" height="34" rx="6"/>
+
+  <text class="t-xs" x="416" y="150">메모리</text>
+  <rect class="solid blue" x="460" y="124" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="488" y="124" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="516" y="124" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="544" y="124" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="572" y="124" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="460" y="152" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="488" y="152" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="516" y="152" width="22" height="22" rx="3"/>
+  <rect class="solid blue" x="544" y="152" width="22" height="22" rx="3"/>
+  <rect class="box gray" x="572" y="152" width="22" height="22" rx="3"/>
+  <text class="t-xs" x="460" y="198">T의 페이지 8장</text>
+
+  <!-- 원격 접근 -->
+  <path class="ln thin red dash" d="M102 84 V104 H471 V120" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="150" y="99">먼 메모리를 읽는다</text>
+
+  <!-- 해법 -->
+  <path class="ln green" d="M102 50 V36 H482 V46" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-green t-b mid" x="250" y="30">① 태스크를 옮긴다</text>
+  <path class="ln purple" d="M456 164 H220" marker-end="url(#ah-purple)"/>
+  <text class="t-xs tc-purple t-b mid" x="290" y="184">② 페이지를 옮긴다</text>
+
+  <text class="t-s t-ink mid" x="380" y="262">힌트 폴트를 세면 노드 0에서 2번, 노드 1에서 8번이다. T의 선호 노드는 1이 된다</text>
+  <text class="t-s mid" x="380" y="286">① T를 노드 1의 CPU로 옮기거나, ② 폴트가 난 페이지를 T가 도는 노드로 옮긴다</text>
+</svg></div><figcaption><b>그림 7-7</b>태스크가 노드 0에서 돌고 메모리 대부분은 노드 1에 있습니다. 힌트 폴트로 이것을 알아낸 뒤, 태스크를 메모리 쪽으로 옮기거나 페이지를 태스크 쪽으로 옮깁니다.</figcaption></figure>
+<p>부하 분산도 이 정보를 씁니다. <code>can_migrate_task()</code>는 태스크를 선호 노드에서 멀어지게 하는 이동을 캐시가 따뜻한 태스크처럼 꺼립니다. 페이지 폴트와 페이지 이동은 <a href="ch17.html">17장</a>과 <a href="ch18.html">18장</a>에서 다룹니다. <code>sysctl kernel.numa_balancing</code>으로 켜고 끄며, 노드별 메모리 분포는 <code>numastat -p PID</code>로 봅니다.</p>
+</section>
+<section class="level2" id="cache-aware">
+<h2><span class="sec-n">7.9</span>캐시 인지 스케줄링<a aria-label="이 절의 링크" class="anchor" href="#cache-aware">#</a></h2>
+<p>지금까지의 분산은 <strong>부하</strong>를 고르게 하는 것이 목표였습니다. LLC가 여럿인 머신에서는 이것이 손해가 될 수 있습니다. 한 프로세스의 스레드들은 같은 데이터를 만집니다. 스레드들이 여러 LLC에 흩어지면, 한 스레드가 고친 캐시 라인을 다른 LLC의 스레드가 읽을 때마다 캐시 사이를 건너야 합니다. <span class="v">v7.2</span>에 들어온 <strong>캐시 인지 스케줄링</strong>(<code>CONFIG_SCHED_CACHE</code>)은 같은 프로세스의 스레드를 한 LLC에 모으려 합니다.</p>
+<p>방법은 NUMA 균형과 닮았습니다. 프로세스마다 "어느 CPU에서 얼마나 돌았나"를 감쇠 평균으로 쌓아 두고(<code>account_mm_sched()</code>), 주기적으로 그 합이 가장 큰 LLC를 그 프로세스의 <strong>선호 LLC</strong>로 정합니다. 그러고 나서 부하 분산이 태스크를 옮길지 판단할 때 이 선호를 끼워 넣습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L10885" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="10885" id="cb13"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1"><span class="dt">static</span> <span class="kw">enum</span> llc_mig can_migrate_llc<span class="op">(</span><span class="dt">int</span> src_cpu<span class="op">,</span> <span class="dt">int</span> dst_cpu<span class="op">,</span></span>
+<span id="cb13-2">                    <span class="dt">unsigned</span> <span class="dt">long</span> tsk_util<span class="op">,</span></span>
+<span id="cb13-3">                    <span class="dt">bool</span> to_pref<span class="op">)</span></span>
+<span id="cb13-4"><span class="op">{</span></span>
+<span id="cb13-5">    <span class="co">/* ... */</span></span>
+<span id="cb13-6">    <span class="cf">if</span> <span class="op">(!</span>fits_llc_capacity<span class="op">(</span>dst_util<span class="op">,</span> dst_cap<span class="op">)</span> <span class="op">&amp;&amp;</span></span>
+<span id="cb13-7">        <span class="op">!</span>fits_llc_capacity<span class="op">(</span>src_util<span class="op">,</span> src_cap<span class="op">))</span></span>
+<span id="cb13-8">        <span class="cf">return</span> mig_unrestricted<span class="op">;</span></span>
+<span id="cb13-9"></span>
+<span id="cb13-10">    <span class="cf">if</span> <span class="op">(</span>to_pref<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb13-11">        <span class="co">/* ... */</span></span>
+<span id="cb13-12">        <span class="cf">if</span> <span class="op">(!</span>fits_llc_capacity<span class="op">(</span>dst_util<span class="op">,</span> dst_cap<span class="op">)</span> <span class="op">&amp;&amp;</span></span>
+<span id="cb13-13">            util_greater<span class="op">(</span>dst_util<span class="op">,</span> src_util<span class="op">))</span></span>
+<span id="cb13-14">            <span class="cf">return</span> mig_forbid<span class="op">;</span></span>
+<span id="cb13-15">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb13-16">        <span class="co">/* ... */</span></span>
+<span id="cb13-17">        <span class="cf">if</span> <span class="op">(</span>fits_llc_capacity<span class="op">(</span>src_util<span class="op">,</span> src_cap<span class="op">)</span> <span class="op">||</span></span>
+<span id="cb13-18">            <span class="op">!</span>util_greater<span class="op">(</span>src_util<span class="op">,</span> dst_util<span class="op">))</span></span>
+<span id="cb13-19">            <span class="cf">return</span> mig_forbid<span class="op">;</span></span>
+<span id="cb13-20">    <span class="op">}</span></span>
+<span id="cb13-21">    <span class="cf">return</span> mig_llc<span class="op">;</span></span>
+<span id="cb13-22"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li><strong>양쪽이 다 바쁘면 손을 뗍니다</strong>(<code>mig_unrestricted</code>). 두 LLC의 이용률이 모두 문턱(기본 50%)을 넘으면 캐시보다 부하가 급합니다. 보통의 분산에 맡깁니다.</li>
+<li><strong>선호 LLC로 가는 이동</strong>은 허용하되, 그 LLC가 이미 문턱을 넘었고 출발지보다 20% 넘게 바쁘면 막습니다.</li>
+<li><strong>선호 LLC에서 나가는 이동</strong>은 막되, 선호 LLC가 문턱을 넘었고 도착지보다 20% 넘게 바쁘면 허용합니다.</li>
+</ul>
+<figure class="fig" id="fig-cache-aware"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 296" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>LLC가 둘인 머신에서 프로세스 P의 스레드 넷과 프로세스 Q의 스레드 둘. 부하만 보면 두 LLC에 셋씩 나뉘지만, 캐시 인지 스케줄링은 P의 스레드 넷을 한 LLC에 모으고 불균형을 받아들인다.</title>
+
+  <!-- 왼쪽: 부하만 -->
+  <text class="t-b" x="20" y="28">부하만 볼 때</text>
+  <text class="t-xs end" x="370" y="28">3 대 3으로 고르다</text>
+
+  <rect class="panel gray" x="20" y="40" width="165" height="118" rx="12"/>
+  <text class="t-s t-ink t-b" x="34" y="62">LLC 0</text>
+  <rect class="solid blue" x="30" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="46" y="94">P</text>
+  <rect class="solid blue" x="68" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="84" y="94">P</text>
+  <rect class="solid warm" x="106" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="122" y="94">Q</text>
+  <rect class="ghost dash" x="144" y="74" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="30" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="68" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="106" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="144" y="112" width="32" height="30" rx="5"/>
+
+  <rect class="panel gray" x="205" y="40" width="165" height="118" rx="12"/>
+  <text class="t-s t-ink t-b" x="219" y="62">LLC 1</text>
+  <rect class="solid blue" x="215" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="231" y="94">P</text>
+  <rect class="solid blue" x="253" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="269" y="94">P</text>
+  <rect class="solid warm" x="291" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="307" y="94">Q</text>
+  <rect class="ghost dash" x="329" y="74" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="215" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="253" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="291" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="329" y="112" width="32" height="30" rx="5"/>
+
+  <path class="ln red" d="M65 162 V180 H250 V164" marker-start="url(#ah-red)" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red mid" x="158" y="200">P의 데이터가 두 캐시 사이를 오간다</text>
+
+  <!-- 오른쪽: 캐시 인지 -->
+  <text class="t-b" x="390" y="28">캐시 인지 스케줄링</text>
+  <text class="t-xs end" x="740" y="28">4 대 2를 받아들인다</text>
+
+  <rect class="panel green" x="390" y="40" width="165" height="118" rx="12"/>
+  <text class="t-s t-ink t-b" x="404" y="62">LLC 0</text>
+  <text class="t-xs tc-green end" x="545" y="62">P의 선호 LLC</text>
+  <rect class="solid blue" x="400" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="416" y="94">P</text>
+  <rect class="solid blue" x="438" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="454" y="94">P</text>
+  <rect class="solid blue" x="476" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="492" y="94">P</text>
+  <rect class="solid blue" x="514" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="530" y="94">P</text>
+  <rect class="ghost dash" x="400" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="438" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="476" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="514" y="112" width="32" height="30" rx="5"/>
+
+  <rect class="panel gray" x="575" y="40" width="165" height="118" rx="12"/>
+  <text class="t-s t-ink t-b" x="589" y="62">LLC 1</text>
+  <rect class="solid warm" x="585" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="601" y="94">Q</text>
+  <rect class="solid warm" x="623" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="639" y="94">Q</text>
+  <rect class="ghost dash" x="661" y="74" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="699" y="74" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="585" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="623" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="661" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="699" y="112" width="32" height="30" rx="5"/>
+
+  <text class="t-xs tc-green mid" x="565" y="184">P의 스레드가 같은 캐시를 쓴다</text>
+  <text class="t-xs mid" x="565" y="200">선호 LLC에서 나가는 이동을 막는다</text>
+
+  <path class="ln thin muted" d="M20 222 H740"/>
+  <text class="t-s t-ink mid" x="380" y="250">선호 LLC의 이용률이 문턱(기본 50%)을 넘으면 다시 보통의 부하 분산에 맡긴다</text>
+  <text class="t-xs mid" x="380" y="274">스레드가 LLC의 코어 수에 견주어 너무 많거나 쓰는 메모리가 LLC보다 크면 처음부터 모으지 않는다</text>
+</svg></div><figcaption><b>그림 7-8</b>부하만 보면 스레드를 두 LLC에 고르게 나누는 것이 균형입니다. 캐시 인지 스케줄링은 한 프로세스의 스레드를 선호 LLC에 모으고, 그 LLC가 넘치기 전까지 불균형을 받아들입니다.</figcaption></figure>
+<p>모으지 않는 경우도 정해져 있습니다. 스레드가 하나뿐인 프로세스, 활동 중인 스레드가 LLC의 코어 수에 견주어 너무 많은 프로세스, 쓰는 메모리가 LLC 크기를 넘는 프로세스입니다. 모아 봐야 캐시에 다 들어가지 않기 때문입니다. LLC가 하나뿐인 머신에서는 기능 자체가 꺼집니다. 조정값은 <code>/sys/kernel/debug/sched/llc_balancing/</code> 아래에 있습니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>이 기능은 깨울 CPU를 고르는 뜨거운 경로를 건드리지 않고, 드물게 도는 부하 분산의 판단에만 끼어듭니다. 그리고 선호를 <strong>규칙이 아니라 한쪽으로 기운 저울</strong>로 넣었습니다. 20%와 50%라는 여유는 이력 현상을 만듭니다. 조금 기울었다고 옮기고 다시 돌아오는 왕복을 막는 것입니다. 서로 당기는 목표(부하의 균형, 캐시의 가까움)를 한 시스템에 넣을 때 커널이 반복해서 쓰는 방법입니다. 한쪽을 기본으로 두고, 다른 쪽은 문턱을 넘을 때만 이기게 합니다.</p>
+</div>
+</section>
+<section class="level2" id="isolation">
+<h2><span class="sec-n">7.10</span>격리와 코어 스케줄링<a aria-label="이 절의 링크" class="anchor" href="#isolation">#</a></h2>
+<p>분산을 <strong>하지 말아야</strong> 할 때도 있습니다.</p>
+<p><strong>CPU 격리.</strong> 지연 시간에 민감한 워크로드는 CPU 몇 개를 통째로 차지하고 다른 것이 끼어들지 않기를 바랍니다. 부팅 인자 <code>isolcpus=</code>는 지정한 CPU를 스케줄 도메인에서 빼서 부하 분산의 대상이 되지 않게 하고, <code>nohz_full=</code>은 그 CPU에서 태스크 하나만 돌 때 틱까지 멈춥니다(<a href="ch08.html">8장</a>). 격리되지 않은 나머지를 <strong>하우스키핑 CPU</strong>라고 부르고, 묶이지 않은 커널 스레드와 타이머 같은 잡무가 그쪽으로 갑니다. 실행 중에 같은 일을 하려면 cgroup의 cpuset에서 <code>cpuset.cpus.partition</code>에 <code>isolated</code>를 씁니다(<a href="ch22.html">22장</a>).</p>
+<p><strong>코어 스케줄링.</strong> SMT 형제는 연산 장치와 캐시를 같이 쓰므로, 한쪽에서 도는 코드가 다른 쪽의 데이터를 부채널로 엿볼 수 있는 취약점이 여러 번 발견되었습니다. SMT를 끄면 안전하지만 처리량을 잃습니다. 코어 스케줄링은 태스크에 <strong>쿠키</strong>를 붙이고(<code>prctl(PR_SCHED_CORE, ...)</code>), 한 코어의 형제들이 같은 쿠키의 태스크만 동시에 돌리게 합니다. 맞는 짝이 없으면 형제 하나를 일부러 놀립니다. 이를 위해 형제들의 런큐가 락 하나를 같이 쓰고 다음 태스크를 함께 고릅니다. 4장에서 런큐 락을 <code>rq_lock()</code>으로 감싸 쓰던 이유입니다.</p>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>3.8 · 2013</dt>
+<dd>
+자동 NUMA 균형의 토대가 들어옵니다.
+</dd>
+<dt>4.7 · 2016</dt>
+<dd>
+스케줄러의 이용률을 직접 쓰는 주파수 조절기 schedutil.
+</dd>
+<dt>5.0 · 2019</dt>
+<dd>
+에너지 인지 스케줄링(EAS).
+</dd>
+<dt>5.14 · 2021</dt>
+<dd>
+코어 스케줄링. SMT를 켠 채 신뢰하지 않는 태스크를 같은 코어에 올리지 않습니다.
+</dd>
+<dt>6.10 · 2024</dt>
+<dd>
+부하 분산 함수들이 <code>sched_balance_*</code>로 이름이 바뀝니다.
+</dd>
+<dt>7.2 · 2026</dt>
+<dd>
+캐시 인지 스케줄링(<code>CONFIG_SCHED_CACHE</code>).
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>태스크의 CPU는 깨울 때 한 번 정해지고, 부하 분산이 나중에 바로잡습니다. 두 결정 모두 "퍼뜨릴 것인가, 모을 것인가"를 저울질합니다.</li>
+<li>스케줄 도메인은 CPU 사이의 거리를 SMT, MC, PKG, NUMA의 계층으로 나타냅니다. 가까운 단계일수록 자주 균형을 맞춥니다.</li>
+<li>깨울 때는 후보를 <code>prev_cpu</code>와 깨우는 CPU로 줄이고, 그 LLC 안에서 놀고 있는 CPU를 찾습니다. 탐색에는 상한이 있습니다.</li>
+<li>PELT는 태스크의 최근 활동을 32ms 반감기의 감쇠 합으로 추적합니다. <code>util_avg</code>는 배치와 주파수 선택에, <code>load_avg</code>는 분산에 쓰입니다.</li>
+<li>부하 분산은 끌어오기입니다. 가장 바쁜 그룹의 가장 바쁜 런큐에서, 친화성이 허락하고 캐시가 식은 태스크를 가져옵니다.</li>
+<li>코어 크기가 다르면 용량과 이용률을 견주어 들어맞는 CPU를 고르고, 여유가 있을 때는 에너지 모델로 고릅니다.</li>
+<li>NUMA 균형은 힌트 폴트로 태스크가 쓰는 메모리의 위치를 알아내 태스크와 페이지를 서로 가까이 옮깁니다.</li>
+<li>캐시 인지 스케줄링은 한 프로세스의 스레드를 한 LLC에 모으는 쪽으로 부하 분산을 기울입니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p>16코어 머신에서 <code>make -j4</code>를 돌리는데 컴파일러 프로세스들이 CPU를 자주 옮겨 다닙니다. <code>fork</code>로 만들어진 직후의 배치와, 디스크 I/O에서 깨어날 때의 배치는 <code>select_task_rq_fair()</code>의 어느 길로 갑니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>fork</code>와 <code>exec</code>는 느린 길입니다. 도메인에 <code>SD_BALANCE_FORK</code>, <code>SD_BALANCE_EXEC</code>가 서 있어 <code>sd</code>가 잡히고, <code>sched_balance_find_dst_cpu()</code>가 넓은 범위에서 가장 한가한 CPU를 찾습니다. 새 태스크는 캐시가 식어 있으므로 멀리 가도 잃을 것이 없습니다. I/O에서 깨어나는 것은 빠른 길입니다. <code>wake_affine()</code>이 <code>prev_cpu</code>와 깨우는 CPU 가운데 하나를 고르고, <code>select_idle_sibling()</code>이 그 CPU의 LLC 안에서 놀고 있는 CPU를 찾습니다. 16코어가 LLC 하나를 같이 쓴다면 놀고 있는 CPU가 많으므로 깨어날 때마다 다른 CPU로 갈 수 있습니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>100ms 동안 CPU를 꽉 채워 쓰던 태스크가 64ms 동안 잠들었다 깨어났습니다. 깨어난 직후의 <code>util_avg</code>는 잠들기 전의 대략 몇 분의 일입니까? 스케줄러가 이 태스크를 작은 태스크로 오해하지 않게 하는 장치는 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>PELT의 반감기가 32ms이므로 64ms 뒤에는 약 4분의 1입니다. 이 값만 보면 큰 태스크가 작아 보여, 작은 코어에 놓이거나 낮은 주파수를 받을 수 있습니다. <code>util_est</code>가 잠들기 직전의 이용률을 기억하고 있고, <code>task_util_est()</code>는 <code>util_avg</code>와 <code>util_est</code> 가운데 큰 값을 돌려주므로 배치와 주파수 결정은 잠들기 전의 크기를 봅니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>sched_balance_rq()</code>가 가장 바쁜 런큐를 찾았는데 태스크를 하나도 옮기지 못하는 경우를 <code>can_migrate_task()</code>의 조건으로 세 가지 들어 보세요. 그 뒤에 무슨 일이 일어납니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<ol type="1">
+<li>태스크들의 <code>cpus_ptr</code>에 이 CPU가 없는 경우(친화성). (2) 런큐의 태스크가 지금 실행 중인 것 하나뿐인 경우. (3) 남은 태스크가 모두 방금 실행되어 캐시가 따뜻한 경우. 실패하면 도메인의 <code>nr_balance_failed</code>가 올라갑니다. 이 값이 <code>cache_nice_tries</code>를 넘으면 다음 시도에서는 따뜻한 태스크도 옮기고, 그래도 안 되면 바쁜 CPU의 stop 태스크를 깨워 실행 중인 태스크를 밀어내는 액티브 밸런싱을 합니다. 친화성 때문이라면 같은 그룹의 다른 CPU로 대신 옮기는 길을 찾습니다.</li>
+</ol>
+</div></details></div><div class="q"><div class="q-body">
+<p>EAS는 왜 시스템이 과이용 상태가 되면 꺼집니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>EAS는 "태스크를 어디에 놓아도 필요한 만큼의 CPU 시간을 받는다"는 가정 위에서 에너지만 비교합니다. 그리고 PELT의 이용률이 태스크의 실제 요구를 나타낸다고 믿습니다. CPU가 꽉 차면 태스크는 원하는 만큼 돌지 못하므로 이용률이 요구보다 작게 측정되고, 그 숫자로 한 에너지 추정은 틀립니다. 그때는 에너지를 아끼는 것보다 놀고 있는 용량을 찾아 처리량을 지키는 것이 먼저이므로, 보통의 부하 분산과 <code>select_idle_sibling()</code> 경로로 돌아갑니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>스레드 4개가 같은 해시 테이블을 읽고 쓰는 프로세스가 LLC 둘(각 16 CPU)인 머신에서 돕니다. 다른 부하는 없습니다. 캐시 인지 스케줄링이 꺼져 있을 때와 켜져 있을 때 스레드의 배치는 어떻게 다릅니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>꺼져 있으면 부하 분산이 두 LLC의 부하를 고르게 하려 하므로 스레드가 2개씩 나뉘는 쪽으로 갑니다. 한 LLC의 스레드가 고친 캐시 라인을 다른 LLC의 스레드가 읽을 때마다 캐시 미스가 납니다. 켜져 있으면 프로세스가 가장 많이 돈 LLC가 선호 LLC가 되고, <code>can_migrate_llc()</code>가 그쪽으로 가는 이동은 허용하고 나가는 이동은 막습니다. 스레드 4개의 이용률은 16 CPU인 LLC의 문턱(50%)에 못 미치므로 한 LLC에 모입니다. 다른 LLC는 비지만, 이 프로세스에는 그 편이 빠릅니다.</p>
+</div></details></div></div>
+
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>부하 분산<small>load balancing</small></dt>
+<dd>
+런큐 사이에 태스크를 옮겨 CPU들의 부하를 맞추는 일.
+</dd>
+<dt>스케줄 도메인<small>scheduling domain</small></dt>
+<dd>
+하드웨어 자원을 같이 쓰는 CPU들의 범위. SMT, MC, PKG, NUMA 단계로 계층을 이룬다.
+</dd>
+<dt>LLC<small>last level cache</small></dt>
+<dd>
+CPU들이 같이 쓰는 가장 바깥 단계의 캐시. 보통 L3.
+</dd>
+<dt>PELT<small>per-entity load tracking</small></dt>
+<dd>
+태스크와 런큐의 최근 활동을 지수 감쇠 합으로 추적하는 방식.
+</dd>
+<dt>이용률<small>utilization</small></dt>
+<dd>
+태스크가 실제로 실행된 시간의 비율. 0–1024로 나타내고 CPU 용량과 같은 눈금이다.
+</dd>
+<dt>util_est</dt>
+<dd>
+태스크가 잠들기 직전의 이용률을 기억해 둔 값.
+</dd>
+<dt>CPU 친화성<small>CPU affinity</small></dt>
+<dd>
+태스크가 실행될 수 있는 CPU의 집합. <code>p-&gt;cpus_ptr</code>.
+</dd>
+<dt>용량<small>capacity</small></dt>
+<dd>
+CPU의 상대적 처리 능력. 가장 큰 코어가 1024.
+</dd>
+<dt>EAS<small>energy aware scheduling</small></dt>
+<dd>
+에너지 모델로 태스크를 놓을 CPU를 고르는 깨우기 경로.
+</dd>
+<dt>NUMA 힌트 폴트<small>NUMA hinting fault</small></dt>
+<dd>
+태스크가 어느 노드의 메모리를 쓰는지 알아내려고 커널이 일부러 일으키는 페이지 폴트.
+</dd>
+<dt>캐시 인지 스케줄링<small>cache aware scheduling</small></dt>
+<dd>
+같은 프로세스의 스레드를 한 LLC에 모으도록 부하 분산을 기울이는 기능.
+</dd>
+<dt>코어 스케줄링<small>core scheduling</small></dt>
+<dd>
+SMT 형제가 같은 쿠키의 태스크만 동시에 실행하게 하는 기능.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/scheduler/sched-domains.html" rel="noopener" target="_blank"><code>Documentation/scheduler/sched-domains.rst</code></a>: 도메인과 그룹, 균형을 맞추는 순서.</li>
+<li><a href="https://docs.kernel.org/scheduler/sched-capacity.html" rel="noopener" target="_blank"><code>Documentation/scheduler/sched-capacity.rst</code></a>: CPU 용량, 이용률, 주파수·용량 불변성.</li>
+<li><a href="https://docs.kernel.org/scheduler/sched-energy.html" rel="noopener" target="_blank"><code>Documentation/scheduler/sched-energy.rst</code></a>: 에너지 모델과 EAS의 판단 과정을 예제로 설명합니다.</li>
+<li><a href="https://docs.kernel.org/scheduler/schedutil.html" rel="noopener" target="_blank"><code>Documentation/scheduler/schedutil.rst</code></a>: PELT 신호와 schedutil의 관계.</li>
+<li><a href="https://docs.kernel.org/admin-guide/hw-vuln/core-scheduling.html" rel="noopener" target="_blank"><code>Documentation/admin-guide/hw-vuln/core-scheduling.rst</code></a>: 코어 스케줄링의 사용법과 한계.</li>
+<li><a href="https://docs.kernel.org/scheduler/sched-stats.html" rel="noopener" target="_blank"><code>Documentation/scheduler/sched-stats.rst</code></a>: <code>/proc/schedstat</code>의 필드.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch06.html"><small>← 6장</small><b>커널 선점</b></a><a class="next" href="ch08.html"><small>8장 →</small><b>시간과 타이머</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#two-decisions">두 번의 결정</a><a href="#domains">스케줄 도메인</a><a href="#wakeup">깨울 CPU 고르기</a><a href="#pelt">부하를 재는 법: PELT</a><a href="#balance">부하 분산</a><a href="#affinity">친화성과 실시간 태스크</a><a href="#capacity">크기가 다른 CPU</a><a href="#numa">NUMA 균형</a><a href="#cache-aware">캐시 인지 스케줄링</a><a href="#isolation">격리와 코어 스케줄링</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

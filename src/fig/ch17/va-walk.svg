@@ -1,0 +1,78 @@
+<svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg">
+  <title>4단계 페이지 테이블 워크: 48비트 가상 주소의 9비트 조각 네 개가 PGD, PUD, PMD, PTE 표의 색인이 되고 마지막 12비트가 페이지 안의 오프셋이 된다</title>
+
+  <!-- 비트 번호 -->
+  <text class="t-code mid tc-muted" x="85" y="30">63–48</text>
+  <text class="t-code mid tc-muted" x="209" y="30">47–39</text>
+  <text class="t-code mid tc-muted" x="327" y="30">38–30</text>
+  <text class="t-code mid tc-muted" x="445" y="30">29–21</text>
+  <text class="t-code mid tc-muted" x="563" y="30">20–12</text>
+  <text class="t-code mid tc-muted" x="681" y="30">11–0</text>
+
+  <!-- 주소의 칸 -->
+  <rect class="box gray" x="20" y="38" width="130" height="44"/>
+  <text class="t-b mid" x="85" y="65">부호 확장</text>
+  <rect class="box blue" x="150" y="38" width="118" height="44"/>
+  <text class="t-b mid" x="209" y="65">PGD 색인</text>
+  <rect class="box blue" x="268" y="38" width="118" height="44"/>
+  <text class="t-b mid" x="327" y="65">PUD 색인</text>
+  <rect class="box blue" x="386" y="38" width="118" height="44"/>
+  <text class="t-b mid" x="445" y="65">PMD 색인</text>
+  <rect class="box blue" x="504" y="38" width="118" height="44"/>
+  <text class="t-b mid" x="563" y="65">PTE 색인</text>
+  <rect class="box warm" x="622" y="38" width="118" height="44"/>
+  <text class="t-b mid" x="681" y="65">오프셋</text>
+
+  <!-- 색인 화살표 -->
+  <path class="ln thin blue" d="M209 82 V174" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M327 82 V174" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M445 82 V174" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M563 82 V174" marker-end="url(#ah-blue)"/>
+  <path class="ln thin warm" d="M681 82 V174" marker-end="url(#ah-warm)"/>
+  <text class="t-xs" x="217" y="150">512칸 중 하나</text>
+  <text class="t-xs" x="335" y="150">512칸 중 하나</text>
+  <text class="t-xs" x="453" y="150">512칸 중 하나</text>
+  <text class="t-xs end" x="673" y="116">4096바이트 중 하나</text>
+
+  <!-- CR3 -->
+  <text class="t-code mid" x="62" y="204">mm-&gt;pgd</text>
+  <rect class="box yellow" x="20" y="214" width="84" height="42" rx="8"/>
+  <text class="t-mono t-b mid" x="62" y="240">CR3</text>
+  <path class="ln" d="M104 235 H159" marker-end="url(#ah)"/>
+
+  <!-- 표 네 개 -->
+  <rect class="box" x="163" y="180" width="92" height="110"/>
+  <path class="ln thin muted" d="M163 202 H255 M163 268 H255"/>
+  <rect class="box blue" x="163" y="224" width="92" height="22"/>
+  <path class="ln" d="M255 235 H277" marker-end="url(#ah)"/>
+
+  <rect class="box" x="281" y="180" width="92" height="110"/>
+  <path class="ln thin muted" d="M281 202 H373 M281 268 H373"/>
+  <rect class="box blue" x="281" y="224" width="92" height="22"/>
+  <path class="ln" d="M373 235 H395" marker-end="url(#ah)"/>
+
+  <rect class="box" x="399" y="180" width="92" height="110"/>
+  <path class="ln thin muted" d="M399 202 H491 M399 268 H491"/>
+  <rect class="box blue" x="399" y="224" width="92" height="22"/>
+  <path class="ln" d="M491 235 H513" marker-end="url(#ah)"/>
+
+  <rect class="box" x="517" y="180" width="92" height="110"/>
+  <path class="ln thin muted" d="M517 202 H609 M517 268 H609"/>
+  <rect class="box blue" x="517" y="224" width="92" height="22"/>
+  <path class="ln" d="M609 235 H631" marker-end="url(#ah)"/>
+
+  <!-- 물리 페이지 -->
+  <rect class="box green" x="635" y="180" width="92" height="110"/>
+  <rect class="solid warm" x="635" y="230" width="92" height="10"/>
+
+  <!-- 이름 -->
+  <text class="t-s t-ink t-b mid" x="209" y="310">PGD</text>
+  <text class="t-s t-ink t-b mid" x="327" y="310">PUD</text>
+  <text class="t-s t-ink t-b mid" x="445" y="310">PMD</text>
+  <text class="t-s t-ink t-b mid" x="563" y="310">PTE 테이블</text>
+  <text class="t-s t-ink t-b mid" x="681" y="310">4KB 페이지</text>
+  <text class="t-xs mid" x="327" y="328">리프면 1GB</text>
+  <text class="t-xs mid" x="445" y="328">리프면 2MB</text>
+
+  <text class="t-s mid" x="380" y="356">TLB에 없으면 표를 네 번 읽는다. 5단계에서는 PGD와 PUD 사이에 P4D가 하나 더 들어간다.</text>
+</svg>

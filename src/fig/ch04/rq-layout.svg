@@ -1,0 +1,101 @@
+<svg viewBox="0 0 760 412" xmlns="http://www.w3.org/2000/svg">
+  <title>CPU마다 하나씩 있는 런큐 struct rq의 구조: nr_running, 런큐 락, 시계, curr 포인터, 클래스별 하위 큐 dl·rt·cfs·scx, 그리고 stop과 idle 태스크</title>
+
+  <!-- CPU 0의 런큐 -->
+  <rect class="panel yellow" x="20" y="14" width="516" height="384" rx="14"/>
+  <text class="t-b" x="36" y="40">CPU 0의 런큐</text>
+  <text class="t-code end" x="520" y="40">struct rq · cpu_rq(0)</text>
+
+  <rect class="box" x="36" y="52" width="152" height="48" rx="8"/>
+  <text class="t-mono" x="48" y="72">nr_running</text>
+  <text class="t-xs" x="48" y="90">실행 가능한 태스크 수</text>
+
+  <rect class="box" x="198" y="52" width="152" height="48" rx="8"/>
+  <text class="t-mono" x="210" y="72">__lock</text>
+  <text class="t-xs" x="210" y="90">런큐 락 (raw 스핀락)</text>
+
+  <rect class="box" x="360" y="52" width="160" height="48" rx="8"/>
+  <text class="t-mono" x="372" y="72">clock</text>
+  <text class="t-xs" x="372" y="90">런큐가 가진 시계</text>
+
+  <rect class="box" x="36" y="112" width="200" height="52" rx="8"/>
+  <text class="t-mono" x="48" y="134">curr · donor</text>
+  <text class="t-xs" x="48" y="152">지금 실행 중인 태스크</text>
+  <path class="ln green" d="M236 138 H286" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="290" y="112" width="230" height="52" rx="8"/>
+  <text class="t-b" x="304" y="134">태스크 C</text>
+  <text class="t-code" x="304" y="152">on_rq = 1, on_cpu = 1</text>
+
+  <text class="t-s t-ink t-b" x="36" y="190">클래스별 하위 큐</text>
+
+  <rect class="box warm" x="36" y="200" width="114" height="112" rx="8"/>
+  <text class="t-mono t-b mid" x="93" y="222">dl</text>
+  <text class="t-code mid" x="93" y="240">struct dl_rq</text>
+  <text class="t-xs mid" x="93" y="262">데드라인 순</text>
+  <text class="t-xs mid" x="93" y="278">RB 트리</text>
+  <text class="t-xs tc-muted mid" x="93" y="300">비어 있음</text>
+
+  <rect class="box warm" x="158" y="200" width="114" height="112" rx="8"/>
+  <text class="t-mono t-b mid" x="215" y="222">rt</text>
+  <text class="t-code mid" x="215" y="240">struct rt_rq</text>
+  <text class="t-xs mid" x="215" y="262">우선순위별</text>
+  <text class="t-xs mid" x="215" y="278">리스트 100개</text>
+  <rect class="solid warm" x="206" y="290" width="18" height="12" rx="3"/>
+
+  <rect class="box green" x="280" y="200" width="114" height="112" rx="8"/>
+  <text class="t-mono t-b mid" x="337" y="222">cfs</text>
+  <text class="t-code mid" x="337" y="240">struct cfs_rq</text>
+  <text class="t-xs mid" x="337" y="262">fair 클래스의</text>
+  <text class="t-xs mid" x="337" y="278">RB 트리</text>
+  <rect class="solid green" x="304" y="290" width="18" height="12" rx="3"/>
+  <rect class="solid green" x="328" y="290" width="18" height="12" rx="3"/>
+  <rect class="solid green" x="352" y="290" width="18" height="12" rx="3"/>
+
+  <rect class="box teal" x="402" y="200" width="118" height="112" rx="8"/>
+  <text class="t-mono t-b mid" x="461" y="222">scx</text>
+  <text class="t-code mid" x="461" y="240">struct scx_rq</text>
+  <text class="t-xs mid" x="461" y="262">ext 클래스의</text>
+  <text class="t-xs mid" x="461" y="278">로컬 DSQ</text>
+  <text class="t-xs tc-muted mid" x="461" y="300">비어 있음</text>
+
+  <rect class="box gray" x="36" y="328" width="236" height="56" rx="8"/>
+  <text class="t-mono" x="48" y="351">stop</text>
+  <text class="t-xs" x="48" y="370">migration/0 · 가장 높은 클래스</text>
+
+  <rect class="box gray" x="284" y="328" width="236" height="56" rx="8"/>
+  <text class="t-mono" x="296" y="351">idle</text>
+  <text class="t-xs" x="296" y="370">swapper/0 · 돌릴 것이 없을 때</text>
+
+  <!-- 다른 CPU -->
+  <rect class="panel yellow" x="556" y="14" width="184" height="104" rx="14"/>
+  <text class="t-b" x="570" y="40">CPU 1의 런큐</text>
+  <text class="t-code" x="570" y="62">cpu_rq(1)</text>
+  <rect class="box warm" x="570" y="76" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="588" y="94">dl</text>
+  <rect class="box warm" x="610" y="76" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="628" y="94">rt</text>
+  <rect class="box green" x="650" y="76" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="668" y="94">cfs</text>
+  <rect class="box teal" x="690" y="76" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="708" y="94">scx</text>
+
+  <rect class="panel yellow" x="556" y="130" width="184" height="104" rx="14"/>
+  <text class="t-b" x="570" y="156">CPU 2의 런큐</text>
+  <text class="t-code" x="570" y="178">cpu_rq(2)</text>
+  <rect class="box warm" x="570" y="192" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="588" y="210">dl</text>
+  <rect class="box warm" x="610" y="192" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="628" y="210">rt</text>
+  <rect class="box green" x="650" y="192" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="668" y="210">cfs</text>
+  <rect class="box teal" x="690" y="192" width="36" height="28" rx="5"/>
+  <text class="t-code mid" x="708" y="210">scx</text>
+
+  <text class="t-l mid" x="648" y="264">⋮</text>
+
+  <text class="t-s t-ink t-b" x="556" y="302">CPU별 변수 runqueues</text>
+  <text class="t-s" x="556" y="324">CPU마다 큐와 락이 따로</text>
+  <text class="t-s" x="556" y="342">있어 서로 기다리지 않는다.</text>
+  <text class="t-s" x="556" y="368">큐 사이의 균형은</text>
+  <text class="t-s" x="556" y="386">부하 분산이 맞춘다 (7장).</text>
+</svg>

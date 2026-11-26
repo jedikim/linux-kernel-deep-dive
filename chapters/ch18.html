@@ -1,0 +1,1241 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>물리 메모리와 회수 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="버디, 슬랩, 폴리오, 그리고 메모리가 모자랄 때">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="물리 메모리와 회수 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="버디, 슬랩, 폴리오, 그리고 메모리가 모자랄 때">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch18" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html" aria-current="page"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">5부 메모리 › <b>18장 물리 메모리와 회수</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-red">
+<div class="ch-kicker"><span class="ch-no">18</span><span class="part">5부 · 메모리</span></div>
+<h1>물리 메모리와 회수</h1>
+<p class="ch-sub">버디, 슬랩, 폴리오, 그리고 메모리가 모자랄 때</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 55분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/mm_types.h" target="_blank" rel="noopener">include/linux/mm_types.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/mmzone.h" target="_blank" rel="noopener">include/linux/mmzone.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/mm/page_alloc.c" target="_blank" rel="noopener">mm/page_alloc.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/mm/page_alloc.h" target="_blank" rel="noopener">mm/page_alloc.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/gfp_types.h" target="_blank" rel="noopener">include/linux/gfp_types.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/mm/slub.c" target="_blank" rel="noopener">mm/slub.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/mm/swap_table.h" target="_blank" rel="noopener">mm/swap_table.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/mm/oom_kill.c" target="_blank" rel="noopener">mm/oom_kill.c</a></div>
+</header><div class="lead">
+<p>가상 주소는 얼마든지 약속할 수 있지만 물리 메모리는 정해진 양뿐입니다. 커널은 그것을 4KB 조각으로 나눠 조각마다 장부를 적고, 요청이 올 때마다 내주고, 모자라면 덜 쓰이는 조각을 골라 거둬 갑니다. 어떻게 적는가, 어떻게 나눠 주는가, 무엇을 거두는가. 세 질문 모두 지난 몇 년 사이에 답이 바뀌었습니다. 장부는 페이지에서 폴리오로, 객체 할당자는 세 구현에서 하나로, 스왑 캐시는 트리에서 배열로 옮겨 갔습니다. 이 장은 v7.3의 답을 소스에서 읽습니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>폴리오는 <code>struct page</code>의 어떤 문제를 풀려고 생겼는가?</li>
+<li>버디 할당자는 큰 블록을 어떻게 쪼개고 다시 합치는가?</li>
+<li><code>GFP_KERNEL</code>과 <code>GFP_ATOMIC</code>은 할당 경로의 어디에서 갈리는가?</li>
+<li>v7.3의 SLUB에서 <code>kmalloc()</code>의 빠른 경로는 무엇을 건드리는가?</li>
+<li>회수는 어떤 페이지를 먼저 버리고, 그 판단의 근거를 어디서 얻는가?</li>
+<li>회수로도 메모리를 만들지 못하면 OOM 킬러는 누구를 고르는가?</li>
+</ul>
+</div>
+<section class="level2" id="folio">
+<h2><span class="sec-n">18.1</span>페이지와 폴리오<a aria-label="이 절의 링크" class="anchor" href="#folio">#</a></h2>
+<p>물리 메모리는 4KB짜리 <strong>페이지 프레임</strong>으로 나뉘고, 프레임마다 <code>struct page</code>가 하나씩 있습니다. 이 구조체들의 배열이 <a href="ch17.html">17장</a>의 vmemmap 영역에 놓여 있어서, 프레임 번호(PFN)와 <code>struct page</code>의 주소는 덧셈 한 번으로 오갑니다. x86-64의 흔한 설정에서 <code>struct page</code>는 64바이트입니다. 메모리 16GB에 프레임이 약 400만 개이므로 장부만 256MB를 씁니다. 그래서 이 구조체는 한 바이트도 허투루 쓰지 않습니다. 같은 자리를 용도에 따라 다르게 읽는 union으로 이루어져 있습니다. 페이지 캐시의 페이지일 때는 <code>mapping</code>과 오프셋으로, 버디 할당자의 빈 페이지일 때는 리스트 노드와 블록 크기로 읽습니다.</p>
+<p>커널은 연속한 2<sup>n</sup>개의 페이지를 한 덩어리로 다루기도 합니다. 이것이 <strong>복합 페이지</strong>(compound page)입니다. 첫 페이지가 head이고 나머지는 tail입니다. tail의 <code>struct page</code>는 <code>compound_info</code> 필드의 비트 0을 세워 "나는 tail"임을 표시하고 head를 가리킵니다.</p>
+<p>여기서 문제가 생겼습니다. <code>struct page *</code>를 받은 함수는 그것이 홑 페이지인지, head인지, tail인지 타입만으로는 알 수 없습니다. 참조 카운트와 플래그는 head에만 의미가 있으므로, 함수마다 "혹시 tail이면 head를 찾아라"는 <code>compound_head()</code> 호출이 끼어들었습니다. 빠뜨리면 tail의 엉뚱한 필드를 고치는 버그가 됩니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/mm_types.h#L404" rel="noopener" target="_blank">include/linux/mm_types.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/mm_types.h" data-line="404" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="kw">struct</span> folio <span class="op">{</span></span>
+<span id="cb1-2">    <span class="co">/* private: don't document the anon union */</span></span>
+<span id="cb1-3">    <span class="kw">union</span> <span class="op">{</span></span>
+<span id="cb1-4">        <span class="kw">struct</span> <span class="op">{</span></span>
+<span id="cb1-5">    <span class="co">/* public: */</span></span>
+<span id="cb1-6">            memdesc_flags_t flags<span class="op">;</span></span>
+<span id="cb1-7">            <span class="kw">union</span> <span class="op">{</span></span>
+<span id="cb1-8">                <span class="kw">struct</span> list_head lru<span class="op">;</span></span>
+<span id="cb1-9">                <span class="co">/* ... */</span></span>
+<span id="cb1-10">            <span class="op">};</span></span>
+<span id="cb1-11">            <span class="kw">struct</span> address_space <span class="op">*</span>mapping<span class="op">;</span></span>
+<span id="cb1-12">            <span class="kw">union</span> <span class="op">{</span></span>
+<span id="cb1-13">                pgoff_t index<span class="op">;</span></span>
+<span id="cb1-14">                <span class="dt">unsigned</span> <span class="dt">long</span> share<span class="op">;</span></span>
+<span id="cb1-15">            <span class="op">};</span></span>
+<span id="cb1-16">            <span class="co">/* ... */</span></span>
+<span id="cb1-17">            atomic_t _mapcount<span class="op">;</span></span>
+<span id="cb1-18">            atomic_t _refcount<span class="op">;</span></span>
+<span id="cb1-19">            <span class="co">/* ... */</span></span>
+<span id="cb1-20">    <span class="co">/* private: the union with struct page is transitional */</span></span>
+<span id="cb1-21">        <span class="op">};</span></span>
+<span id="cb1-22">        <span class="kw">struct</span> page page<span class="op">;</span></span>
+<span id="cb1-23">    <span class="op">};</span></span>
+<span id="cb1-24">    <span class="co">/* ... */</span></span>
+<span id="cb1-25"><span class="op">};</span></span></code></pre></div></div>
+<p><strong>폴리오</strong>(folio)는 "tail이 아닌 페이지에서 시작하는, 크기가 2의 거듭제곱인 페이지 묶음"입니다. 홑 페이지도 크기 1인 폴리오입니다. 읽을 곳은 두 군데입니다.</p>
+<ul>
+<li>폴리오는 새 메모리를 차지하지 않습니다. head의 <code>struct page</code>와 같은 자리를 다른 타입으로 읽습니다(<code>struct page page</code>와의 union). 주석은 이 겹침이 과도기적(transitional)이라고 적고 있습니다.</li>
+<li><code>flags</code>, <code>lru</code>, <code>mapping</code>, <code>_refcount</code>는 묶음 <strong>전체</strong>에 대한 것입니다. 락을 잡거나 참조를 올리거나 LRU에 넣는 일은 폴리오 단위로 합니다.</li>
+</ul>
+<figure class="fig" id="fig-page-folio"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 352" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>struct page 배열 위의 폴리오: 연속한 네 프레임 가운데 첫 프레임이 head이고 나머지 tail의 compound_info가 head를 가리킨다. struct folio는 head의 struct page와 같은 메모리를 다른 타입으로 읽는다.</title>
+
+  <text class="t-s t-ink t-b" x="60" y="22">vmemmap의 struct page 배열 · 프레임마다 하나</text>
+
+  <text class="t-code mid tc-muted" x="100" y="46">PFN 40</text>
+  <text class="t-code mid tc-muted" x="180" y="46">41</text>
+  <text class="t-code mid tc-muted" x="260" y="46">42</text>
+  <text class="t-code mid tc-muted" x="340" y="46">43</text>
+  <text class="t-code mid tc-muted" x="420" y="46">44</text>
+  <text class="t-code mid tc-muted" x="500" y="46">45</text>
+  <text class="t-code mid tc-muted" x="580" y="46">46</text>
+  <text class="t-code mid tc-muted" x="660" y="46">47</text>
+
+  <rect class="box" x="60" y="54" width="80" height="54"/>
+  <text class="t-s mid" x="100" y="86">홑 페이지</text>
+  <rect class="box" x="140" y="54" width="80" height="54"/>
+  <text class="t-s mid" x="180" y="86">홑 페이지</text>
+  <rect class="box blue" x="220" y="54" width="80" height="54"/>
+  <text class="t-b mid" x="260" y="78">head</text>
+  <text class="t-xs mid" x="260" y="97">플래그·참조</text>
+  <rect class="box gray" x="300" y="54" width="80" height="54"/>
+  <text class="t-s t-ink mid" x="340" y="86">tail</text>
+  <rect class="box gray" x="380" y="54" width="80" height="54"/>
+  <text class="t-s t-ink mid" x="420" y="86">tail</text>
+  <rect class="box gray" x="460" y="54" width="80" height="54"/>
+  <text class="t-s t-ink mid" x="500" y="86">tail</text>
+  <rect class="box" x="540" y="54" width="80" height="54"/>
+  <text class="t-s mid" x="580" y="86">홑 페이지</text>
+  <rect class="box" x="620" y="54" width="80" height="54"/>
+  <text class="t-s mid" x="660" y="86">홑 페이지</text>
+
+  <rect class="ghost warm" x="216" y="50" width="328" height="62" rx="6"/>
+
+  <path class="ln thin" d="M340 112 V128 M420 112 V128 M500 112 V128 H260 V116" marker-end="url(#ah)"/>
+  <text class="t-code" x="512" y="132">compound_info → head</text>
+  <text class="t-s tc-warm mid" x="380" y="152">폴리오 하나 · order 2 · 네 프레임</text>
+
+  <!-- 같은 메모리, 두 타입 -->
+  <rect class="panel" x="60" y="172" width="310" height="166" rx="12"/>
+  <text class="t-mono t-b" x="74" y="196">struct page</text>
+  <text class="t-xs" x="170" y="196">head 프레임의 것</text>
+  <rect class="box" x="74" y="206" width="282" height="22"/>
+  <text class="t-code" x="84" y="222">flags</text>
+  <rect class="box" x="74" y="228" width="282" height="22"/>
+  <text class="t-code" x="84" y="244">lru / buddy_list / pcp_list …</text>
+  <rect class="box" x="74" y="250" width="282" height="22"/>
+  <text class="t-code" x="84" y="266">mapping</text>
+  <rect class="box" x="74" y="272" width="282" height="22"/>
+  <text class="t-code" x="84" y="288">__folio_index</text>
+  <rect class="box" x="74" y="294" width="282" height="22"/>
+  <text class="t-code" x="84" y="310">_mapcount · _refcount</text>
+
+  <text class="t-h mid" x="380" y="266">=</text>
+
+  <rect class="panel blue" x="390" y="172" width="310" height="166" rx="12"/>
+  <text class="t-mono t-b" x="404" y="196">struct folio</text>
+  <text class="t-xs" x="508" y="196">같은 주소, 다른 타입</text>
+  <rect class="box" x="404" y="206" width="282" height="22"/>
+  <text class="t-code" x="414" y="222">flags</text>
+  <rect class="box" x="404" y="228" width="282" height="22"/>
+  <text class="t-code" x="414" y="244">lru</text>
+  <rect class="box" x="404" y="250" width="282" height="22"/>
+  <text class="t-code" x="414" y="266">mapping</text>
+  <rect class="box" x="404" y="272" width="282" height="22"/>
+  <text class="t-code" x="414" y="288">index</text>
+  <rect class="box" x="404" y="294" width="282" height="22"/>
+  <text class="t-code" x="414" y="310">_mapcount · _refcount</text>
+  <text class="t-xs" x="404" y="331">tail 자리에는 _nr_pages, _large_mapcount 등</text>
+</svg></div><figcaption><b>그림 18-1</b>연속한 네 프레임으로 이루어진 폴리오. <code>struct folio</code>는 head의 <code>struct page</code>와 같은 메모리이고, tail의 <code>compound_info</code>는 head를 가리킵니다.</figcaption></figure>
+<p><code>page_folio(page)</code>는 어떤 페이지든 그것이 속한 폴리오를 돌려줍니다. 폴리오를 받는 함수는 다시 확인할 필요가 없습니다. <code>folio_nr_pages()</code>와 <code>folio_order()</code>가 크기를 알려 줍니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>폴리오는 새 기능이 아니라 <strong>불변식을 타입에 담은 것</strong>입니다. "이 포인터는 tail을 가리키지 않는다"는 약속을 주석이나 실행 중 검사 대신 타입 이름으로 표현했습니다. 그러면 검사는 타입이 바뀌는 경계(<code>page_folio()</code>)에서 한 번만 하면 되고, 그 안쪽 함수들에서 반복하던 <code>compound_head()</code>가 사라집니다. 잘못된 포인터를 넘기는 코드는 컴파일이 되지 않습니다. 전환은 한 번에 하지 않았습니다. 5.16에 타입을 들여온 뒤 페이지 캐시, 파일시스템, 회수 코드를 서브시스템 단위로 옮겼고, v7.3에도 <code>struct page</code>를 받는 옛 인터페이스가 남아 있습니다. 같은 방식으로 슬랩에는 <code>struct slab</code>, 페이지 테이블에는 <code>struct ptdesc</code>라는 타입이 생겨, <code>struct page</code>가 하던 여러 역할을 하나씩 떼어 내고 있습니다.</p>
+</div>
+<section class="level3" id="큰-폴리오-thp와-mthp">
+<h3>큰 폴리오: THP와 mTHP</h3>
+<p>폴리오의 실질적인 쓸모는 큰 단위입니다. 4KB 512개 대신 2MB 폴리오 하나를 다루면 LRU 조작도, 락도, 페이지 폴트도 512분의 1로 줄어듭니다. <strong>THP</strong>(transparent huge page)는 익명 메모리에 2MB 폴리오를 할당해 PMD 항목 하나로 매핑합니다. 프로그램은 아무것도 하지 않아도 되고, 커널 스레드 <code>khugepaged</code>가 흩어진 작은 페이지를 뒤늦게 큰 폴리오로 합쳐 주기도 합니다. <strong>mTHP</strong>는 그 사이의 크기입니다. 16KB, 64KB 같은 폴리오를 할당하되 매핑은 PTE로 합니다. <a href="ch17.html">17장</a>에서 본 <code>alloc_anon_folio()</code>가 허용된 크기 가운데 가장 큰 것부터 시도합니다. 전체 스위치는 <code>/sys/kernel/mm/transparent_hugepage/enabled</code>이고, 크기별 허용 여부는 그 아래 <code>hugepages-&lt;크기&gt;kB/enabled</code>로 정합니다. 페이지 캐시에서는 파일시스템이 허용한 범위에서 미리 읽기가 큰 폴리오를 만듭니다.</p>
+<p>hugetlbfs는 이름이 비슷하지만 다른 장치입니다. 관리자가 미리 떼어 둔 풀에서 큰 페이지를 주고, 그 페이지는 회수되지도 스왑되지도 않습니다.</p>
+</section>
+</section>
+<section class="level2" id="zones">
+<h2><span class="sec-n">18.2</span>노드와 존<a aria-label="이 절의 링크" class="anchor" href="#zones">#</a></h2>
+<p>물리 메모리는 두 겹으로 묶여 있습니다. 바깥은 <strong>노드</strong>입니다. NUMA 시스템에서 CPU 소켓에 가까운 메모리 한 덩어리가 노드 하나이고, <code>pg_data_t</code>가 대표합니다. 안쪽은 <strong>존</strong>(zone)입니다. 주소 범위에 따라 쓸 수 있는 용도가 달라서 나눕니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>존</th>
+<th>x86-64에서의 범위</th>
+<th>용도</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ZONE_DMA</code></td>
+<td>16MB 아래</td>
+<td>24비트 주소만 다루는 옛 장치</td>
+</tr>
+<tr>
+<td><code>ZONE_DMA32</code></td>
+<td>4GB 아래</td>
+<td>32비트 주소만 다루는 장치</td>
+</tr>
+<tr>
+<td><code>ZONE_NORMAL</code></td>
+<td>그 위 전부</td>
+<td>일반 용도</td>
+</tr>
+<tr>
+<td><code>ZONE_MOVABLE</code></td>
+<td>설정에 따라</td>
+<td>옮길 수 있는 페이지만. 메모리 핫플러그용</td>
+</tr>
+<tr>
+<td><code>ZONE_DEVICE</code></td>
+<td>장치 메모리</td>
+<td>영구 메모리, GPU 메모리처럼 <code>struct page</code>만 필요한 영역</td>
+</tr>
+</tbody>
+</table></div>
+<p>존마다 빈 페이지 목록과 <strong>워터마크</strong> 세 개가 있습니다. 빈 페이지가 <code>low</code> 아래로 내려가면 회수 스레드 <code>kswapd</code>가 깨어나 <code>high</code>가 될 때까지 회수합니다. <code>min</code> 아래는 비상용이라 보통의 할당은 건드리지 못합니다.</p>
+<figure class="fig" id="fig-node-zone-freearea"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 344" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>노드, 존, free_area의 관계와 워터마크: 노드 안에 존이 있고, 존마다 order별 빈 블록 목록과 min·low·high 워터마크가 있다</title>
+
+  <!-- 노드 -->
+  <rect class="panel" x="20" y="16" width="200" height="312" rx="14"/>
+  <text class="t-b" x="34" y="42">노드 0</text>
+  <text class="t-code" x="88" y="42">pg_data_t</text>
+  <rect class="box" x="34" y="54" width="172" height="34" rx="6"/>
+  <text class="t-code" x="46" y="76">ZONE_DMA</text>
+  <rect class="box" x="34" y="94" width="172" height="52" rx="6"/>
+  <text class="t-code" x="46" y="116">ZONE_DMA32</text>
+  <text class="t-xs" x="46" y="134">4GB 아래</text>
+  <rect class="box yellow" x="34" y="152" width="172" height="124" rx="6"/>
+  <text class="t-code t-b" x="46" y="176">ZONE_NORMAL</text>
+  <text class="t-xs" x="46" y="196">free_area[11]</text>
+  <text class="t-xs" x="46" y="214">_watermark[]</text>
+  <text class="t-xs" x="46" y="232">per_cpu_pageset</text>
+  <rect class="box gray" x="34" y="284" width="172" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="120" y="305">kswapd0 스레드</text>
+
+  <path class="ln thin muted dash" d="M206 152 L250 30"/>
+  <path class="ln thin muted dash" d="M206 276 L250 262"/>
+
+  <!-- free_area -->
+  <text class="t-mono t-b" x="250" y="34">zone-&gt;free_area[]</text>
+
+  <rect class="box" x="250" y="46" width="88" height="28" rx="6"/>
+  <text class="t-code mid" x="294" y="65">order 0</text>
+  <path class="ln thin green" d="M338 60 H556"/>
+  <rect class="box green" x="356" y="52" width="14" height="16"/>
+  <rect class="box green" x="384" y="52" width="14" height="16"/>
+  <rect class="box green" x="412" y="52" width="14" height="16"/>
+  <rect class="box green" x="440" y="52" width="14" height="16"/>
+  <text class="t-xs end" x="572" y="80">4KB</text>
+
+  <rect class="box" x="250" y="88" width="88" height="28" rx="6"/>
+  <text class="t-code mid" x="294" y="107">order 1</text>
+  <path class="ln thin green" d="M338 102 H556"/>
+  <rect class="box green" x="356" y="94" width="24" height="16"/>
+  <rect class="box green" x="394" y="94" width="24" height="16"/>
+  <rect class="box green" x="432" y="94" width="24" height="16"/>
+  <text class="t-xs end" x="572" y="122">8KB</text>
+
+  <rect class="box" x="250" y="130" width="88" height="28" rx="6"/>
+  <text class="t-code mid" x="294" y="149">order 2</text>
+  <path class="ln thin green" d="M338 144 H556"/>
+  <rect class="box green" x="356" y="136" width="40" height="16"/>
+  <rect class="box green" x="410" y="136" width="40" height="16"/>
+  <text class="t-xs end" x="572" y="164">16KB</text>
+
+  <text class="t-s mid" x="294" y="186">⋮</text>
+
+  <rect class="box" x="250" y="198" width="88" height="28" rx="6"/>
+  <text class="t-code mid" x="294" y="217">order 9</text>
+  <path class="ln thin green" d="M338 212 H556"/>
+  <rect class="box green" x="356" y="204" width="80" height="16"/>
+  <rect class="box green" x="450" y="204" width="80" height="16"/>
+  <text class="t-xs end" x="572" y="232">2MB</text>
+
+  <rect class="box" x="250" y="240" width="88" height="28" rx="6"/>
+  <text class="t-code mid" x="294" y="259">order 10</text>
+  <path class="ln thin green" d="M338 254 H556"/>
+  <rect class="box green" x="356" y="246" width="150" height="16"/>
+  <text class="t-xs end" x="572" y="274">4MB</text>
+
+  <rect class="box green" x="250" y="300" width="14" height="14"/>
+  <text class="t-xs" x="272" y="312">빈 블록. 같은 크기끼리 한 목록에 걸린다</text>
+
+  <!-- 워터마크 -->
+  <text class="t-s t-ink t-b mid" x="645" y="34">빈 페이지 수</text>
+  <rect class="box green" x="620" y="46" width="50" height="84"/>
+  <rect class="box" x="620" y="130" width="50" height="50"/>
+  <rect class="box yellow" x="620" y="180" width="50" height="50"/>
+  <rect class="box red" x="620" y="230" width="50" height="60"/>
+  <text class="t-code end" x="612" y="134">high</text>
+  <text class="t-code end" x="612" y="184">low</text>
+  <text class="t-code end" x="612" y="234">min</text>
+  <text class="t-code end" x="612" y="294">0</text>
+  <text class="t-xs" x="678" y="92">넉넉함</text>
+  <text class="t-xs" x="678" y="159">할당 통과</text>
+  <text class="t-xs" x="678" y="200">kswapd가</text>
+  <text class="t-xs" x="678" y="216">회수한다</text>
+  <text class="t-xs" x="678" y="256">예비분</text>
+  <text class="t-xs" x="678" y="272">직접 회수</text>
+</svg></div><figcaption><b>그림 18-2</b>노드 안의 존, 존 안의 <code>free_area</code> 배열과 워터마크. 빈 페이지는 블록 크기(order)별로 다른 목록에 걸려 있습니다.</figcaption></figure>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>존별로 크기마다 빈 블록이 몇 개인지 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ cat /proc/buddyinfo
+Node 0, zone    DMA32   1205    984    712    403    188     77     31     12      5      2    301
+Node 0, zone   Normal  18332   9120   4411   1876    702    241     83     27      9      3     12
+...</code></pre></div>
+<p>숫자 열한 개가 order 0부터 10까지의 빈 블록 수입니다. 오른쪽 열이 0에 가까워지면 큰 연속 메모리를 구하기 어렵습니다. 워터마크는 <code>/proc/zoneinfo</code>에 페이지 수로 나옵니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ grep -A4 'zone   Normal' /proc/zoneinfo
+Node 0, zone   Normal
+  pages free     243611
+        boost    0
+        min      16904
+        low      21130</code></pre></div>
+<p>전체 그림은 <code>/proc/meminfo</code>에 있습니다. <code>MemFree</code>는 버디의 빈 페이지이고, <code>MemAvailable</code>은 거기에 쉽게 회수할 수 있는 페이지 캐시와 슬랩(<code>SReclaimable</code>)을 더한 추정치입니다. "쓸 수 있는 메모리"를 볼 때는 뒤쪽을 봅니다. <code>Cached</code>는 페이지 캐시, <code>AnonPages</code>는 익명 메모리, <code>Slab</code>은 슬랩 할당자가 쥔 양입니다.</p>
+</div>
+</section>
+<section class="level2" id="buddy">
+<h2><span class="sec-n">18.3</span>버디 할당자<a aria-label="이 절의 링크" class="anchor" href="#buddy">#</a></h2>
+<p>페이지 단위의 할당을 맡는 것이 <strong>버디 할당자</strong>(buddy allocator)입니다. 빈 메모리를 2<sup>order</sup> 페이지 크기의 블록으로 관리합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/mmzone.h#L30" rel="noopener" target="_blank">include/linux/mmzone.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/mmzone.h" data-line="30" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="pp">#ifndef CONFIG_ARCH_FORCE_MAX_ORDER</span></span>
+<span id="cb4-2"><span class="pp">#define MAX_PAGE_ORDER </span><span class="dv">10</span></span>
+<span id="cb4-3"><span class="pp">#else</span></span>
+<span id="cb4-4"><span class="pp">#define MAX_PAGE_ORDER CONFIG_ARCH_FORCE_MAX_ORDER</span></span>
+<span id="cb4-5"><span class="pp">#endif</span></span>
+<span id="cb4-6"><span class="co">/* ... */</span></span>
+<span id="cb4-7"><span class="kw">struct</span> free_area <span class="op">{</span></span>
+<span id="cb4-8">    <span class="kw">struct</span> list_head    free_list<span class="op">[</span>MIGRATE_TYPES<span class="op">];</span></span>
+<span id="cb4-9">    <span class="dt">unsigned</span> <span class="dt">long</span>       nr_free<span class="op">;</span></span>
+<span id="cb4-10"><span class="op">};</span></span></code></pre></div></div>
+<p>존마다 <code>free_area</code>가 order 0부터 <code>MAX_PAGE_ORDER</code>까지 11개 있습니다. 가장 큰 블록은 1024페이지, 4MB입니다. 요청이 오면 그 크기의 목록부터 위로 올라가며 빈 블록을 찾습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/mm/page_alloc.c#L1900" rel="noopener" target="_blank">mm/page_alloc.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="mm/page_alloc.c" data-line="1900" id="cb5"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb5-1"><span class="dt">static</span> __always_inline</span>
+<span id="cb5-2"><span class="kw">struct</span> page <span class="op">*</span>__rmqueue_smallest<span class="op">(</span><span class="kw">struct</span> zone <span class="op">*</span>zone<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span> order<span class="op">,</span></span>
+<span id="cb5-3">                        <span class="dt">int</span> migratetype<span class="op">)</span></span>
+<span id="cb5-4"><span class="op">{</span></span>
+<span id="cb5-5">    <span class="dt">unsigned</span> <span class="dt">int</span> current_order<span class="op">;</span></span>
+<span id="cb5-6">    <span class="kw">struct</span> free_area <span class="op">*</span>area<span class="op">;</span></span>
+<span id="cb5-7">    <span class="kw">struct</span> page <span class="op">*</span>page<span class="op">;</span></span>
+<span id="cb5-8"></span>
+<span id="cb5-9">    <span class="co">/* Find a page of the appropriate size in the preferred list */</span></span>
+<span id="cb5-10">    <span class="cf">for</span> <span class="op">(</span>current_order <span class="op">=</span> order<span class="op">;</span> current_order <span class="op">&lt;</span> NR_PAGE_ORDERS<span class="op">;</span> <span class="op">++</span>current_order<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-11">        area <span class="op">=</span> <span class="op">&amp;(</span>zone<span class="op">-&gt;</span>free_area<span class="op">[</span>current_order<span class="op">]);</span></span>
+<span id="cb5-12">        page <span class="op">=</span> get_page_from_free_area<span class="op">(</span>area<span class="op">,</span> migratetype<span class="op">);</span></span>
+<span id="cb5-13">        <span class="cf">if</span> <span class="op">(!</span>page<span class="op">)</span></span>
+<span id="cb5-14">            <span class="cf">continue</span><span class="op">;</span></span>
+<span id="cb5-15"></span>
+<span id="cb5-16">        page_del_and_expand<span class="op">(</span>zone<span class="op">,</span> page<span class="op">,</span> order<span class="op">,</span> current_order<span class="op">,</span></span>
+<span id="cb5-17">                    migratetype<span class="op">);</span></span>
+<span id="cb5-18">        <span class="co">/* ... */</span></span>
+<span id="cb5-19">        <span class="cf">return</span> page<span class="op">;</span></span>
+<span id="cb5-20">    <span class="op">}</span></span>
+<span id="cb5-21"></span>
+<span id="cb5-22">    <span class="cf">return</span> NULL<span class="op">;</span></span>
+<span id="cb5-23"><span class="op">}</span></span></code></pre></div></div>
+<p>원하는 크기가 없어서 더 큰 블록을 꺼냈다면 <code>page_del_and_expand()</code>가 <strong>쪼갭니다</strong>. 블록을 반으로 갈라 위쪽 절반을 한 단계 아래 목록에 걸고, 남은 절반을 다시 반으로 가르기를 요청한 크기가 될 때까지 되풀이합니다.</p>
+<p>돌려받을 때는 반대로 <strong>합칩니다</strong>. 같은 크기의 이웃 블록, 곧 <strong>버디</strong>가 비어 있으면 둘을 합쳐 한 단계 위로 올리고, 거기서 또 버디를 찾습니다. 버디의 위치는 계산으로 나옵니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/mm/page_alloc.h#L176" rel="noopener" target="_blank">mm/page_alloc.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="mm/page_alloc.h" data-line="176" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">unsigned</span> <span class="dt">long</span></span>
+<span id="cb6-2">__find_buddy_pfn<span class="op">(</span><span class="dt">unsigned</span> <span class="dt">long</span> page_pfn<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span> order<span class="op">)</span></span>
+<span id="cb6-3"><span class="op">{</span></span>
+<span id="cb6-4">    <span class="cf">return</span> page_pfn <span class="op">^</span> <span class="op">(</span><span class="dv">1</span> <span class="op">&lt;&lt;</span> order<span class="op">);</span></span>
+<span id="cb6-5"><span class="op">}</span></span></code></pre></div></div>
+<p>블록이 항상 자기 크기의 배수 위치에서 시작하므로, PFN의 <code>order</code>번 비트만 뒤집으면 버디입니다. 검색도 별도의 자료구조도 필요 없습니다.</p>
+<figure class="fig" id="fig-buddy-split-merge"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 362" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>버디 할당자의 쪼개기와 합치기: order 3 블록을 세 번 반으로 쪼개 order 0 페이지 하나를 내주고, 해제하면 버디가 비어 있는 동안 다시 합쳐 order 3으로 돌아간다</title>
+
+  <text class="t-xs end" x="240" y="28">PFN</text>
+  <text class="t-code mid tc-muted" x="280" y="28">0</text>
+  <text class="t-code mid tc-muted" x="340" y="28">1</text>
+  <text class="t-code mid tc-muted" x="400" y="28">2</text>
+  <text class="t-code mid tc-muted" x="460" y="28">3</text>
+  <text class="t-code mid tc-muted" x="520" y="28">4</text>
+  <text class="t-code mid tc-muted" x="580" y="28">5</text>
+  <text class="t-code mid tc-muted" x="640" y="28">6</text>
+  <text class="t-code mid tc-muted" x="700" y="28">7</text>
+
+  <!-- A -->
+  <text class="t-s t-ink t-b" x="20" y="60">order 3 블록 하나만 비어 있다</text>
+  <rect class="box green" x="250" y="40" width="480" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="490" y="60">order 3</text>
+
+  <!-- B -->
+  <text class="t-s t-ink t-b" x="20" y="108">① 반으로 쪼갠다</text>
+  <rect class="box" x="250" y="88" width="240" height="30" rx="4"/>
+  <text class="t-s mid" x="370" y="108">더 쪼갤 쪽</text>
+  <rect class="box green" x="490" y="88" width="240" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="610" y="108">order 2 목록으로</text>
+
+  <!-- C -->
+  <text class="t-s t-ink t-b" x="20" y="156">② 앞쪽을 다시 쪼갠다</text>
+  <rect class="box" x="250" y="136" width="120" height="30" rx="4"/>
+  <text class="t-s mid" x="310" y="156">더 쪼갤 쪽</text>
+  <rect class="box green" x="370" y="136" width="120" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="430" y="156">order 1 목록으로</text>
+  <rect class="box green" x="490" y="136" width="240" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="610" y="156">order 2</text>
+
+  <!-- D -->
+  <text class="t-s t-ink t-b" x="20" y="204">③ 한 번 더 쪼개 PFN 0을 내준다</text>
+  <rect class="solid blue" x="250" y="184" width="60" height="30" rx="4"/>
+  <text class="t-s t-on t-b mid" x="280" y="204">할당</text>
+  <rect class="box green" x="310" y="184" width="60" height="30" rx="4"/>
+  <text class="t-xs t-ink mid" x="340" y="203">order 0</text>
+  <rect class="box green" x="370" y="184" width="120" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="430" y="204">order 1</text>
+  <rect class="box green" x="490" y="184" width="240" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="610" y="204">order 2</text>
+
+  <path class="ln thin muted dash" d="M20 236 H740"/>
+
+  <!-- E -->
+  <text class="t-s t-ink t-b" x="20" y="272">PFN 0을 해제하면</text>
+  <text class="t-xs" x="20" y="290">버디가 비어 있는 동안 합친다</text>
+  <rect class="box green" x="250" y="256" width="480" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="490" y="276">다시 order 3 블록 하나</text>
+
+  <text class="t-code" x="250" y="314">0 ^ (1 &lt;&lt; 0) = 1</text>
+  <text class="t-xs" x="400" y="314">PFN 1이 비어 있다 → 합쳐서 order 1</text>
+  <text class="t-code" x="250" y="331">0 ^ (1 &lt;&lt; 1) = 2</text>
+  <text class="t-xs" x="400" y="331">PFN 2–3이 비어 있다 → 합쳐서 order 2</text>
+  <text class="t-code" x="250" y="348">0 ^ (1 &lt;&lt; 2) = 4</text>
+  <text class="t-xs" x="400" y="348">PFN 4–7이 비어 있다 → 합쳐서 order 3</text>
+</svg></div><figcaption><b>그림 18-3</b>order 0 페이지 하나를 요청했는데 order 3 블록만 남아 있는 경우. 세 번 쪼개 나머지를 각 목록에 걸고, 해제할 때는 버디가 비어 있는 동안 거꾸로 합칩니다.</figcaption></figure>
+<p>두 가지 장치가 덧붙어 있습니다.</p>
+<ul>
+<li><strong>이동 유형</strong>(migratetype). <code>free_list</code>가 배열인 이유입니다. 커널 자료구조처럼 옮길 수 없는 페이지(<code>MIGRATE_UNMOVABLE</code>)와 유저 페이지처럼 옮길 수 있는 페이지(<code>MIGRATE_MOVABLE</code>)를 다른 구역에서 할당합니다. 못 옮기는 페이지가 곳곳에 박히면 그 주변은 영영 큰 블록으로 합쳐지지 못하기 때문입니다. 그래도 조각났을 때는 <strong>컴팩션</strong>(compaction)이 옮길 수 있는 페이지를 한쪽으로 몰아 빈 블록을 만듭니다.</li>
+<li><strong>CPU별 페이지 목록</strong>(pcp). 작은 요청마다 <code>zone-&gt;lock</code>을 잡으면 경합이 큽니다. 그래서 CPU마다 빈 페이지를 얼마간 쟁여 두고(<code>struct per_cpu_pages</code>), order 3 이하의 요청(과 THP 크기의 요청)은 먼저 여기서 꺼냅니다.</li>
+</ul>
+</section>
+<section class="level2" id="alloc-path">
+<h2><span class="sec-n">18.4</span>할당 경로와 GFP 플래그<a aria-label="이 절의 링크" class="anchor" href="#alloc-path">#</a></h2>
+<p><code>alloc_pages()</code>는 <code>__alloc_frozen_pages_noprof()</code>로 모입니다. 이 함수는 먼저 <code>get_page_from_freelist()</code>를 한 번 부릅니다. 존을 차례로 보며 빈 페이지가 <code>low</code> 워터마크 위에 있는 존에서 꺼내는 <strong>빠른 경로</strong>입니다. 실패하면 <code>__alloc_pages_slowpath()</code>로 갑니다. 느린 경로에서 무엇까지 해도 되는지는 호출한 쪽이 넘긴 <strong>GFP 플래그</strong>가 정합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/gfp_types.h#L370" rel="noopener" target="_blank">include/linux/gfp_types.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/gfp_types.h" data-line="370" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="pp">#define GFP_ATOMIC  </span><span class="op">(</span><span class="pp">__GFP_HIGH</span><span class="op">|</span><span class="pp">__GFP_KSWAPD_RECLAIM</span><span class="op">)</span></span>
+<span id="cb7-2"><span class="pp">#define GFP_KERNEL  </span><span class="op">(</span><span class="pp">__GFP_RECLAIM </span><span class="op">|</span><span class="pp"> __GFP_IO </span><span class="op">|</span><span class="pp"> __GFP_FS</span><span class="op">)</span></span>
+<span id="cb7-3"><span class="pp">#define GFP_KERNEL_ACCOUNT </span><span class="op">(</span><span class="pp">GFP_KERNEL </span><span class="op">|</span><span class="pp"> __GFP_ACCOUNT</span><span class="op">)</span></span>
+<span id="cb7-4"><span class="pp">#define GFP_NOWAIT  </span><span class="op">(</span><span class="pp">__GFP_KSWAPD_RECLAIM </span><span class="op">|</span><span class="pp"> __GFP_NOWARN</span><span class="op">)</span></span>
+<span id="cb7-5"><span class="pp">#define GFP_NOIO    </span><span class="op">(</span><span class="pp">__GFP_RECLAIM</span><span class="op">)</span></span>
+<span id="cb7-6"><span class="pp">#define GFP_NOFS    </span><span class="op">(</span><span class="pp">__GFP_RECLAIM </span><span class="op">|</span><span class="pp"> __GFP_IO</span><span class="op">)</span></span></code></pre></div></div>
+<p><code>__GFP_RECLAIM</code>은 두 비트의 합입니다. <code>__GFP_KSWAPD_RECLAIM</code>은 "kswapd를 깨워도 된다", <code>__GFP_DIRECT_RECLAIM</code>은 "내가 직접 회수해도 된다"입니다. 뒤쪽은 잠들 수 있다는 뜻입니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>플래그</th>
+<th>잠드는가</th>
+<th>쓰는 곳</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GFP_KERNEL</code></td>
+<td>예</td>
+<td>태스크 컨텍스트의 일반 할당. 직접 회수, I/O, 파일시스템 호출을 모두 허용</td>
+</tr>
+<tr>
+<td><code>GFP_ATOMIC</code></td>
+<td>아니오</td>
+<td>인터럽트 핸들러, 스핀락 구간. <code>__GFP_HIGH</code>로 <code>min</code> 아래 예비분 일부를 씁니다.</td>
+</tr>
+<tr>
+<td><code>GFP_NOWAIT</code></td>
+<td>아니오</td>
+<td>실패해도 되는 기회주의적 할당. 예비분은 쓰지 않습니다.</td>
+</tr>
+<tr>
+<td><code>GFP_NOIO</code>, <code>GFP_NOFS</code></td>
+<td>예</td>
+<td>회수는 하되 I/O나 파일시스템으로 다시 들어가지 않게. 블록 계층과 파일시스템 내부용</td>
+</tr>
+</tbody>
+</table></div>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/mm/page_alloc.c#L4783" rel="noopener" target="_blank">mm/page_alloc.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="mm/page_alloc.c" data-line="4783" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="kw">struct</span> page <span class="op">*</span></span>
+<span id="cb8-2">__alloc_pages_slowpath<span class="op">(</span>gfp_t gfp_mask<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span> order<span class="op">,</span></span>
+<span id="cb8-3">                        <span class="kw">struct</span> alloc_context <span class="op">*</span>ac<span class="op">)</span></span>
+<span id="cb8-4"><span class="op">{</span></span>
+<span id="cb8-5">    <span class="dt">bool</span> can_direct_reclaim <span class="op">=</span> gfp_mask <span class="op">&amp;</span> __GFP_DIRECT_RECLAIM<span class="op">;</span></span>
+<span id="cb8-6">    <span class="co">/* ... */</span></span>
+<span id="cb8-7">    <span class="cf">if</span> <span class="op">(</span>alloc_flags <span class="op">&amp;</span> ALLOC_KSWAPD<span class="op">)</span></span>
+<span id="cb8-8">        wake_all_kswapds<span class="op">(</span>order<span class="op">,</span> gfp_mask<span class="op">,</span> ac<span class="op">);</span></span>
+<span id="cb8-9">    <span class="co">/* ... */</span></span>
+<span id="cb8-10">    page <span class="op">=</span> get_page_from_freelist<span class="op">(</span>gfp_mask<span class="op">,</span> order<span class="op">,</span> alloc_flags<span class="op">,</span> ac<span class="op">);</span></span>
+<span id="cb8-11">    <span class="cf">if</span> <span class="op">(</span>page<span class="op">)</span></span>
+<span id="cb8-12">        <span class="cf">goto</span> got_pg<span class="op">;</span></span>
+<span id="cb8-13">    <span class="co">/* ... */</span></span>
+<span id="cb8-14">    <span class="co">/* Caller is not willing to reclaim, we can't balance anything */</span></span>
+<span id="cb8-15">    <span class="cf">if</span> <span class="op">(!</span>can_direct_reclaim<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-16">        <span class="co">/* ... */</span></span>
+<span id="cb8-17">        <span class="cf">goto</span> nopage<span class="op">;</span></span>
+<span id="cb8-18">    <span class="op">}</span></span>
+<span id="cb8-19">    <span class="co">/* ... */</span></span>
+<span id="cb8-20">        page <span class="op">=</span> __alloc_pages_direct_reclaim<span class="op">(</span>gfp_mask<span class="op">,</span> order<span class="op">,</span> alloc_flags<span class="op">,</span></span>
+<span id="cb8-21">                            ac<span class="op">,</span> <span class="op">&amp;</span>did_some_progress<span class="op">);</span></span>
+<span id="cb8-22">    <span class="co">/* ... */</span></span>
+<span id="cb8-23">    page <span class="op">=</span> __alloc_pages_direct_compact<span class="op">(</span>gfp_mask<span class="op">,</span> order<span class="op">,</span> alloc_flags<span class="op">,</span> ac<span class="op">,</span></span>
+<span id="cb8-24">                    compact_priority<span class="op">,</span> <span class="op">&amp;</span>compact_result<span class="op">);</span></span>
+<span id="cb8-25">    <span class="co">/* ... */</span></span>
+<span id="cb8-26">    page <span class="op">=</span> __alloc_pages_may_oom<span class="op">(</span>gfp_mask<span class="op">,</span> order<span class="op">,</span> ac<span class="op">,</span> <span class="op">&amp;</span>did_some_progress<span class="op">);</span></span>
+<span id="cb8-27">    <span class="co">/* ... */</span></span>
+<span id="cb8-28"><span class="op">}</span></span></code></pre></div></div>
+<p>느린 경로는 점점 비싼 수단을 차례로 씁니다. kswapd를 깨우고, 워터마크를 <code>min</code>으로 낮춰 다시 시도하고, 그래도 없으면 호출한 태스크가 <strong>직접 회수</strong>를 하고, 컴팩션을 하고, 몇 번 되풀이한 끝에 OOM 킬러를 부릅니다. <code>GFP_ATOMIC</code>과 <code>GFP_NOWAIT</code>은 <code>can_direct_reclaim</code>이 거짓이므로 둘째 시도에서 실패하면 곧바로 <code>NULL</code>을 받습니다.</p>
+<figure class="fig" id="fig-alloc-paths"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 418" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>페이지 할당의 빠른 경로와 느린 경로: 빠른 경로가 실패하면 kswapd 깨우기, min 기준 재시도, 직접 회수, 컴팩션, OOM 킬러 순으로 내려가고, 잠들 수 없는 요청은 재시도까지만 한다</title>
+
+  <rect class="box blue" x="200" y="14" width="360" height="36" rx="10"/>
+  <text class="t-mono t-b mid" x="380" y="37">alloc_pages(gfp, order)</text>
+  <path class="ln" d="M380 50 V62" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="200" y="66" width="360" height="52" rx="10"/>
+  <text class="t-b" x="214" y="88">빠른 경로</text>
+  <text class="t-code end" x="548" y="88">get_page_from_freelist()</text>
+  <text class="t-s" x="214" y="108">빈 페이지가 low 위인 존에서 꺼낸다</text>
+  <path class="ln green" d="M560 92 H596" marker-end="url(#ah-green)"/>
+  <text class="t-s tc-green" x="604" y="96">페이지 반환</text>
+
+  <path class="ln" d="M380 118 V136" marker-end="url(#ah)"/>
+  <text class="t-xs" x="388" y="131">실패</text>
+
+  <rect class="panel warm" x="180" y="140" width="400" height="264" rx="14"/>
+  <text class="t-b tc-warm" x="196" y="164">느린 경로</text>
+  <text class="t-code end" x="564" y="164">__alloc_pages_slowpath()</text>
+
+  <rect class="box" x="196" y="174" width="368" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="210" y="196">① kswapd를 깨운다</text>
+  <text class="t-code end" x="552" y="196">wake_all_kswapds()</text>
+
+  <rect class="box" x="196" y="214" width="368" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="210" y="236">② min 기준으로 재시도</text>
+  <text class="t-code end" x="552" y="236">get_page_from_freelist()</text>
+
+  <path class="ln thin red dash" d="M196 258 H564"/>
+  <text class="t-xs tc-red mid" x="380" y="274">잠들 수 없는 요청은 여기서 NULL을 받는다</text>
+
+  <rect class="box" x="196" y="282" width="368" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="210" y="304">③ 직접 회수</text>
+  <text class="t-code end" x="552" y="304">__alloc_pages_direct_reclaim()</text>
+
+  <rect class="box" x="196" y="322" width="368" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="210" y="344">④ 컴팩션</text>
+  <text class="t-code end" x="552" y="344">__alloc_pages_direct_compact()</text>
+
+  <rect class="box red" x="196" y="362" width="368" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="210" y="384">⑤ OOM 킬러</text>
+  <text class="t-code end" x="552" y="384">__alloc_pages_may_oom()</text>
+
+  <!-- 왼쪽: 잠들 수 없는 요청 -->
+  <path class="ln blue" d="M166 178 H156 V246 H166"/>
+  <text class="t-code end" x="148" y="204">GFP_ATOMIC</text>
+  <text class="t-code end" x="148" y="222">GFP_NOWAIT</text>
+  <text class="t-xs end" x="148" y="240">②까지만</text>
+
+  <!-- 오른쪽: 잠들 수 있는 요청 -->
+  <path class="ln green" d="M594 178 H604 V392 H594"/>
+  <text class="t-code" x="612" y="280">GFP_KERNEL</text>
+  <text class="t-xs" x="612" y="298">끝까지 내려간다</text>
+  <text class="t-xs" x="612" y="314">③부터는 잠들 수 있다</text>
+</svg></div><figcaption><b>그림 18-4</b>페이지 할당의 빠른 경로와 느린 경로. 잠들 수 없는 요청은 점선에서 포기하고, <code>GFP_KERNEL</code> 요청은 끝까지 내려갑니다.</figcaption></figure>
+<div class="callout warn"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-warn"></use></svg>주의</div>
+<p>스핀락을 쥔 채, 또는 인터럽트 핸들러에서 <code>GFP_KERNEL</code>로 할당하면 안 됩니다. 메모리가 넉넉할 때는 빠른 경로에서 끝나므로 아무 일도 없다가, 메모리가 모자란 날 직접 회수로 들어가 잠들려 하면서 문제가 드러납니다(<a href="ch06.html">6장</a>). 그래서 <code>kmalloc()</code>의 진입부에는 <code>might_alloc()</code>이 있습니다. 디버그 옵션을 켠 커널은 실제로 잠들지 않아도 "잠들 수 있는 플래그를 원자적 컨텍스트에서 넘겼다"는 사실만으로 경고를 냅니다.</p>
+</div>
+</section>
+<section class="level2" id="slub">
+<h2><span class="sec-n">18.5</span>슬랩: SLUB과 sheaves<a aria-label="이 절의 링크" class="anchor" href="#slub">#</a></h2>
+<p>커널이 할당하는 것은 대부분 페이지보다 훨씬 작습니다. <code>task_struct</code>, 아이노드, 수십 바이트짜리 버퍼입니다. <strong>슬랩 할당자</strong>는 버디에서 받은 페이지를 같은 크기의 객체로 잘라 나눠 줍니다. 객체 종류 하나가 <code>struct kmem_cache</code> 하나이고, 객체로 잘라 놓은 페이지 묶음 하나가 <strong>슬랩</strong>(<code>struct slab</code>)입니다. <code>kmalloc()</code>은 8, 16, 32, 64, 96, 128, 192, 256바이트부터 8KB까지 크기별로 미리 만들어 둔 캐시에서 요청 크기 이상인 가장 작은 것을 고릅니다. 그보다 크면 페이지 할당자로 넘깁니다. 같은 크기의 캐시도 한 벌이 아닙니다. 하드닝 옵션을 켜면 크기마다 캐시를 여러 벌 두어 호출 위치나 타입에 따라 갈라 넣고(<code>CONFIG_KMALLOC_PARTITION_CACHES</code>), 유저가 크기를 정할 수 있는 할당은 따로 만든 버킷으로 보냅니다(<code>CONFIG_SLAB_BUCKETS</code>). 공격자가 고른 데이터를 표적 객체 바로 옆에 놓기 어렵게 하려는 것입니다.</p>
+<p>v7.3의 SLUB은 객체가 지나는 층이 넷입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/mm/slub.c#L421" rel="noopener" target="_blank">mm/slub.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="mm/slub.c" data-line="421" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="kw">struct</span> node_barn <span class="op">{</span></span>
+<span id="cb9-2">    spinlock_t lock<span class="op">;</span></span>
+<span id="cb9-3">    <span class="kw">struct</span> list_head sheaves_full<span class="op">;</span></span>
+<span id="cb9-4">    <span class="kw">struct</span> list_head sheaves_empty<span class="op">;</span></span>
+<span id="cb9-5">    <span class="dt">unsigned</span> <span class="dt">int</span> nr_full<span class="op">;</span></span>
+<span id="cb9-6">    <span class="dt">unsigned</span> <span class="dt">int</span> nr_empty<span class="op">;</span></span>
+<span id="cb9-7"><span class="op">};</span></span>
+<span id="cb9-8"></span>
+<span id="cb9-9"><span class="kw">struct</span> slab_sheaf <span class="op">{</span></span>
+<span id="cb9-10">    <span class="co">/* ... */</span></span>
+<span id="cb9-11">    <span class="kw">struct</span> kmem_cache <span class="op">*</span>cache<span class="op">;</span></span>
+<span id="cb9-12">    <span class="dt">unsigned</span> <span class="dt">int</span> size<span class="op">;</span></span>
+<span id="cb9-13">    <span class="dt">int</span> node<span class="op">;</span> <span class="co">/* only used for rcu_sheaf */</span></span>
+<span id="cb9-14">    <span class="dt">void</span> <span class="op">*</span>objects<span class="op">[];</span></span>
+<span id="cb9-15"><span class="op">};</span></span>
+<span id="cb9-16"></span>
+<span id="cb9-17"><span class="kw">struct</span> slub_percpu_sheaves <span class="op">{</span></span>
+<span id="cb9-18">    local_trylock_t lock<span class="op">;</span></span>
+<span id="cb9-19">    <span class="kw">struct</span> slab_sheaf <span class="op">*</span>main<span class="op">;</span> <span class="co">/* never NULL when unlocked */</span></span>
+<span id="cb9-20">    <span class="kw">struct</span> slab_sheaf <span class="op">*</span>spare<span class="op">;</span> <span class="co">/* empty or full, may be NULL */</span></span>
+<span id="cb9-21">    <span class="kw">struct</span> slab_sheaf <span class="op">*</span>rcu_free<span class="op">;</span> <span class="co">/* for batching kfree_rcu() */</span></span>
+<span id="cb9-22"><span class="op">};</span></span></code></pre></div></div>
+<p><strong>sheaf</strong>는 객체 포인터의 배열입니다. CPU마다 <code>main</code>과 <code>spare</code> 두 개를 갖고, NUMA 노드마다 가득 찬 sheaf와 빈 sheaf를 쌓아 두는 <strong>barn</strong>이 있습니다. 그 아래에 빈 객체가 남은 슬랩의 목록(노드별 partial 목록)이 있고, 맨 아래가 버디 할당자입니다.</p>
+<figure class="fig" id="fig-slub-sheaves"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 414" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>v7.3 SLUB의 네 층: CPU별 main·spare sheaf, NUMA 노드별 barn의 가득 찬 sheaf와 빈 sheaf, 노드별 partial 슬랩 목록, 버디 할당자</title>
+
+  <!-- 1층: CPU별 -->
+  <rect class="panel blue" x="20" y="14" width="350" height="104" rx="12"/>
+  <text class="t-b tc-blue" x="34" y="38">CPU 0</text>
+  <text class="t-code" x="90" y="38">slub_percpu_sheaves</text>
+  <text class="t-code" x="34" y="66">main</text>
+  <text class="t-code" x="34" y="98">spare</text>
+  <g>
+    <rect class="solid blue" x="90" y="50" width="22" height="22"/><rect class="solid blue" x="112" y="50" width="22" height="22"/><rect class="solid blue" x="134" y="50" width="22" height="22"/><rect class="solid blue" x="156" y="50" width="22" height="22"/><rect class="solid blue" x="178" y="50" width="22" height="22"/><rect class="ghost" x="200" y="50" width="22" height="22"/><rect class="ghost" x="222" y="50" width="22" height="22"/><rect class="ghost" x="244" y="50" width="22" height="22"/>
+    <rect class="solid blue" x="90" y="82" width="22" height="22"/><rect class="solid blue" x="112" y="82" width="22" height="22"/><rect class="solid blue" x="134" y="82" width="22" height="22"/><rect class="solid blue" x="156" y="82" width="22" height="22"/><rect class="solid blue" x="178" y="82" width="22" height="22"/><rect class="solid blue" x="200" y="82" width="22" height="22"/><rect class="solid blue" x="222" y="82" width="22" height="22"/><rect class="solid blue" x="244" y="82" width="22" height="22"/>
+  </g>
+  <text class="t-xs" x="276" y="66">← 넣고 빼는 곳</text>
+  <text class="t-xs" x="276" y="98">예비</text>
+
+  <rect class="panel blue" x="390" y="14" width="350" height="104" rx="12"/>
+  <text class="t-b tc-blue" x="404" y="38">CPU 1</text>
+  <text class="t-code" x="460" y="38">slub_percpu_sheaves</text>
+  <text class="t-code" x="404" y="66">main</text>
+  <text class="t-code" x="404" y="98">spare</text>
+  <g>
+    <rect class="solid blue" x="460" y="50" width="22" height="22"/><rect class="solid blue" x="482" y="50" width="22" height="22"/><rect class="ghost" x="504" y="50" width="22" height="22"/><rect class="ghost" x="526" y="50" width="22" height="22"/><rect class="ghost" x="548" y="50" width="22" height="22"/><rect class="ghost" x="570" y="50" width="22" height="22"/><rect class="ghost" x="592" y="50" width="22" height="22"/><rect class="ghost" x="614" y="50" width="22" height="22"/>
+    <rect class="ghost" x="460" y="82" width="22" height="22"/><rect class="ghost" x="482" y="82" width="22" height="22"/><rect class="ghost" x="504" y="82" width="22" height="22"/><rect class="ghost" x="526" y="82" width="22" height="22"/><rect class="ghost" x="548" y="82" width="22" height="22"/><rect class="ghost" x="570" y="82" width="22" height="22"/><rect class="ghost" x="592" y="82" width="22" height="22"/><rect class="ghost" x="614" y="82" width="22" height="22"/>
+  </g>
+
+  <!-- 1↔2 -->
+  <path class="ln" d="M185 152 V124" marker-end="url(#ah)"/>
+  <path class="ln" d="M205 122 V150" marker-end="url(#ah)"/>
+  <path class="ln" d="M555 152 V124" marker-end="url(#ah)"/>
+  <path class="ln" d="M575 122 V150" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="380" y="142">둘 다 비면 가득 찬 sheaf를 받고, 둘 다 차면 넘긴다</text>
+
+  <!-- 2층: barn -->
+  <rect class="panel yellow" x="20" y="156" width="720" height="74" rx="12"/>
+  <text class="t-b tc-yellow" x="34" y="180">barn</text>
+  <text class="t-xs" x="76" y="180">NUMA 노드마다 하나 · node_barn</text>
+  <text class="t-code" x="34" y="212">sheaves_full</text>
+  <g>
+    <rect class="solid blue" x="136" y="198" width="60" height="18"/>
+    <rect class="solid blue" x="206" y="198" width="60" height="18"/>
+    <rect class="solid blue" x="276" y="198" width="60" height="18"/>
+  </g>
+  <text class="t-code" x="400" y="212">sheaves_empty</text>
+  <g>
+    <rect class="ghost" x="510" y="198" width="60" height="18"/>
+    <rect class="ghost" x="580" y="198" width="60" height="18"/>
+  </g>
+
+  <!-- 2↔3 -->
+  <path class="ln" d="M370 264 V236" marker-end="url(#ah)"/>
+  <path class="ln" d="M390 234 V262" marker-end="url(#ah)"/>
+  <text class="t-xs" x="404" y="254">barn에도 없으면 슬랩에서 객체를 꺼내 sheaf를 채운다</text>
+
+  <!-- 3층: partial -->
+  <rect class="panel" x="20" y="268" width="720" height="74" rx="12"/>
+  <text class="t-b" x="34" y="292">partial 목록</text>
+  <text class="t-xs" x="122" y="292">빈 객체가 남은 슬랩들 · kmem_cache_node</text>
+  <g>
+    <rect class="box gray" x="34" y="304" width="22" height="24"/><rect class="box gray" x="56" y="304" width="22" height="24"/><rect class="box green" x="78" y="304" width="22" height="24"/><rect class="box gray" x="100" y="304" width="22" height="24"/><rect class="box green" x="122" y="304" width="22" height="24"/><rect class="box green" x="144" y="304" width="22" height="24"/><rect class="box gray" x="166" y="304" width="22" height="24"/><rect class="box gray" x="188" y="304" width="22" height="24"/><rect class="box green" x="210" y="304" width="22" height="24"/><rect class="box gray" x="232" y="304" width="22" height="24"/>
+    <rect class="box green" x="270" y="304" width="22" height="24"/><rect class="box green" x="292" y="304" width="22" height="24"/><rect class="box gray" x="314" y="304" width="22" height="24"/><rect class="box gray" x="336" y="304" width="22" height="24"/><rect class="box gray" x="358" y="304" width="22" height="24"/><rect class="box green" x="380" y="304" width="22" height="24"/><rect class="box gray" x="402" y="304" width="22" height="24"/><rect class="box green" x="424" y="304" width="22" height="24"/><rect class="box green" x="446" y="304" width="22" height="24"/><rect class="box green" x="468" y="304" width="22" height="24"/>
+    <rect class="box gray" x="506" y="304" width="22" height="24"/><rect class="box green" x="528" y="304" width="22" height="24"/><rect class="box green" x="550" y="304" width="22" height="24"/><rect class="box green" x="572" y="304" width="22" height="24"/><rect class="box green" x="594" y="304" width="22" height="24"/><rect class="box green" x="616" y="304" width="22" height="24"/><rect class="box green" x="638" y="304" width="22" height="24"/><rect class="box gray" x="660" y="304" width="22" height="24"/><rect class="box green" x="682" y="304" width="22" height="24"/><rect class="box green" x="704" y="304" width="22" height="24"/>
+  </g>
+
+  <!-- 3↔4 -->
+  <path class="ln" d="M370 374 V348" marker-end="url(#ah)"/>
+  <path class="ln" d="M390 346 V372" marker-end="url(#ah)"/>
+  <text class="t-xs" x="404" y="364">슬랩이 없으면 새 페이지를 받아 객체로 자른다</text>
+
+  <!-- 4층 -->
+  <rect class="box green" x="20" y="378" width="720" height="30" rx="8"/>
+  <text class="t-b mid" x="380" y="398">버디 할당자</text>
+</svg></div><figcaption><b>그림 18-5</b>v7.3 SLUB의 네 층. 대부분의 <code>kmalloc()</code>과 <code>kfree()</code>는 맨 위층에서 배열 원소 하나를 넣고 빼는 것으로 끝납니다.</figcaption></figure>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/mm/slub.c#L4826" rel="noopener" target="_blank">mm/slub.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="mm/slub.c" data-line="4826" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="dt">static</span> __fastpath_inline</span>
+<span id="cb10-2"><span class="dt">void</span> <span class="op">*</span>alloc_from_pcs<span class="op">(</span><span class="kw">struct</span> kmem_cache <span class="op">*</span>s<span class="op">,</span> gfp_t gfp<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span> alloc_flags<span class="op">,</span> <span class="dt">int</span> node<span class="op">)</span></span>
+<span id="cb10-3"><span class="op">{</span></span>
+<span id="cb10-4">    <span class="co">/* ... */</span></span>
+<span id="cb10-5">    <span class="cf">if</span> <span class="op">(!</span>local_trylock<span class="op">(&amp;</span>s<span class="op">-&gt;</span>cpu_sheaves<span class="op">-&gt;</span>lock<span class="op">))</span></span>
+<span id="cb10-6">        <span class="cf">return</span> NULL<span class="op">;</span></span>
+<span id="cb10-7"></span>
+<span id="cb10-8">    pcs <span class="op">=</span> this_cpu_ptr<span class="op">(</span>s<span class="op">-&gt;</span>cpu_sheaves<span class="op">);</span></span>
+<span id="cb10-9"></span>
+<span id="cb10-10">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>pcs<span class="op">-&gt;</span>main<span class="op">-&gt;</span>size <span class="op">==</span> <span class="dv">0</span><span class="op">))</span> <span class="op">{</span></span>
+<span id="cb10-11">        pcs <span class="op">=</span> __pcs_replace_empty_main<span class="op">(</span>s<span class="op">,</span> pcs<span class="op">,</span> gfp<span class="op">,</span> alloc_flags<span class="op">);</span></span>
+<span id="cb10-12">        <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(!</span>pcs<span class="op">))</span></span>
+<span id="cb10-13">            <span class="cf">return</span> NULL<span class="op">;</span></span>
+<span id="cb10-14">    <span class="op">}</span></span>
+<span id="cb10-15"></span>
+<span id="cb10-16">    object <span class="op">=</span> pcs<span class="op">-&gt;</span>main<span class="op">-&gt;</span>objects<span class="op">[</span>pcs<span class="op">-&gt;</span>main<span class="op">-&gt;</span>size <span class="op">-</span> <span class="dv">1</span><span class="op">];</span></span>
+<span id="cb10-17">    <span class="co">/* ... */</span></span>
+<span id="cb10-18">    pcs<span class="op">-&gt;</span>main<span class="op">-&gt;</span>size<span class="op">--;</span></span>
+<span id="cb10-19"></span>
+<span id="cb10-20">    local_unlock<span class="op">(&amp;</span>s<span class="op">-&gt;</span>cpu_sheaves<span class="op">-&gt;</span>lock<span class="op">);</span></span>
+<span id="cb10-21"></span>
+<span id="cb10-22">    stat<span class="op">(</span>s<span class="op">,</span> ALLOC_FASTPATH<span class="op">);</span></span>
+<span id="cb10-23"></span>
+<span id="cb10-24">    <span class="cf">return</span> object<span class="op">;</span></span>
+<span id="cb10-25"><span class="op">}</span></span></code></pre></div></div>
+<p>빠른 경로는 이것이 전부입니다. <code>local_trylock()</code>은 RT가 아닌 커널에서 선점을 끄는 일만 하고 원자 연산을 쓰지 않습니다. 그 뒤 <code>main</code> 배열의 마지막 포인터를 꺼냅니다. <code>main</code>이 비었으면 <code>__pcs_replace_empty_main()</code>이 <code>spare</code>와 맞바꾸고, <code>spare</code>도 비었으면 barn에서 가득 찬 sheaf를 받아 오고, barn에도 없으면 partial 슬랩에서 객체를 꺼내 sheaf를 채웁니다. 해제(<code>free_to_pcs()</code>)는 거울상입니다. <code>main</code>에 포인터를 하나 넣고, 가득 차면 barn으로 보냅니다. <code>rcu_free</code>는 <code>kfree_rcu()</code>로 넘어온 객체를 모았다가 유예 기간 뒤에 통째로 돌려주는 sheaf입니다(<a href="ch16.html">16장</a>).</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>교재는 흔히 슬랩 할당자가 SLAB, SLUB, SLOB 셋이고 빌드할 때 고른다고 설명합니다. SLOB은 6.4에서, SLAB은 6.8에서 지워져 v7.3에는 SLUB만 있습니다. SLUB의 내부도 달라졌습니다. 예전 SLUB은 CPU마다 슬랩 하나를 통째로 붙들고(<code>kmem_cache_cpu</code>), 그 슬랩의 빈 객체 리스트를 <code>this_cpu_cmpxchg_double()</code>로 락 없이 고쳤습니다. 6.18에 sheaves가 일부 캐시에 선택 사항으로 들어왔고, 7.0에서 모든 캐시가 sheaves를 쓰게 되면서 CPU별 슬랩과 그 빠른 경로가 지워졌습니다. v7.3의 <code>mm/slub.c</code>에는 <code>kmem_cache_cpu</code>라는 이름이 없습니다.</p>
+</div>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>구현을 줄이는 것도 설계 결정입니다. 세 할당자는 같은 API 뒤에 있었지만, 새 기능(메모리 cgroup 과금, 하드닝, 디버깅)을 넣을 때마다 세 번 구현하고 세 번 시험해야 했습니다. 메인테이너들은 SLOB이 맡던 아주 작은 시스템을 SLUB의 설정 하나(<code>CONFIG_SLUB_TINY</code>)로 덮고, 사라질 구현을 먼저 "폐기 예정"으로 표시해 몇 릴리스를 기다린 뒤 지웠습니다. 하나만 남자 내부를 과감하게 바꿀 수 있게 되었고, 그 결과가 sheaves입니다. 다만 7.0의 전환 직후 특정 부하에서 성능 회귀가 보고되어 다음 릴리스에서 고쳐졌습니다. 가장 뜨거운 경로를 갈아 끼우는 일의 값입니다.</p>
+</div>
+<p>물리적으로 연속할 필요가 없는 큰 메모리는 <code>vmalloc()</code>으로 받습니다. 페이지를 하나씩 따로 할당해 <a href="ch17.html">17장</a>의 vmalloc 영역에 이어 붙여 매핑합니다. 큰 연속 블록을 구하지 못해 실패할 일이 없는 대신 매핑 비용이 듭니다. <code>kvmalloc()</code>은 먼저 <code>kmalloc()</code>을 시도하고 실패하면 <code>vmalloc()</code>으로 넘어갑니다.</p>
+<p>돌아가는 시스템에서는 <code>slabtop -o | head -15</code>가 캐시를 메모리 사용량 순으로 보여 줍니다. 보통 <code>dentry</code>와 <code>inode_cache</code>가 위에 있습니다. 캐시 하나의 설정은 <code>/sys/kernel/slab/&lt;이름&gt;/</code> 아래의 <code>object_size</code>, <code>objs_per_slab</code>, <code>order</code>에서 봅니다.</p>
+</section>
+<section class="level2" id="pagecache-rmap">
+<h2><span class="sec-n">18.6</span>페이지 캐시와 역매핑<a aria-label="이 절의 링크" class="anchor" href="#pagecache-rmap">#</a></h2>
+<p>회수를 보기 전에, 물리 페이지를 가리키는 두 가지 연결을 짚어 둡니다.</p>
+<p><strong>페이지 캐시</strong>는 파일의 내용을 담은 폴리오의 모음입니다. 파일(아이노드)마다 <code>struct address_space</code>가 하나 있고, 그 안의 <code>i_pages</code>가 "파일 안의 오프셋 → 폴리오"를 찾는 xarray입니다. 큰 폴리오는 여러 오프셋을 한 항목으로 덮습니다. 폴리오가 회수되어 빠진 자리에는 포인터 대신 작은 정수값이 남습니다. 뒤에서 볼 그림자 항목입니다. 읽기와 쓰기가 이 캐시를 거치는 경로는 <a href="ch20.html">20장</a>에서 다룹니다.</p>
+<p><strong>역매핑</strong>(reverse mapping, rmap)은 반대 방향의 길입니다. 페이지 테이블은 "가상 주소 → 물리 페이지"를 알려 주지만, 회수는 "이 물리 페이지를 매핑한 PTE는 어디 어디인가"를 알아야 합니다. 페이지를 거두려면 그 PTE들을 전부 지워야 하기 때문입니다.</p>
+<figure class="fig" id="fig-rmap"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>역매핑의 길: 파일 폴리오는 mapping이 가리키는 address_space의 i_mmap 트리로, 익명 폴리오는 anon_vma의 트리로 VMA들을 찾고, VMA마다 페이지 테이블을 내려가 PTE에 닿는다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="24">물리 페이지</text>
+  <text class="t-s t-ink t-b" x="210" y="24">mapping이 가리키는 것</text>
+  <text class="t-s t-ink t-b" x="460" y="24">매핑한 VMA들</text>
+  <text class="t-s t-ink t-b" x="660" y="24">PTE</text>
+
+  <!-- 파일 -->
+  <rect class="box blue" x="20" y="48" width="130" height="64" rx="10"/>
+  <text class="t-b mid" x="85" y="76">파일 폴리오</text>
+  <text class="t-code mid" x="85" y="98">mapping</text>
+  <path class="ln blue" d="M150 80 H206" marker-end="url(#ah-blue)"/>
+
+  <rect class="box yellow" x="210" y="40" width="200" height="80" rx="10"/>
+  <text class="t-mono t-b" x="224" y="64">address_space</text>
+  <text class="t-code" x="224" y="86">i_mmap</text>
+  <text class="t-xs" x="224" y="106">이 파일을 매핑한 VMA의 트리</text>
+  <path class="ln" d="M410 66 H436 V59 H456" marker-end="url(#ah)"/>
+  <path class="ln" d="M410 94 H436 V101 H456" marker-end="url(#ah)"/>
+
+  <rect class="box" x="460" y="44" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="64">VMA · 프로세스 A</text>
+  <rect class="box" x="460" y="86" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="106">VMA · 프로세스 B</text>
+  <path class="ln" d="M610 59 H656" marker-end="url(#ah)"/>
+  <path class="ln" d="M610 101 H656" marker-end="url(#ah)"/>
+  <rect class="box green" x="660" y="44" width="80" height="30" rx="6"/>
+  <text class="t-code mid" x="700" y="64">PTE</text>
+  <rect class="box green" x="660" y="86" width="80" height="30" rx="6"/>
+  <text class="t-code mid" x="700" y="106">PTE</text>
+
+  <path class="ln thin muted dash" d="M20 140 H740"/>
+
+  <!-- 익명 -->
+  <rect class="box blue" x="20" y="168" width="130" height="64" rx="10"/>
+  <text class="t-b mid" x="85" y="196">익명 폴리오</text>
+  <text class="t-code mid" x="85" y="218">mapping | 1</text>
+  <path class="ln blue" d="M150 200 H206" marker-end="url(#ah-blue)"/>
+
+  <rect class="box yellow" x="210" y="160" width="200" height="80" rx="10"/>
+  <text class="t-mono t-b" x="224" y="184">anon_vma</text>
+  <text class="t-code" x="224" y="206">rb_root</text>
+  <text class="t-xs" x="224" y="226">fork()로 갈라진 VMA의 트리</text>
+  <path class="ln" d="M410 186 H436 V179 H456" marker-end="url(#ah)"/>
+  <path class="ln" d="M410 214 H436 V221 H456" marker-end="url(#ah)"/>
+
+  <rect class="box" x="460" y="164" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="184">VMA · 부모</text>
+  <rect class="box" x="460" y="206" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="226">VMA · 자식</text>
+  <path class="ln" d="M610 179 H656" marker-end="url(#ah)"/>
+  <path class="ln" d="M610 221 H656" marker-end="url(#ah)"/>
+  <rect class="box green" x="660" y="164" width="80" height="30" rx="6"/>
+  <text class="t-code mid" x="700" y="184">PTE</text>
+  <rect class="box green" x="660" y="206" width="80" height="30" rx="6"/>
+  <text class="t-code mid" x="700" y="226">PTE</text>
+
+  <text class="t-s mid" x="380" y="276">rmap_walk()가 이 길을 걸으며 VMA마다 콜백을 부른다</text>
+  <text class="t-s mid" x="380" y="298">folio_referenced()는 ACCESSED 비트를 모으고, try_to_unmap()은 PTE를 지운다</text>
+</svg></div><figcaption><b>그림 18-6</b>폴리오에서 PTE까지 거슬러 올라가는 길. <code>mapping</code>이 파일이면 <code>i_mmap</code> 트리를, 익명이면 <code>anon_vma</code>의 트리를 따라 VMA들을 찾고, VMA마다 페이지 테이블을 내려가 PTE에 닿습니다.</figcaption></figure>
+<p>출발점은 <code>folio-&gt;mapping</code>입니다. 파일 폴리오라면 <code>address_space</code>를 가리키고, 그 안의 <code>i_mmap</code>이 이 파일을 매핑한 VMA들의 구간 트리입니다. 익명 폴리오라면 포인터의 맨 아래 비트가 서 있고 <code>struct anon_vma</code>를 가리킵니다. <code>fork()</code>로 같은 페이지를 공유하게 된 VMA들이 이 <code>anon_vma</code>의 트리에 걸려 있습니다. <code>rmap_walk()</code>가 이 길을 걷고, 그 위에서 <code>folio_referenced()</code>(누가 최근에 접근했나)와 <code>try_to_unmap()</code>(모든 PTE에서 떼어 내기)이 동작합니다.</p>
+</section>
+<section class="level2" id="reclaim">
+<h2><span class="sec-n">18.7</span>회수<a aria-label="이 절의 링크" class="anchor" href="#reclaim">#</a></h2>
+<p><strong>회수</strong>(reclaim)는 쓰이고 있는 페이지를 비워 빈 페이지로 만드는 일입니다. 하는 주체는 둘입니다. 노드마다 있는 커널 스레드 <strong><code>kswapd</code></strong>는 빈 페이지가 <code>low</code> 아래로 내려가면 깨어나 <code>high</code>까지 채웁니다. 그것으로 모자라면 할당을 요청한 태스크가 제 시간을 써서 <strong>직접 회수</strong>를 합니다. 직접 회수는 그 태스크의 지연 시간으로 곧바로 나타납니다.</p>
+<p>비우는 값은 페이지마다 다릅니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>페이지</th>
+<th>비우려면</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>깨끗한 파일 페이지</td>
+<td>그냥 버립니다. 필요하면 파일에서 다시 읽습니다.</td>
+</tr>
+<tr>
+<td>더러운 파일 페이지</td>
+<td>먼저 디스크에 써야 합니다.</td>
+</tr>
+<tr>
+<td>익명 페이지</td>
+<td>스왑에 써야 합니다. 스왑이 없으면 못 거둡니다.</td>
+</tr>
+<tr>
+<td><code>mlock()</code>된 페이지 등</td>
+<td>거둘 수 없습니다.</td>
+</tr>
+</tbody>
+</table></div>
+<p>남은 문제는 <strong>어느 것부터</strong>입니다. 곧 다시 쓰일 페이지를 버리면 되읽는 비용이 듭니다. 커널은 "최근에 쓰이지 않은 것이 앞으로도 덜 쓰일 것"이라는 가정으로 고릅니다.</p>
+<p>고전적인 방식은 리스트 넷입니다. 익명과 파일 각각에 <strong>active</strong>와 <strong>inactive</strong> 리스트가 있습니다. 새 페이지는 inactive로 들어가고, 거기 있는 동안 다시 접근되면 active로 올라가고, active가 너무 커지면 꼬리가 inactive로 내려옵니다. 회수는 inactive의 꼬리부터 봅니다. 접근 여부는 rmap으로 PTE를 찾아가 <code>ACCESSED</code> 비트를 읽어 압니다. 페이지 하나를 판정하려고 rmap을 한 번 걷는 셈입니다.</p>
+<p><strong>MGLRU</strong>(multi-gen LRU)는 둘로 나누던 것을 여러 <strong>세대</strong>로 나눕니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/mmzone.h#L563" rel="noopener" target="_blank">include/linux/mmzone.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/mmzone.h" data-line="563" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1"><span class="kw">struct</span> lru_gen_folio <span class="op">{</span></span>
+<span id="cb11-2">    <span class="co">/* the aging increments the youngest generation number */</span></span>
+<span id="cb11-3">    <span class="dt">unsigned</span> <span class="dt">long</span> max_seq<span class="op">;</span></span>
+<span id="cb11-4">    <span class="co">/* the eviction increments the oldest generation numbers */</span></span>
+<span id="cb11-5">    <span class="dt">unsigned</span> <span class="dt">long</span> min_seq<span class="op">[</span>ANON_AND_FILE<span class="op">];</span></span>
+<span id="cb11-6">    <span class="co">/* the birth time of each generation in jiffies */</span></span>
+<span id="cb11-7">    <span class="dt">unsigned</span> <span class="dt">long</span> timestamps<span class="op">[</span>MAX_NR_GENS<span class="op">];</span></span>
+<span id="cb11-8">    <span class="co">/* the multi-gen LRU lists, lazily sorted on eviction */</span></span>
+<span id="cb11-9">    <span class="kw">struct</span> list_head folios<span class="op">[</span>MAX_NR_GENS<span class="op">][</span>ANON_AND_FILE<span class="op">][</span>MAX_NR_ZONES<span class="op">];</span></span>
+<span id="cb11-10">    <span class="co">/* ... */</span></span>
+<span id="cb11-11"><span class="op">};</span></span></code></pre></div></div>
+<p>세대는 최대 넷(<code>MAX_NR_GENS</code>)입니다. 두 가지 일이 번갈아 돕니다. <strong>에이징</strong>은 <code>max_seq</code>를 올려 새 세대를 만들고, 그사이 접근된 페이지를 가장 젊은 세대로 옮깁니다. <strong>축출</strong>은 가장 늙은 세대(<code>min_seq</code>)의 페이지를 거둡니다. 차이는 접근 여부를 모으는 방법에 있습니다. MGLRU의 에이징은 페이지마다 rmap을 걷는 대신 프로세스의 페이지 테이블을 통째로 훑어 <code>ACCESSED</code> 비트가 선 PTE를 한꺼번에 모읍니다. 접근된 페이지는 주소 공간에서 몰려 있는 경향이 있으므로 이쪽이 캐시에 유리합니다.</p>
+<figure class="fig" id="fig-lru-mglru"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 366" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>고전 LRU와 MGLRU의 비교: 고전 LRU는 inactive와 active 두 리스트 사이를 승격과 강등으로 오가고, MGLRU는 가장 젊은 세대에서 가장 늙은 세대로 한 방향으로 흐른다</title>
+
+  <!-- 고전 LRU -->
+  <text class="t-b" x="20" y="28">고전 LRU</text>
+  <text class="t-xs" x="20" y="46">익명·파일 각각 리스트 둘</text>
+
+  <text class="t-xs end" x="402" y="36">새 페이지</text>
+  <path class="ln thin" d="M410 26 V46" marker-end="url(#ah)"/>
+
+  <rect class="box red" x="40" y="54" width="80" height="36" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="80" y="77">회수</text>
+  <path class="ln red" d="M200 72 H124" marker-end="url(#ah-red)"/>
+
+  <rect class="box gray" x="200" y="50" width="220" height="44" rx="8"/>
+  <text class="t-mono t-b mid" x="310" y="70">inactive</text>
+  <text class="t-xs mid" x="310" y="87">꼬리부터 살핀다</text>
+
+  <rect class="box blue" x="520" y="50" width="220" height="44" rx="8"/>
+  <text class="t-mono t-b mid" x="630" y="70">active</text>
+  <text class="t-xs mid" x="630" y="87">보호된다</text>
+
+  <path class="ln" d="M520 66 H424" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="470" y="58">커지면 강등</text>
+  <path class="ln blue" d="M310 94 V122 H630 V98" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue mid" x="470" y="116">다시 접근되면 승격</text>
+
+  <text class="t-xs" x="200" y="148">접근 여부를 알려면 페이지마다 rmap을 걸어 ACCESSED 비트를 읽는다</text>
+
+  <path class="ln thin muted dash" d="M20 168 H740"/>
+
+  <!-- MGLRU -->
+  <text class="t-b" x="20" y="196">MGLRU</text>
+  <text class="t-xs" x="20" y="214">세대 번호가 한 방향으로 흐른다</text>
+
+  <rect class="box red" x="40" y="226" width="80" height="36" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="80" y="249">축출</text>
+  <path class="ln red" d="M200 244 H124" marker-end="url(#ah-red)"/>
+
+  <rect class="box gray" x="200" y="222" width="115" height="44" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="257" y="241">가장 늙은 세대</text>
+  <text class="t-code mid" x="257" y="258">min_seq</text>
+  <path class="ln thin" d="M335 244 H319" marker-end="url(#ah)"/>
+  <rect class="box" x="335" y="222" width="115" height="44" rx="8"/>
+  <text class="t-s mid" x="392" y="249">세대</text>
+  <path class="ln thin" d="M470 244 H454" marker-end="url(#ah)"/>
+  <rect class="box" x="470" y="222" width="115" height="44" rx="8"/>
+  <text class="t-s mid" x="527" y="249">세대</text>
+  <path class="ln thin" d="M605 244 H589" marker-end="url(#ah)"/>
+  <rect class="box blue" x="605" y="222" width="115" height="44" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="662" y="241">가장 젊은 세대</text>
+  <text class="t-code mid" x="662" y="258">max_seq</text>
+
+  <text class="t-xs mid" x="392" y="284">max_seq가 오를 때마다 한 칸씩 늙는다</text>
+
+  <rect class="box yellow" x="250" y="302" width="300" height="48" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="400" y="322">에이징 · 페이지 테이블을 통째로 훑는다</text>
+  <text class="t-xs mid" x="400" y="340">ACCESSED가 선 PTE를 한꺼번에 모은다</text>
+  <path class="ln blue" d="M550 326 H662 V270" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="670" y="300">접근된</text>
+  <text class="t-xs tc-blue" x="670" y="316">페이지를</text>
+  <text class="t-xs tc-blue" x="670" y="332">여기로</text>
+</svg></div><figcaption><b>그림 18-7</b>고전 LRU는 리스트 둘 사이를 오가고, MGLRU는 세대 번호가 한 방향으로 흐릅니다. 익명과 파일은 각각 따로 같은 구조를 가집니다.</figcaption></figure>
+<p>v7.3에는 두 구현이 함께 들어 있습니다. <code>shrink_node()</code>와 <code>shrink_lruvec()</code>는 <code>lru_gen_enabled()</code>가 참이면 MGLRU 쪽으로, 아니면 고전 리스트 쪽으로 갑니다. 빌드 옵션 <code>CONFIG_LRU_GEN_ENABLED</code>는 기본값이 꺼짐이어서, 어느 쪽이 도는지는 배포판에 달려 있습니다.</p>
+<p>판단이 틀렸는지도 확인합니다. 파일 폴리오를 버릴 때 xarray의 그 자리에 <strong>그림자 항목</strong>(shadow entry)을 남깁니다. 버린 시점의 정보를 담은 정수입니다. 같은 오프셋이 다시 읽혀 폴트가 나면(<strong>재폴트</strong>), 그림자 항목으로 "버린 지 얼마 만에 돌아왔는가"를 계산합니다. 금방 돌아왔다면 버리지 말았어야 할 페이지이므로 곧바로 보호 대상으로 올리고, 이 통계가 익명과 파일 사이의 회수 비율을 조정하는 데 쓰입니다. <code>vm.swappiness</code>(기본 60, 범위 0–200)는 그 비율의 기준점입니다. 값이 클수록 익명 페이지를 스왑으로 내보내는 쪽으로 기웁니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>어느 구현이 도는지, 회수가 얼마나 일어났는지 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ cat /sys/kernel/mm/lru_gen/enabled
+0x0007
+$ grep -E 'pgscan_(kswapd|direct) |pgsteal_(kswapd|direct) |workingset_refault' /proc/vmstat
+pgsteal_kswapd 48211930
+pgsteal_direct 10462
+pgscan_kswapd 51930014
+pgscan_direct 11208
+workingset_refault_anon 20417
+...</code></pre></div>
+<p><code>enabled</code>가 <code>0x0000</code>이면 고전 LRU입니다. <code>pgscan</code>은 살펴본 페이지 수, <code>pgsteal</code>은 실제로 거둔 수입니다. <code>pgscan_direct</code>가 빠르게 늘면 kswapd가 따라가지 못해 태스크들이 직접 회수를 하고 있다는 신호입니다. <code>workingset_refault_*</code>가 빠르게 늘면 버린 페이지를 곧 되읽는 <strong>스래싱</strong>입니다.</p>
+</div>
+<p>메모리가 모자라기 전에 미리 거두는 길도 있습니다. cgroup v2의 <code>memory.reclaim</code> 파일에 양을 쓰면 그만큼 회수합니다. <strong>DAMON</strong>은 메모리 접근 패턴을 낮은 비용으로 표본 조사하는 프레임워크이고, 그 위의 <code>DAMON_RECLAIM</code>은 오래 접근되지 않은 영역을 압력이 오기 전에 내보냅니다.</p>
+</section>
+<section class="level2" id="swap">
+<h2><span class="sec-n">18.8</span>스왑<a aria-label="이 절의 링크" class="anchor" href="#swap">#</a></h2>
+<p>익명 페이지는 돌아갈 파일이 없으므로, 거두려면 내용을 <strong>스왑</strong> 영역에 써 둬야 합니다. 회수가 익명 폴리오를 고르면 스왑 장치의 빈 자리(슬롯)를 배정하고, rmap으로 찾은 PTE들을 "스왑 장치 번호와 슬롯 오프셋"을 담은 <strong>스왑 엔트리</strong>로 바꿉니다. <code>PRESENT</code>가 꺼진 PTE의 나머지 비트를 커널이 쓰는 경우입니다. 내용을 장치에 쓰고 나면 폴리오를 해제합니다. 나중에 그 주소에 접근하면 <a href="ch17.html">17장</a>의 <code>do_swap_page()</code>가 엔트리를 보고 읽어 옵니다.</p>
+<p>쓰는 중이거나 읽은 직후에는 같은 내용이 메모리와 스왑 양쪽에 있습니다. 이 기간에 스왑 엔트리로 폴리오를 찾는 장치가 <strong>스왑 캐시</strong>입니다. 한 페이지를 여러 프로세스가 공유하다 스왑되었을 때, 먼저 폴트를 낸 쪽이 읽어 온 폴리오를 나머지가 다시 읽지 않고 찾아 쓰게 해 줍니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/mm/swap_table.h#L26" rel="noopener" target="_blank">mm/swap_table.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="mm/swap_table.h" data-line="26" id="cb13"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1"> <span class="op">*</span> Swap table entry type and bits layouts<span class="op">:</span></span>
+<span id="cb13-2"> <span class="op">*</span></span>
+<span id="cb13-3"> <span class="op">*</span> NULL<span class="op">:</span>     <span class="op">|----------------</span> <span class="dv">0</span> <span class="op">---------------|</span> <span class="op">-</span> Free slot</span>
+<span id="cb13-4"> <span class="op">*</span> Shadow<span class="op">:</span>   <span class="op">|</span>SWAP_COUNT<span class="op">|</span>Z<span class="op">|----</span> SHADOW_VAL <span class="op">---|</span><span class="dv">1</span><span class="op">|</span> <span class="op">-</span> Swapped out slot</span>
+<span id="cb13-5"> <span class="op">*</span> PFN<span class="op">:</span>      <span class="op">|</span>SWAP_COUNT<span class="op">|</span>Z<span class="op">|------</span> PFN <span class="op">-------|</span><span class="dv">10</span><span class="op">|</span> <span class="op">-</span> Cached slot</span>
+<span id="cb13-6"> <span class="op">*</span> Pointer<span class="op">:</span>  <span class="op">|-----------</span> Pointer <span class="op">----------|</span><span class="dv">100</span><span class="op">|</span> <span class="op">-</span> <span class="op">(</span>Unused<span class="op">)</span></span>
+<span id="cb13-7"> <span class="op">*</span> Bad<span class="op">:</span>      <span class="op">|-------------</span> <span class="dv">1</span> <span class="op">-------------|</span><span class="dv">1000</span><span class="op">|</span> <span class="op">-</span> Bad slot</span></code></pre></div></div>
+<p>v7.3의 스왑 캐시는 <strong>스왑 테이블</strong>입니다. 스왑 장치는 <strong>클러스터</strong>(x86-64에서 보통 512슬롯)로 나뉘고, 클러스터마다 슬롯당 8바이트인 배열이 하나 있습니다. 배열 전체가 정확히 한 페이지입니다. 항목 하나가 슬롯의 상태를 전부 담습니다. 0이면 빈 슬롯, 맨 아래 비트가 <code>1</code>이면 스왑에만 있는 상태이고 나머지에 회수 때의 그림자 정보, <code>10</code>이면 메모리에도 폴리오가 있는 상태이고 나머지에 그 PFN이 들어 있습니다. 윗비트에는 이 슬롯을 가리키는 스왑 엔트리가 몇 개인지 세는 카운트가 함께 있습니다.</p>
+<figure class="fig" id="fig-swap-table"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>스왑 테이블과 스왑 슬롯의 상태: 클러스터마다 항목 배열이 있고, 항목 하나가 빈 슬롯은 0, 메모리에도 있는 슬롯은 PFN, 스왑에만 있는 슬롯은 그림자 값으로 바뀐다</title>
+
+  <!-- 왼쪽: 구조 -->
+  <rect class="box" x="20" y="30" width="220" height="56" rx="10"/>
+  <text class="t-mono t-b" x="32" y="54">swap_cluster_info</text>
+  <text class="t-code" x="32" y="74">table</text>
+  <path class="ln" d="M130 86 V106" marker-end="url(#ah)"/>
+
+  <rect class="box" x="60" y="110" width="140" height="24"/>
+  <text class="t-code mid" x="130" y="127">0</text>
+  <rect class="box blue" x="60" y="134" width="140" height="24"/>
+  <text class="t-code mid" x="130" y="151">PFN … 10</text>
+  <rect class="box yellow" x="60" y="158" width="140" height="24"/>
+  <text class="t-code mid" x="130" y="175">그림자 … 1</text>
+  <rect class="box" x="60" y="182" width="140" height="24"/>
+  <text class="t-code mid" x="130" y="199">⋮</text>
+  <rect class="box" x="60" y="206" width="140" height="24"/>
+  <text class="t-code mid" x="130" y="223">0</text>
+  <text class="t-xs mid" x="130" y="252">슬롯 512개 → 항목 512개</text>
+  <text class="t-xs mid" x="130" y="268">8바이트 × 512 = 한 페이지</text>
+
+  <!-- 오른쪽: 슬롯의 상태 -->
+  <text class="t-s t-ink t-b" x="290" y="24">슬롯 하나가 거치는 상태</text>
+  <text class="t-xs mid" x="437" y="52">스왑 아웃 시작</text>
+  <text class="t-xs mid" x="602" y="52">쓰기 끝</text>
+
+  <rect class="box" x="290" y="62" width="130" height="64" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="355" y="88">빈 슬롯</text>
+  <text class="t-code mid" x="355" y="110">0</text>
+  <path class="ln" d="M420 86 H451" marker-end="url(#ah)"/>
+
+  <rect class="box blue" x="455" y="62" width="130" height="64" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="520" y="88">메모리에도 있다</text>
+  <text class="t-code mid" x="520" y="110">PFN … 10</text>
+  <path class="ln" d="M585 86 H616" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="620" y="62" width="120" height="64" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="680" y="88">스왑에만 있다</text>
+  <text class="t-code mid" x="680" y="110">그림자 … 1</text>
+
+  <path class="ln" d="M680 126 V150 H540 V130" marker-end="url(#ah)"/>
+  <text class="t-xs" x="550" y="166">스왑 인 · 폴리오를 다시 올린다</text>
+  <path class="ln" d="M500 126 V176 H355 V130" marker-end="url(#ah)"/>
+  <text class="t-xs" x="290" y="194">가리키는 PTE가 없어지면 슬롯을 놓는다</text>
+
+  <!-- 항목의 배치 -->
+  <text class="t-s t-ink t-b" x="290" y="234">항목 하나의 배치 · 8바이트</text>
+  <rect class="box warm" x="290" y="244" width="96" height="34"/>
+  <text class="t-s t-ink mid" x="338" y="266">참조 횟수</text>
+  <rect class="box" x="386" y="244" width="34" height="34"/>
+  <text class="t-code mid" x="403" y="265">Z</text>
+  <rect class="box" x="420" y="244" width="240" height="34"/>
+  <text class="t-s t-ink mid" x="540" y="266">PFN 또는 그림자 값</text>
+  <rect class="box gray" x="660" y="244" width="80" height="34"/>
+  <text class="t-s t-ink mid" x="700" y="266">종류 표시</text>
+  <text class="t-xs" x="290" y="298">윗비트</text>
+  <text class="t-xs end" x="740" y="298">아랫비트 · 1이면 그림자, 10이면 PFN</text>
+</svg></div><figcaption><b>그림 18-8</b>스왑 슬롯 하나가 거치는 상태. 스왑 테이블의 항목 하나가 상태에 따라 0, PFN, 그림자 값으로 바뀝니다.</figcaption></figure>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>예전 자료는 스왑 캐시를 <code>swapper_spaces</code>라는 <code>address_space</code> 배열로, 곧 페이지 캐시와 같은 xarray로 설명하고, 슬롯마다 참조 횟수를 세는 바이트 배열 <code>swap_map</code>을 따로 둡니다. xarray는 트리라서 조회마다 노드 몇 개를 거치고, 넓은 범위가 락 하나를 공유했습니다. 6.18에서 스왑 캐시가 클러스터별 배열로 바뀌었고, v7.3의 <code>struct swap_info_struct</code>에는 <code>swap_map</code> 필드도 없습니다. 조회는 배열 색인 한 번이고 락은 클러스터 단위입니다.</p>
+</div>
+<p>스왑 장치가 느린 디스크일 필요는 없습니다. <strong>zswap</strong>은 스왑으로 나가려는 페이지를 가로채 압축해서 메모리 안의 풀에 담아 두고, 풀이 차면 오래된 것부터 진짜 스왑 장치로 내보냅니다. <strong>zram</strong>은 압축한 메모리 자체를 블록 장치로 보이게 하는 드라이버여서, 그 위에 스왑을 올리면 디스크 없이 스왑을 씁니다.</p>
+</section>
+<section class="level2" id="oom">
+<h2><span class="sec-n">18.9</span>메모리가 정말 없을 때<a aria-label="이 절의 링크" class="anchor" href="#oom">#</a></h2>
+<p>회수와 컴팩션을 되풀이해도 페이지를 얻지 못하면 <code>__alloc_pages_may_oom()</code>이 <code>out_of_memory()</code>를 부릅니다. <strong>OOM 킬러</strong>는 프로세스 하나를 골라 죽여 그 메모리를 통째로 돌려받습니다. 고르는 기준은 짧습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/mm/oom_kill.c#L199" rel="noopener" target="_blank">mm/oom_kill.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="mm/oom_kill.c" data-line="199" id="cb14"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb14-1"><span class="dt">long</span> oom_badness<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">long</span> totalpages<span class="op">)</span></span>
+<span id="cb14-2"><span class="op">{</span></span>
+<span id="cb14-3">    <span class="co">/* ... */</span></span>
+<span id="cb14-4">    adj <span class="op">=</span> <span class="op">(</span><span class="dt">long</span><span class="op">)</span>p<span class="op">-&gt;</span>signal<span class="op">-&gt;</span>oom_score_adj<span class="op">;</span></span>
+<span id="cb14-5">    <span class="cf">if</span> <span class="op">(</span>adj <span class="op">==</span> OOM_SCORE_ADJ_MIN <span class="op">||</span></span>
+<span id="cb14-6">            mm_flags_test<span class="op">(</span>MMF_OOM_SKIP<span class="op">,</span> p<span class="op">-&gt;</span>mm<span class="op">)</span> <span class="op">||</span></span>
+<span id="cb14-7">            in_vfork<span class="op">(</span>p<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb14-8">        task_unlock<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb14-9">        <span class="cf">return</span> LONG_MIN<span class="op">;</span></span>
+<span id="cb14-10">    <span class="op">}</span></span>
+<span id="cb14-11"></span>
+<span id="cb14-12">    <span class="co">/*</span></span>
+<span id="cb14-13"><span class="co">     * The baseline for the badness score is the proportion of RAM that each</span></span>
+<span id="cb14-14"><span class="co">     * task's rss, pagetable and swap space use.</span></span>
+<span id="cb14-15"><span class="co">     */</span></span>
+<span id="cb14-16">    points <span class="op">=</span> get_mm_rss_sum<span class="op">(</span>p<span class="op">-&gt;</span>mm<span class="op">)</span> <span class="op">+</span> get_mm_counter_sum<span class="op">(</span>p<span class="op">-&gt;</span>mm<span class="op">,</span> MM_SWAPENTS<span class="op">)</span> <span class="op">+</span></span>
+<span id="cb14-17">        mm_pgtables_bytes<span class="op">(</span>p<span class="op">-&gt;</span>mm<span class="op">)</span> <span class="op">/</span> PAGE_SIZE<span class="op">;</span></span>
+<span id="cb14-18">    task_unlock<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb14-19"></span>
+<span id="cb14-20">    <span class="co">/* Normalize to oom_score_adj units */</span></span>
+<span id="cb14-21">    adj <span class="op">*=</span> totalpages <span class="op">/</span> <span class="dv">1000</span><span class="op">;</span></span>
+<span id="cb14-22">    points <span class="op">+=</span> adj<span class="op">;</span></span>
+<span id="cb14-23"></span>
+<span id="cb14-24">    <span class="cf">return</span> points<span class="op">;</span></span>
+<span id="cb14-25"><span class="op">}</span></span></code></pre></div></div>
+<p>점수는 그 프로세스가 차지한 메모리의 페이지 수입니다. 물리 메모리(RSS), 스왑에 나가 있는 양, 페이지 테이블을 더합니다. 여기에 <code>/proc/PID/oom_score_adj</code>(−1000에서 1000)가 더해집니다. 1이 전체 메모리의 0.1%에 해당하고, −1000이면 후보에서 빠집니다. 점수가 가장 높은 프로세스가 <code>SIGKILL</code>을 받습니다.</p>
+<p>죽이는 것만으로는 메모리가 바로 돌아오지 않습니다. 희생자가 락을 기다리며 잠들어 있으면 종료 처리가 늦어집니다. 그래서 커널 스레드 <strong><code>oom_reaper</code></strong>가 희생자의 종료를 기다리지 않고 그 익명 메모리의 매핑을 먼저 걷어 냅니다.</p>
+<p>메모리 cgroup이 자기 한도에 걸렸을 때도 같은 코드가 돌되, 후보가 그 cgroup 안의 프로세스로 좁혀집니다(<a href="ch22.html">22장</a>).</p>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"OOM 킬러가 돌기 전까지는 시스템이 멀쩡하다." 아닙니다. OOM 킬러는 마지막 수단이고, 거기 이르기 전에 시스템은 이미 한참 동안 직접 회수와 재폴트로 거의 멈춰 있을 수 있습니다. 그래서 <strong>PSI</strong>(pressure stall information)가 "메모리를 기다리느라 태스크가 멈춰 있던 시간의 비율"을 <code>/proc/pressure/memory</code>로 내보내고, <code>systemd-oomd</code> 같은 유저 공간 데몬이 이 값을 보고 커널보다 먼저 프로세스를 정리합니다.</p>
+</div>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>OOM이 났다면 <code>dmesg</code>에 보고서가 남습니다. 읽을 줄은 셋입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ sudo dmesg | grep -iE 'oom|killed process'
+stress invoked oom-killer: gfp_mask=0x140dca(...), order=0, oom_score_adj=0
+...
+Out of memory: Killed process 4127 (stress) total-vm:8413004kB, anon-rss:7902216kB, ...</code></pre></div>
+<p>첫 줄은 <strong>누가 요청하다가</strong> OOM이 났는지와 그 요청의 GFP 플래그와 order입니다. 희생자와 다른 프로세스일 수 있습니다. 가운데에는 존별 빈 페이지와 워터마크, 프로세스별 메모리 표가 나옵니다. 마지막 줄이 고른 희생자입니다. 지금의 압력은 <code>cat /proc/pressure/memory</code>로 봅니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>5.16 · 2022</dt>
+<dd>
+폴리오. <code>struct folio</code>가 들어오고 페이지 캐시부터 옮겨 가기 시작합니다.
+</dd>
+<dt>6.1 · 2022</dt>
+<dd>
+MGLRU.
+</dd>
+<dt>6.4 · 2023</dt>
+<dd>
+SLOB 제거.
+</dd>
+<dt>6.8 · 2024</dt>
+<dd>
+SLAB 제거로 SLUB만 남습니다. 익명 메모리의 mTHP.
+</dd>
+<dt>6.18 · 2025</dt>
+<dd>
+SLUB에 sheaves가 선택 사항으로 들어옵니다. 스왑 캐시가 스왑 테이블로 바뀝니다.
+</dd>
+<dt>7.0 · 2026</dt>
+<dd>
+모든 슬랩 캐시가 sheaves를 쓰고, CPU별 슬랩이 지워집니다.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>프레임마다 <code>struct page</code>가 있고, 폴리오는 "tail이 아닌 페이지 묶음"이라는 불변식을 타입으로 만든 것입니다. 락, 참조 카운트, LRU는 폴리오 단위입니다.</li>
+<li>버디 할당자는 order별 빈 목록을 두고, 큰 블록을 반씩 쪼개 내주고 버디가 비면 합칩니다. 버디의 위치는 PFN의 비트 하나를 뒤집어 구합니다.</li>
+<li>할당은 빠른 경로에서 실패하면 kswapd 깨우기, 직접 회수, 컴팩션, OOM으로 내려갑니다. GFP 플래그가 어디까지 내려갈 수 있는지를 정합니다.</li>
+<li>v7.3의 슬랩 할당자는 SLUB 하나이고, 빠른 경로는 CPU별 sheaf 배열에서 포인터를 넣고 빼는 것입니다.</li>
+<li>회수는 rmap으로 PTE를 찾아 떼어 냅니다. 무엇을 먼저 버릴지는 고전 LRU나 MGLRU가 정하고, 그림자 항목으로 재폴트를 감지해 판단을 고칩니다.</li>
+<li>스왑 캐시는 클러스터별 배열인 스왑 테이블입니다. 항목 하나가 슬롯의 상태와 참조 횟수를 함께 담습니다.</li>
+<li>OOM 킬러는 RSS, 스왑, 페이지 테이블을 더한 값에 <code>oom_score_adj</code>를 반영해 희생자를 고릅니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p>PFN 12에서 시작하는 order 2 블록이 해제되었습니다. 버디는 어느 PFN에서 시작합니까? 버디도 비어 있어 합쳐진 order 3 블록의 시작 PFN과, 그 블록의 버디는 각각 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>order 2의 버디는 <code>12 ^ (1 &lt;&lt; 2) = 12 ^ 4 = 8</code>입니다. 합치면 둘 가운데 작은 쪽인 PFN 8에서 시작하는 order 3 블록이 됩니다. <code>__free_one_page()</code>는 이것을 <code>combined_pfn = buddy_pfn &amp; pfn</code>으로 구합니다. 그 블록의 버디는 <code>8 ^ (1 &lt;&lt; 3) = 0</code>입니다. PFN 0–7이 비어 있으면 다시 합쳐 order 4가 됩니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>네트워크 드라이버의 인터럽트 핸들러가 <code>kmalloc(size, GFP_ATOMIC)</code>을 부릅니다. 빈 페이지가 <code>low</code>와 <code>min</code> 사이에 있을 때와 <code>min</code> 바로 아래에 있을 때, 이 요청은 각각 어떻게 됩니까? 같은 상황에서 <code>GFP_NOWAIT</code>은 어떻게 다릅니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>대부분은 CPU별 sheaf에서 끝나 페이지 할당자까지 가지 않습니다. 슬랩이 새 페이지를 필요로 할 때가 문제입니다. <code>low</code>와 <code>min</code> 사이라면 빠른 경로는 <code>low</code>를 기준으로 하므로 실패하고, 느린 경로가 kswapd를 깨운 뒤 <code>min</code> 기준으로 다시 시도해 성공합니다. <code>min</code> 아래라면 <code>GFP_ATOMIC</code>의 <code>__GFP_HIGH</code>가 예비분 일부를 쓰게 해 주므로 여전히 성공할 수 있습니다. 그마저 없으면 <code>can_direct_reclaim</code>이 거짓이라 <code>NULL</code>을 돌려받습니다. <code>GFP_NOWAIT</code>은 <code>__GFP_HIGH</code>가 없어서 <code>min</code> 아래로는 내려가지 못하고 더 일찍 실패합니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>v7.3에서 한 CPU가 같은 캐시의 객체를 <code>kfree()</code>만 계속하면, 객체는 어떤 순서로 어느 층까지 내려갑니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>처음에는 <code>free_to_pcs()</code>가 <code>main</code> sheaf에 포인터를 넣습니다. <code>main</code>이 가득 차면 <code>spare</code>와 바꾸고, 둘 다 차면 가득 찬 sheaf를 barn의 <code>sheaves_full</code>에 넘기고 빈 sheaf를 받아 옵니다. barn에는 가득 찬 sheaf를 쌓아 둘 수 있는 한도가 있습니다. 그 한도에 닿으면 sheaf의 객체를 원래의 슬랩으로 돌려보냅니다. 슬랩의 객체가 전부 돌아와 빈 슬랩이 되면 페이지가 버디 할당자로 돌아갑니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>고전 LRU와 MGLRU는 "이 페이지가 최근에 접근되었는가"를 각각 어떻게 알아냅니까? 메모리가 큰 시스템에서 이 차이가 왜 중요합니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>고전 LRU는 살펴볼 페이지마다 rmap을 걸어 그 페이지를 매핑한 PTE들의 <code>ACCESSED</code> 비트를 읽습니다. 페이지 하나에 rmap 한 번이고, 서로 관계없는 페이지 테이블을 건너다니므로 캐시 적중이 나쁩니다. MGLRU의 에이징은 프로세스의 페이지 테이블을 순서대로 훑어 <code>ACCESSED</code>가 선 PTE를 한꺼번에 모으고, 그 페이지들의 세대 번호를 올립니다. 페이지 수가 수억 개에 이르면 판정에 드는 CPU 시간 자체가 kswapd의 병목이 되므로, 접근 정보를 모으는 비용의 차이가 회수 속도의 차이가 됩니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>스왑 테이블의 항목이 <code>PFN</code> 형태에서 <code>Shadow</code> 형태로 바뀌는 때와, 그 반대로 바뀌는 때는 각각 언제입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>PFN</code>에서 <code>Shadow</code>로: 스왑 아웃이 끝났을 때입니다. 폴리오의 내용이 스왑 장치에 다 쓰이고 폴리오가 스왑 캐시에서 빠지면, 그 자리에 회수 시점의 정보를 담은 그림자 값이 남습니다. <code>Shadow</code>에서 <code>PFN</code>으로: 스왑 인이 시작될 때입니다. <code>do_swap_page()</code>가 새 폴리오를 할당해 스왑 캐시에 넣으면 항목이 그 폴리오의 PFN으로 바뀌고, 이때 꺼낸 그림자 값은 재폴트 판정에 쓰입니다.</p>
+</div></details></div></div>
+
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>폴리오<small>folio</small></dt>
+<dd>
+tail이 아닌 페이지에서 시작하는, 2의 거듭제곱 개의 연속한 페이지 묶음. 홑 페이지도 폴리오다.
+</dd>
+<dt>존<small>zone</small></dt>
+<dd>
+노드 안에서 주소 범위와 용도에 따라 나눈 물리 메모리 구역.
+</dd>
+<dt>워터마크<small>watermark</small></dt>
+<dd>
+존의 빈 페이지 수에 대한 기준선. <code>min</code>, <code>low</code>, <code>high</code>.
+</dd>
+<dt>버디 할당자<small>buddy allocator</small></dt>
+<dd>
+빈 메모리를 2<sup>order</sup> 페이지 블록으로 관리하며 쪼개고 합치는 페이지 할당자.
+</dd>
+<dt>GFP 플래그</dt>
+<dd>
+할당 요청이 잠들어도 되는지, 어느 존을 쓰는지, 실패 시 어떻게 할지를 알리는 비트.
+</dd>
+<dt>슬랩<small>slab</small></dt>
+<dd>
+같은 크기의 객체로 잘라 놓은 페이지 묶음. <code>struct slab</code>.
+</dd>
+<dt>sheaf</dt>
+<dd>
+SLUB이 CPU마다 두는 객체 포인터 배열. 가득 찬 것과 빈 것을 노드별 barn과 주고받는다.
+</dd>
+<dt>역매핑<small>reverse mapping</small></dt>
+<dd>
+물리 페이지에서 그것을 매핑한 모든 PTE를 찾아가는 길.
+</dd>
+<dt>회수<small>reclaim</small></dt>
+<dd>
+쓰이는 페이지를 비워 빈 페이지로 만드는 일. kswapd의 회수와 직접 회수가 있다.
+</dd>
+<dt>MGLRU</dt>
+<dd>
+페이지를 여러 세대로 나누고 페이지 테이블 훑기로 접근 정보를 모으는 회수 알고리즘.
+</dd>
+<dt>그림자 항목<small>shadow entry</small></dt>
+<dd>
+회수된 폴리오의 자리에 남겨 두는 값. 재폴트가 났을 때 얼마 만에 돌아왔는지 계산하는 데 쓴다.
+</dd>
+<dt>스왑 테이블<small>swap table</small></dt>
+<dd>
+스왑 클러스터마다 있는 배열. 슬롯별 스왑 캐시 상태와 참조 횟수를 담는다.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/mm/physical_memory.html" rel="noopener" target="_blank"><code>Documentation/mm/physical_memory.rst</code></a>: 노드, 존, <code>struct page</code>의 관계.</li>
+<li><a href="https://docs.kernel.org/mm/multigen_lru.html" rel="noopener" target="_blank"><code>Documentation/mm/multigen_lru.rst</code></a>: MGLRU의 설계. 세대, 티어, 에이징과 축출.</li>
+<li><a href="https://docs.kernel.org/mm/swap-table.html" rel="noopener" target="_blank"><code>Documentation/mm/swap-table.rst</code></a>: 스왑 테이블의 구조와 락 규칙.</li>
+<li><a href="https://docs.kernel.org/admin-guide/mm/transhuge.html" rel="noopener" target="_blank"><code>Documentation/admin-guide/mm/transhuge.rst</code></a>: THP와 mTHP의 설정과 통계.</li>
+<li><a href="https://docs.kernel.org/core-api/memory-allocation.html" rel="noopener" target="_blank"><code>Documentation/core-api/memory-allocation.rst</code></a>: 어떤 할당 함수와 GFP 플래그를 쓸지 고르는 법.</li>
+<li><a href="https://docs.kernel.org/accounting/psi.html" rel="noopener" target="_blank"><code>Documentation/accounting/psi.rst</code></a>: PSI 파일의 형식과 뜻.</li>
+<li>LWN, <a href="https://lwn.net/Articles/874684/" rel="noopener" target="_blank">Folios merged for 5.16</a>: 폴리오 병합 때의 논의.</li>
+<li>LWN, <a href="https://lwn.net/Articles/974138/" rel="noopener" target="_blank">What's next for the SLUB allocator</a>: 할당자가 하나로 줄어든 뒤의 계획.</li>
+<li>LWN, <a href="https://lwn.net/Articles/1056405/" rel="noopener" target="_blank">Modernizing swapping: introducing the swap table</a>: 스왑 테이블의 배경.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch17.html"><small>← 17장</small><b>가상 주소 공간</b></a><a class="next" href="ch19.html"><small>19장 →</small><b>시스템 콜</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#folio">페이지와 폴리오</a><a href="#zones">노드와 존</a><a href="#buddy">버디 할당자</a><a href="#alloc-path">할당 경로와 GFP 플래그</a><a href="#slub">슬랩: SLUB과 sheaves</a><a href="#pagecache-rmap">페이지 캐시와 역매핑</a><a href="#reclaim">회수</a><a href="#swap">스왑</a><a href="#oom">메모리가 정말 없을 때</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

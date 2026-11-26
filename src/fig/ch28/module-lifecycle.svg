@@ -1,0 +1,47 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>모듈의 일생: insmod가 finit_module 시스템 콜로 .ko를 넘기면 커널이 심벌을 연결하고 초기화 함수를 부르며, 그 뒤에는 워크큐가 모듈의 함수를 부르고, rmmod가 종료 함수를 부른 뒤 코드가 해제된다</title>
+
+  <!-- 유저 공간 -->
+  <rect class="panel blue" x="20" y="16" width="720" height="62" rx="14"/>
+  <text class="t-s t-b tc-blue" x="36" y="52">유저 공간</text>
+  <rect class="box" x="130" y="30" width="150" height="34" rx="8"/>
+  <text class="t-mono mid" x="205" y="52">insmod hello.ko</text>
+  <rect class="box" x="590" y="30" width="130" height="34" rx="8"/>
+  <text class="t-mono mid" x="655" y="52">rmmod hello</text>
+
+  <path class="ln blue" d="M205 64 V108" marker-end="url(#ah-blue)"/>
+  <text class="t-code" x="214" y="96">finit_module()</text>
+  <path class="ln blue" d="M655 64 V108" marker-end="url(#ah-blue)"/>
+  <text class="t-code end" x="646" y="96">delete_module()</text>
+
+  <!-- 커널 -->
+  <rect class="panel yellow" x="20" y="100" width="720" height="204" rx="14"/>
+  <text class="t-s t-b tc-yellow" x="36" y="126">커널</text>
+
+  <rect class="box" x="130" y="112" width="150" height="72" rx="8"/>
+  <text class="t-s t-ink t-b" x="142" y="134">적재</text>
+  <text class="t-xs" x="142" y="153">메모리에 올리고</text>
+  <text class="t-xs" x="142" y="171">커널 심벌과 연결</text>
+  <path class="ln" d="M280 148 H306" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="310" y="112" width="120" height="72" rx="8"/>
+  <text class="t-mono t-b" x="322" y="134">hello_init()</text>
+  <text class="t-xs" x="322" y="153">작업을 예약하고</text>
+  <text class="t-xs" x="322" y="171">0을 돌려줌</text>
+
+  <rect class="box red" x="590" y="112" width="130" height="72" rx="8"/>
+  <text class="t-mono t-b" x="602" y="134">hello_exit()</text>
+  <text class="t-xs" x="602" y="153">작업을 취소하고</text>
+  <text class="t-xs" x="602" y="171">끝나기를 기다림</text>
+
+  <!-- 실행 구간 -->
+  <path class="ln green" d="M370 184 V214" marker-end="url(#ah-green)"/>
+  <rect class="box purple" x="130" y="218" width="430" height="70" rx="8"/>
+  <text class="t-s t-ink t-b" x="142" y="240">워크큐의 커널 스레드가 주기마다 부른다</text>
+  <text class="t-mono" x="142" y="262">hello_fn() → pr_info() → 다시 예약</text>
+  <text class="t-xs" x="142" y="280">모듈의 코드는 누가 불러 줄 때만 실행된다</text>
+
+  <path class="ln red dash" d="M655 184 V252 H564" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red end" x="726" y="272">코드가 해제되기 전에</text>
+  <text class="t-xs tc-red end" x="726" y="290">이 고리를 먼저 끊는다</text>
+</svg>

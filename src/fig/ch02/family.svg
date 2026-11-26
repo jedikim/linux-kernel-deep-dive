@@ -1,0 +1,47 @@
+<svg viewBox="0 0 760 338" xmlns="http://www.w3.org/2000/svg">
+  <title>태스크의 가족 관계: 부모의 children 리스트 머리가 자식들의 sibling 노드를 이중 연결 리스트로 잇고, 자식마다 real_parent 포인터가 부모를 가리킨다.</title>
+
+  <!-- 부모 -->
+  <rect class="box blue" x="250" y="16" width="260" height="76" rx="10"/>
+  <text class="t-code t-b mid" x="380" y="38">부모 task_struct · pid 500</text>
+  <rect class="box warm" x="320" y="50" width="120" height="28" rx="6"/>
+  <text class="t-code t-b mid" x="380" y="69">children</text>
+
+  <!-- real_parent 화살표 -->
+  <path class="ln thin blue" d="M135 190 V130 H300 V98" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M380 190 V98" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M625 190 V130 H460 V98" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="390" y="150">real_parent</text>
+
+  <!-- 자식 셋 -->
+  <rect class="box blue" x="30" y="160" width="210" height="110" rx="10"/>
+  <text class="t-code t-b mid" x="135" y="182">자식 · pid 501</text>
+  <rect class="box" x="42" y="192" width="186" height="28" rx="6"/>
+  <text class="t-code mid" x="135" y="211">real_parent</text>
+  <rect class="box warm" x="42" y="230" width="186" height="28" rx="6"/>
+  <text class="t-code t-b mid" x="135" y="249">sibling</text>
+
+  <rect class="box blue" x="275" y="160" width="210" height="110" rx="10"/>
+  <text class="t-code t-b mid" x="380" y="182">자식 · pid 502</text>
+  <rect class="box" x="287" y="192" width="186" height="28" rx="6"/>
+  <text class="t-code mid" x="380" y="211">real_parent</text>
+  <rect class="box warm" x="287" y="230" width="186" height="28" rx="6"/>
+  <text class="t-code t-b mid" x="380" y="249">sibling</text>
+
+  <rect class="box blue" x="520" y="160" width="210" height="110" rx="10"/>
+  <text class="t-code t-b mid" x="625" y="182">자식 · pid 507</text>
+  <rect class="box" x="532" y="192" width="186" height="28" rx="6"/>
+  <text class="t-code mid" x="625" y="211">real_parent</text>
+  <rect class="box warm" x="532" y="230" width="186" height="28" rx="6"/>
+  <text class="t-code t-b mid" x="625" y="249">sibling</text>
+
+  <!-- 리스트 사슬 -->
+  <path class="ln warm" d="M320 64 H14 V244 H42"/>
+  <path class="ln warm" d="M228 244 H287"/>
+  <path class="ln warm" d="M473 244 H532"/>
+  <path class="ln warm" d="M718 244 H746 V64 H440"/>
+  <text class="t-xs tc-warm" x="24" y="56">이중 연결 리스트</text>
+
+  <text class="t-s" x="30" y="298">children과 sibling은 list_head다. 리스트 노드가 구조체 안에 들어 있다 (25장).</text>
+  <text class="t-s" x="30" y="320">이 리스트에는 스레드 그룹의 리더만 든다. 나머지 스레드는 signal_struct의 thread_head로 묶인다.</text>
+</svg>

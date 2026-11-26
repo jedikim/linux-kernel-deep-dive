@@ -1,0 +1,45 @@
+<svg viewBox="0 0 760 308" xmlns="http://www.w3.org/2000/svg">
+  <title>Kconfig 옵션에서 죽은 코드 제거까지: 옵션이 켜지면 autoconf.h에 매크로가 정의되어 IS_ENABLED가 1이 되고 코드가 남는다. 꺼지면 0이 되어 컴파일러가 본문을 타입 검사한 뒤 지운다.</title>
+
+  <rect class="box code" x="20" y="16" width="720" height="38" rx="8"/>
+  <text class="t-xs" x="34" y="40">소스</text>
+  <text class="t-code" x="80" y="40">if (IS_ENABLED(CONFIG_FOO)) foo_init();</text>
+  <text class="t-xs end" x="728" y="40">.c 파일에 #ifdef가 없다</text>
+
+  <!-- 열 제목 -->
+  <text class="t-xs mid" x="116" y="78">.config</text>
+  <text class="t-xs mid" x="304" y="78">include/generated/autoconf.h</text>
+  <text class="t-xs mid" x="498" y="78">전처리 뒤</text>
+  <text class="t-xs mid" x="664" y="78">기계어</text>
+
+  <!-- 켜짐 -->
+  <rect class="box green" x="20" y="88" width="192" height="46" rx="8"/>
+  <text class="t-code mid" x="116" y="116">CONFIG_FOO=y</text>
+  <rect class="box green" x="224" y="88" width="160" height="46" rx="8"/>
+  <text class="t-code mid" x="304" y="116">#define CONFIG_FOO 1</text>
+  <rect class="box green" x="396" y="88" width="204" height="46" rx="8"/>
+  <text class="t-code mid" x="498" y="116">if (1) foo_init();</text>
+  <rect class="box green" x="612" y="88" width="128" height="46" rx="8"/>
+  <text class="t-code mid" x="676" y="116">call foo_init</text>
+  <path class="ln thin green" d="M212 111 H220" marker-end="url(#ah-green)"/>
+  <path class="ln thin green" d="M384 111 H392" marker-end="url(#ah-green)"/>
+  <path class="ln thin green" d="M600 111 H608" marker-end="url(#ah-green)"/>
+
+  <!-- 꺼짐 -->
+  <rect class="box gray" x="20" y="150" width="192" height="46" rx="8"/>
+  <text class="t-code mid" x="116" y="178"># CONFIG_FOO is not set</text>
+  <rect class="box gray" x="224" y="150" width="160" height="46" rx="8"/>
+  <text class="t-xs mid" x="304" y="178">정의 없음</text>
+  <rect class="box gray" x="396" y="150" width="204" height="46" rx="8"/>
+  <text class="t-code mid" x="498" y="178">if (0) foo_init();</text>
+  <rect class="ghost dash" x="612" y="150" width="128" height="46" rx="8"/>
+  <text class="t-xs mid" x="676" y="178">아무것도 없다</text>
+  <path class="ln thin muted" d="M212 173 H220" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M384 173 H392" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M600 173 H608" marker-end="url(#ah-muted)"/>
+
+  <path class="ln thin muted" d="M20 216 H740"/>
+  <text class="t-s" x="20" y="242">꺼진 쪽도 컴파일러가 본문을 읽는다. 문법과 타입을 검사한 다음에 버린다</text>
+  <text class="t-s" x="20" y="264">#ifdef로 감싼 코드는 꺼진 설정에서 아예 보이지 않아, 깨져도 그 설정으로 빌드하기 전에는 모른다</text>
+  <text class="t-s" x="20" y="286">본문이 그 설정에서만 존재하는 심벌을 쓰면 #ifdef나 헤더의 빈 인라인 함수가 필요하다</text>
+</svg>

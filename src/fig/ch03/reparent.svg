@@ -1,0 +1,49 @@
+<svg viewBox="0 0 760 336" xmlns="http://www.w3.org/2000/svg">
+  <title>부모를 잃은 태스크의 새 부모를 찾는 순서: 첫째 죽은 부모와 같은 스레드 그룹의 살아 있는 스레드, 둘째 조상 가운데 가장 가까운 서브리퍼, 셋째 PID 네임스페이스의 init.</title>
+
+  <!-- 원래의 부모 사슬 -->
+  <path class="ln thin muted" d="M190 60 V96"/>
+  <path class="ln thin muted" d="M190 140 V176"/>
+  <path class="ln thin muted dash" d="M190 220 V262"/>
+
+  <rect class="box gray" x="90" y="16" width="200" height="44" rx="10"/>
+  <text class="t-b mid" x="190" y="36">init</text>
+  <text class="t-xs mid" x="190" y="53">PID 1 · child_reaper</text>
+
+  <rect class="box purple" x="90" y="96" width="200" height="44" rx="10"/>
+  <text class="t-b mid" x="190" y="116">서비스 관리자</text>
+  <text class="t-xs mid" x="190" y="133">서브리퍼로 등록함</text>
+
+  <rect class="ghost dash" x="80" y="168" width="390" height="60" rx="12"/>
+  <rect class="box red" x="90" y="176" width="200" height="44" rx="10"/>
+  <text class="t-b mid" x="190" y="196">부모 스레드</text>
+  <text class="t-xs tc-red mid" x="190" y="213">종료하는 중</text>
+  <rect class="box green" x="310" y="176" width="150" height="44" rx="10"/>
+  <text class="t-b mid" x="385" y="196">다른 스레드</text>
+  <text class="t-xs mid" x="385" y="213">같은 그룹, 살아 있음</text>
+
+  <rect class="box blue" x="90" y="266" width="200" height="44" rx="10"/>
+  <text class="t-b mid" x="190" y="286">자식</text>
+  <text class="t-xs mid" x="190" y="303">부모를 잃는다</text>
+
+  <!-- 새 부모 후보 -->
+  <path class="ln green" d="M290 288 H385 V226" marker-end="url(#ah-green)"/>
+  <text class="t-b tc-green" x="394" y="262">①</text>
+  <path class="ln purple" d="M90 280 H52 V118 H84" marker-end="url(#ah-purple)"/>
+  <text class="t-b tc-purple" x="34" y="204">②</text>
+  <path class="ln" d="M90 296 H24 V38 H84" marker-end="url(#ah)"/>
+  <text class="t-b" x="8" y="124">③</text>
+
+  <!-- 설명 -->
+  <text class="t-b" x="500" y="36">새 부모를 찾는 순서</text>
+  <text class="t-s tc-green t-b" x="500" y="72">① 같은 스레드 그룹</text>
+  <text class="t-xs" x="500" y="92">부모의 스레드 그룹에 살아 있는</text>
+  <text class="t-xs" x="500" y="108">스레드가 있으면 그 스레드</text>
+  <text class="t-s tc-purple t-b" x="500" y="144">② 가장 가까운 서브리퍼</text>
+  <text class="t-xs" x="500" y="164">조상 가운데 prctl()로</text>
+  <text class="t-xs" x="500" y="180">PR_SET_CHILD_SUBREAPER를 건 것</text>
+  <text class="t-s t-ink t-b" x="500" y="216">③ init</text>
+  <text class="t-xs" x="500" y="236">그 PID 네임스페이스의 PID 1</text>
+  <text class="t-xs" x="500" y="252">컨테이너라면 컨테이너의 init</text>
+  <text class="t-code" x="500" y="296">find_new_reaper()</text>
+</svg>

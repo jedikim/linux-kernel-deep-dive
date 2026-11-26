@@ -1,0 +1,45 @@
+<svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg">
+  <title>두 CPU가 같은 counter를 동시에 증가시킬 때, 읽기와 더하기와 쓰기가 엇갈려 증가 한 번이 사라지는 과정</title>
+
+  <text class="t-b tc-blue mid" x="155" y="28">CPU 0</text>
+  <text class="t-b mid" x="380" y="28">메모리의 counter</text>
+  <text class="t-b tc-green mid" x="605" y="28">CPU 1</text>
+  <rect class="box blue" x="40" y="44" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="52" y="64">읽기</text>
+  <text class="t-code" x="106" y="64">reg ← counter (5)</text>
+  <rect class="box" x="350" y="44" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid" x="380" y="64">5</text>
+  <path class="ln thin blue" d="M346 59 H278" marker-end="url(#ah-blue)"/>
+  <rect class="box green" x="490" y="82" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="502" y="102">읽기</text>
+  <text class="t-code" x="556" y="102">reg ← counter (5)</text>
+  <rect class="box" x="350" y="82" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid" x="380" y="102">5</text>
+  <path class="ln thin green" d="M414 97 H482" marker-end="url(#ah-green)"/>
+  <rect class="box blue" x="40" y="120" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="52" y="140">더하기</text>
+  <text class="t-code" x="106" y="140">reg ← reg + 1 (6)</text>
+  <rect class="box" x="350" y="120" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid" x="380" y="140">5</text>
+  <rect class="box green" x="490" y="158" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="502" y="178">더하기</text>
+  <text class="t-code" x="556" y="178">reg ← reg + 1 (6)</text>
+  <rect class="box" x="350" y="158" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid" x="380" y="178">5</text>
+  <rect class="box blue" x="40" y="196" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="52" y="216">쓰기</text>
+  <text class="t-code" x="106" y="216">counter ← reg (6)</text>
+  <rect class="box" x="350" y="196" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid" x="380" y="216">6</text>
+  <path class="ln thin blue" d="M274 211 H342" marker-end="url(#ah-blue)"/>
+  <rect class="box green" x="490" y="234" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="502" y="254">쓰기</text>
+  <text class="t-code" x="556" y="254">counter ← reg (6)</text>
+  <rect class="box red" x="350" y="234" width="60" height="30" rx="6"/>
+  <text class="t-mono t-b mid tc-red" x="380" y="254">6</text>
+  <path class="ln thin green" d="M486 249 H418" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="22" y="40">시간</text>
+  <path class="ln thin muted" d="M22 48 V262" marker-end="url(#ah-muted)"/>
+  <text class="t-xs tc-red mid" x="380" y="282">7이어야 한다</text>
+  <text class="t-s mid" x="380" y="308">두 번 증가시켰는데 값은 한 번만 늘었다. counter++는 읽기, 더하기, 쓰기 세 단계다.</text>
+</svg>

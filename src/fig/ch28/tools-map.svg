@@ -1,0 +1,44 @@
+<svg viewBox="0 0 760 332" xmlns="http://www.w3.org/2000/svg">
+  <title>관찰 도구의 지도: 가벼운 도구부터 무거운 도구까지, 각 도구가 커널의 어디에 붙고 무엇이 필요한지</title>
+
+  <text class="t-s t-ink t-b" x="68" y="24">도구</text>
+  <text class="t-s t-ink t-b" x="312" y="24">붙는 자리</text>
+  <text class="t-s t-ink t-b" x="570" y="24">필요한 것</text>
+  <text class="t-xs mid" x="30" y="48">가볍다</text>
+  <path class="ln muted" d="M30 56 V296" marker-end="url(#ah-muted)"/>
+  <text class="t-xs mid" x="30" y="318">깊다</text>
+
+  <rect class="box green" x="56" y="36" width="684" height="28" rx="6"/>
+  <text class="t-code" x="68" y="55">/proc, /sys, dmesg</text>
+  <text class="t-xs t-ink" x="312" y="55">커널이 내보내는 값을 읽는다</text>
+  <text class="t-xs" x="570" y="55">준비 없음</text>
+  <rect class="box green" x="56" y="70" width="684" height="28" rx="6"/>
+  <text class="t-code" x="68" y="89">dynamic debug, 추적점 + bpftrace</text>
+  <text class="t-xs t-ink" x="312" y="89">미리 심어 둔 지점을 켠다</text>
+  <text class="t-xs" x="570" y="89">재부팅 없음</text>
+  <rect class="box green" x="56" y="104" width="684" height="28" rx="6"/>
+  <text class="t-code" x="68" y="123">ftrace, kprobe</text>
+  <text class="t-xs t-ink" x="312" y="123">함수 진입점을 실행 중에 고쳐 쓴다</text>
+  <text class="t-xs" x="570" y="123">재부팅 없음</text>
+  <rect class="box green" x="56" y="138" width="684" height="28" rx="6"/>
+  <text class="t-code" x="68" y="157">perf</text>
+  <text class="t-xs t-ink" x="312" y="157">일정 간격으로 CPU를 표본 조사한다</text>
+  <text class="t-xs" x="570" y="157">재부팅 없음</text>
+  <rect class="box green" x="56" y="172" width="684" height="28" rx="6"/>
+  <text class="t-code" x="68" y="191">SysRq</text>
+  <text class="t-xs t-ink" x="312" y="191">인터럽트에서 스택을 찍는다</text>
+  <text class="t-xs" x="570" y="191">멈춘 시스템에서도 된다</text>
+  <rect class="box yellow" x="56" y="206" width="684" height="28" rx="6"/>
+  <text class="t-code" x="68" y="225">pr_info() 추가, 모듈</text>
+  <text class="t-xs t-ink" x="312" y="225">소스를 고친다</text>
+  <text class="t-xs" x="570" y="225">다시 빌드</text>
+  <rect class="box warm" x="56" y="240" width="684" height="28" rx="6"/>
+  <text class="t-code" x="68" y="259">gdb + QEMU</text>
+  <text class="t-xs t-ink" x="312" y="259">가상 CPU를 멈추고 메모리를 읽는다</text>
+  <text class="t-xs" x="570" y="259">가상 머신, 디버그 정보</text>
+  <rect class="box red" x="56" y="274" width="684" height="28" rx="6"/>
+  <text class="t-code" x="68" y="293">kdump + crash</text>
+  <text class="t-xs t-ink" x="312" y="293">죽을 때 남긴 메모리 덤프를 읽는다</text>
+  <text class="t-xs" x="570" y="293">미리 설정해 둔 kdump</text>
+  <text class="t-xs" x="68" y="324">초록은 운영 중인 시스템에 쓸 수 있는 것</text>
+</svg>

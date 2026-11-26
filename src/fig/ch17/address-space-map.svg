@@ -1,0 +1,84 @@
+<svg viewBox="0 0 760 492" xmlns="http://www.w3.org/2000/svg">
+  <title>4단계 페이지 테이블을 쓰는 x86-64의 가상 주소 공간: 아래 128TB는 유저 공간, 위 128TB는 커널 공간, 그 사이는 쓸 수 없는 비정규 주소 범위</title>
+
+  <text class="t-xs" x="20" y="24">↑ 높은 주소</text>
+
+  <!-- 왼쪽: 전체 64비트 공간 -->
+  <rect class="box yellow" x="20" y="36" width="210" height="130" rx="10"/>
+  <text class="t-code mid" x="125" y="56">ffffffffffffffff</text>
+  <text class="t-l mid" x="125" y="98">커널 공간</text>
+  <text class="t-s mid" x="125" y="120">128TB · 모든 프로세스 공통</text>
+  <text class="t-code mid" x="125" y="156">ffff800000000000</text>
+
+  <rect class="ghost dash" x="20" y="166" width="210" height="150" rx="10"/>
+  <text class="t-b mid tc-muted" x="125" y="236">쓸 수 없는 구멍</text>
+  <text class="t-s mid" x="125" y="258">정규 주소가 아닌 범위</text>
+
+  <rect class="box blue" x="20" y="316" width="210" height="130" rx="10"/>
+  <text class="t-code mid" x="125" y="336">00007fffffffffff</text>
+  <text class="t-l mid" x="125" y="378">유저 공간</text>
+  <text class="t-s mid" x="125" y="400">128TB · 프로세스마다 다름</text>
+  <text class="t-code mid" x="125" y="436">0000000000000000</text>
+
+  <text class="t-xs" x="20" y="470">↓ 낮은 주소</text>
+
+  <!-- 확대 안내선 -->
+  <path class="ln thin muted dash" d="M230 36 L300 30"/>
+  <path class="ln thin muted dash" d="M230 166 L300 278"/>
+  <path class="ln thin muted dash" d="M230 316 L300 300"/>
+  <path class="ln thin muted dash" d="M230 446 L300 476"/>
+
+  <!-- 오른쪽 위: 커널 쪽 -->
+  <rect class="panel yellow" x="300" y="30" width="440" height="248" rx="14"/>
+  <text class="t-b tc-yellow" x="316" y="54">커널 쪽 · 높은 주소부터</text>
+
+  <rect class="box" x="316" y="64" width="408" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="328" y="84">모듈</text>
+  <text class="t-xs end" x="586" y="84">1520MB</text>
+  <text class="t-code end" x="714" y="84">ffffffffa0000000</text>
+
+  <rect class="box" x="316" y="98" width="408" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="328" y="118">커널 텍스트</text>
+  <text class="t-xs end" x="586" y="118">512MB</text>
+  <text class="t-code end" x="714" y="118">ffffffff80000000</text>
+
+  <rect class="box" x="316" y="132" width="408" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="328" y="152">cpu_entry_area</text>
+  <text class="t-xs end" x="586" y="152">0.5TB</text>
+  <text class="t-code end" x="714" y="152">fffffe0000000000</text>
+
+  <rect class="box" x="316" y="166" width="408" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="328" y="186">vmemmap · struct page 배열</text>
+  <text class="t-xs end" x="586" y="186">1TB</text>
+  <text class="t-code end" x="714" y="186">ffffea0000000000</text>
+
+  <rect class="box" x="316" y="200" width="408" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="328" y="220">vmalloc · ioremap</text>
+  <text class="t-xs end" x="586" y="220">32TB</text>
+  <text class="t-code end" x="714" y="220">ffffc90000000000</text>
+
+  <rect class="box" x="316" y="234" width="408" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="328" y="254">직접 매핑 · 물리 메모리 전체</text>
+  <text class="t-xs end" x="586" y="254">64TB</text>
+  <text class="t-code end" x="714" y="254">ffff888000000000</text>
+
+  <!-- 오른쪽 아래: 유저 쪽 -->
+  <rect class="panel blue" x="300" y="300" width="440" height="176" rx="14"/>
+  <text class="t-b tc-blue" x="316" y="324">유저 쪽 · 높은 주소부터</text>
+
+  <rect class="box" x="316" y="334" width="408" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="328" y="354">스택</text>
+  <text class="t-xs end" x="714" y="354">아래로 자란다 · [stack]</text>
+
+  <rect class="box" x="316" y="368" width="408" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="328" y="388">mmap 영역</text>
+  <text class="t-xs end" x="714" y="388">공유 라이브러리, 파일·익명 매핑</text>
+
+  <rect class="box" x="316" y="402" width="408" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="328" y="422">힙</text>
+  <text class="t-xs end" x="714" y="422">brk()로 위로 자란다 · [heap]</text>
+
+  <rect class="box" x="316" y="436" width="408" height="30" rx="6"/>
+  <text class="t-s t-ink t-b" x="328" y="456">실행 파일</text>
+  <text class="t-xs end" x="714" y="456">텍스트, 데이터, BSS</text>
+</svg>

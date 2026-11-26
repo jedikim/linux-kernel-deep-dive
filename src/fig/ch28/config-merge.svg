@@ -1,0 +1,44 @@
+<svg viewBox="0 0 760 226" xmlns="http://www.w3.org/2000/svg">
+  <title>.config가 만들어지는 길: 기본 설정에 설정 조각을 차례로 덮어쓰고 olddefconfig가 의존 관계를 다시 푼다</title>
+
+  <!-- 입력 -->
+  <rect class="box gray" x="20" y="16" width="210" height="42" rx="8"/>
+  <text class="t-mono t-b" x="34" y="35">defconfig</text>
+  <text class="t-xs" x="34" y="51">아키텍처의 기본값</text>
+  <rect class="box blue" x="20" y="66" width="210" height="42" rx="8"/>
+  <text class="t-mono t-b" x="34" y="85">kvm_guest.config</text>
+  <text class="t-xs" x="34" y="101">virtio, 직렬 콘솔, 9p</text>
+  <rect class="box blue" x="20" y="116" width="210" height="42" rx="8"/>
+  <text class="t-mono t-b" x="34" y="135">debug.config</text>
+  <text class="t-xs" x="34" y="151">KASAN, lockdep, 디버그 정보</text>
+
+  <path class="ln" d="M230 37 C252 37 248 78 266 78" marker-end="url(#ah)"/>
+  <path class="ln" d="M230 87 H266" marker-end="url(#ah)"/>
+  <path class="ln" d="M230 137 C252 137 248 96 266 96" marker-end="url(#ah)"/>
+
+  <!-- 덮어쓰기 -->
+  <rect class="box yellow" x="270" y="48" width="160" height="78" rx="10"/>
+  <text class="t-b" x="284" y="72">차례로 덮어쓰기</text>
+  <text class="t-code" x="284" y="92">merge_config.sh</text>
+  <text class="t-xs" x="284" y="112">뒤에 온 조각이 이긴다</text>
+  <path class="ln" d="M430 87 H456" marker-end="url(#ah)"/>
+
+  <!-- 다시 풀기 -->
+  <rect class="box yellow" x="460" y="48" width="170" height="78" rx="10"/>
+  <text class="t-b" x="474" y="72">의존 관계 다시 풀기</text>
+  <text class="t-code" x="474" y="92">make olddefconfig</text>
+  <text class="t-xs" x="474" y="112">select, depends on</text>
+  <path class="ln green" d="M630 87 H656" marker-end="url(#ah-green)"/>
+
+  <!-- 결과 -->
+  <rect class="box green" x="660" y="58" width="80" height="58" rx="10"/>
+  <text class="t-mono t-b mid" x="700" y="92">.config</text>
+
+  <!-- 낱개 수정 -->
+  <rect class="box purple" x="258" y="160" width="184" height="50" rx="10"/>
+  <text class="t-code" x="276" y="181">scripts/config -e -d</text>
+  <text class="t-xs" x="276" y="199">심벌 하나의 글자만 고침</text>
+  <path class="ln purple" d="M442 185 H545 V130" marker-end="url(#ah-purple)"/>
+  <text class="t-xs tc-purple" x="556" y="180">그래서 반드시 이 단계를</text>
+  <text class="t-xs tc-purple" x="556" y="198">다시 거친다</text>
+</svg>

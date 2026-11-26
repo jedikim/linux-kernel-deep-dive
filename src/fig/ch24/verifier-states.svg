@@ -1,0 +1,52 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>검증기의 레지스터 상태 추적: 맵 조회 뒤 R0은 널일 수 있는 맵 값 포인터이고, 0과 비교하는 분기를 지나면 한 갈래에서는 역참조할 수 있는 맵 값 포인터, 다른 갈래에서는 값 0인 숫자가 된다. 범위도 비교문을 지나며 좁혀진다.</title>
+
+  <text class="t-s t-ink t-b" x="20" y="28">명령어</text>
+  <text class="t-s t-ink t-b" x="390" y="28">그 뒤에 검증기가 아는 것</text>
+
+  <rect class="box code" x="20" y="38" width="340" height="38" rx="8"/>
+  <text class="t-code" x="34" y="62">call bpf_map_lookup_elem</text>
+  <rect class="box warm" x="390" y="38" width="350" height="38" rx="8"/>
+  <text class="t-mono" x="404" y="62">R0 = map_value_or_null</text>
+  <text class="t-xs tc-warm end" x="728" y="62">역참조 불가</text>
+  <path class="ln thin" d="M360 57 H386" marker-end="url(#ah)"/>
+
+  <rect class="box code" x="20" y="92" width="340" height="38" rx="8"/>
+  <text class="t-code" x="34" y="116">if r0 == 0 goto exit</text>
+  <path class="ln" d="M190 76 V88" marker-end="url(#ah)"/>
+  <text class="t-s" x="390" y="116">상태를 둘로 복사해 각각 끝까지 따라간다</text>
+
+  <path class="ln green" d="M110 130 V158" marker-end="url(#ah-green)"/>
+  <path class="ln muted" d="M270 130 V144 H565 V158" marker-end="url(#ah-muted)"/>
+
+  <!-- 널이 아닌 갈래 -->
+  <rect class="panel green" x="20" y="162" width="350" height="104" rx="12"/>
+  <text class="t-b tc-green" x="34" y="186">r0 != 0 인 갈래</text>
+  <text class="t-mono" x="34" y="212">R0 = map_value</text>
+  <text class="t-xs" x="170" y="212">맵 값 8바이트 안에서 읽고 쓴다</text>
+  <rect class="box code" x="34" y="224" width="250" height="30" rx="6"/>
+  <text class="t-code" x="44" y="244">*(u64 *)(r0 + 0) += 1</text>
+  <text class="t-s tc-green t-b end" x="356" y="244">통과</text>
+
+  <!-- 널인 갈래 -->
+  <rect class="panel gray" x="390" y="162" width="350" height="104" rx="12"/>
+  <text class="t-b" x="404" y="186">r0 == 0 인 갈래</text>
+  <text class="t-mono" x="404" y="212">R0 = scalar, 값 0</text>
+  <text class="t-xs" x="404" y="244">포인터가 아니다. 여기서 역참조하면 거부된다</text>
+
+  <path class="ln thin muted dash" d="M20 286 H740"/>
+
+  <!-- 범위 -->
+  <text class="t-s t-ink t-b" x="20" y="312">범위도 비교문에서 좁혀진다</text>
+  <rect class="box warm" x="20" y="324" width="196" height="38" rx="8"/>
+  <text class="t-mono" x="32" y="348">R1 = scalar, 0…2³²−1</text>
+  <path class="ln" d="M216 343 H236" marker-end="url(#ah)"/>
+  <rect class="box code" x="240" y="324" width="180" height="38" rx="8"/>
+  <text class="t-code" x="252" y="348">if r1 &gt; 15 goto exit</text>
+  <path class="ln green" d="M420 343 H440" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="444" y="324" width="160" height="38" rx="8"/>
+  <text class="t-mono" x="456" y="348">R1 = scalar, 0…15</text>
+  <text class="t-xs" x="614" y="340">원소 16개 배열의</text>
+  <text class="t-xs" x="614" y="356">인덱스로 통과</text>
+  <text class="t-xs mid" x="380" y="382">범위를 모르는 값으로는 포인터를 움직일 수 없다</text>
+</svg>

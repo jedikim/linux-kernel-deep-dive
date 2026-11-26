@@ -1,0 +1,52 @@
+<svg viewBox="0 0 760 390" xmlns="http://www.w3.org/2000/svg">
+  <title>미룰 일을 어디에 맡길지 고르는 흐름: 잠들어야 하면 스레드 IRQ나 워크큐, 잠들지 않고 스케줄러 지연도 못 견디면 BH 워크큐</title>
+
+  <rect class="solid" x="230" y="14" width="300" height="34" rx="17"/>
+  <text class="t-b t-on mid" x="380" y="36">핸들러에서 미루고 싶은 일이 있다</text>
+  <path class="ln" d="M380 48 V66" marker-end="url(#ah)"/>
+
+  <rect class="box" x="250" y="70" width="260" height="52" rx="10"/>
+  <text class="t-b mid" x="380" y="92">잠들어야 하는 일인가</text>
+  <text class="t-xs mid" x="380" y="111">뮤텍스, GFP_KERNEL 할당, 느린 버스</text>
+
+  <path class="ln blue" d="M250 96 H190 V156" marker-end="url(#ah-blue)"/>
+  <text class="t-s tc-blue t-b end" x="240" y="88">예</text>
+  <path class="ln purple" d="M510 96 H570 V156" marker-end="url(#ah-purple)"/>
+  <text class="t-s tc-purple t-b" x="520" y="88">아니오</text>
+
+  <rect class="box" x="40" y="160" width="300" height="52" rx="10"/>
+  <text class="t-b mid" x="190" y="182">인터럽트 하나에 딸린 일인가</text>
+  <text class="t-xs mid" x="190" y="201">그 장치의 인터럽트가 올 때마다 하는 처리</text>
+
+  <rect class="box" x="420" y="160" width="300" height="52" rx="10"/>
+  <text class="t-b mid" x="570" y="182">스케줄러를 거치는 지연을 견디는가</text>
+  <text class="t-xs mid" x="570" y="201">스레드가 깨어나 CPU를 받을 때까지의 시간</text>
+
+  <path class="ln blue" d="M106 212 V252" marker-end="url(#ah-blue)"/>
+  <text class="t-s tc-blue t-b end" x="98" y="238">예</text>
+  <path class="ln blue" d="M286 212 V252" marker-end="url(#ah-blue)"/>
+  <text class="t-s tc-blue t-b" x="294" y="238">아니오</text>
+  <path class="ln blue" d="M466 212 V252" marker-end="url(#ah-blue)"/>
+  <text class="t-s tc-blue t-b end" x="458" y="238">예</text>
+  <path class="ln purple" d="M646 212 V252" marker-end="url(#ah-purple)"/>
+  <text class="t-s tc-purple t-b" x="654" y="238">아니오</text>
+
+  <rect class="box blue" x="20" y="256" width="172" height="66" rx="10"/>
+  <text class="t-l mid" x="106" y="283">스레드 IRQ</text>
+  <text class="t-code mid" x="106" y="306">request_threaded_irq()</text>
+
+  <rect class="box blue" x="200" y="256" width="172" height="66" rx="10"/>
+  <text class="t-l mid" x="286" y="283">워크큐</text>
+  <text class="t-code mid" x="286" y="306">queue_work()</text>
+
+  <rect class="box blue" x="380" y="256" width="172" height="66" rx="10"/>
+  <text class="t-l mid" x="466" y="283">워크큐 · 스레드 IRQ</text>
+  <text class="t-xs mid" x="466" y="306">코드가 단순해지는 쪽</text>
+
+  <rect class="box purple" x="560" y="256" width="172" height="66" rx="10"/>
+  <text class="t-l mid" x="646" y="283">BH 워크큐</text>
+  <text class="t-code mid" x="646" y="306">system_bh_wq</text>
+
+  <text class="t-s mid" x="380" y="350">새 softirq 번호는 사실상 받지 못한다. 태스크릿은 새 코드에 쓰지 않는다.</text>
+  <text class="t-s mid" x="380" y="372">아주 짧고 급한 일은 미루지 않고 hardirq 핸들러 안에서 끝낸다.</text>
+</svg>

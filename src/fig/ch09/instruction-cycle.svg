@@ -1,0 +1,47 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>CPU는 명령어 하나를 끝낼 때마다 인터럽트 요청을 확인한다. 요청이 있고 IF가 1이면 벡터를 받아 돌아올 자리를 저장하고 핸들러로 점프한다</title>
+
+  <!-- 되돌아가는 길 -->
+  <path class="ln blue" d="M635 60 V32 H100 V55" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue mid" x="368" y="24">요청이 없거나 IF=0이면 다음 명령어로</text>
+
+  <!-- 명령어 주기 -->
+  <rect class="box blue" x="30" y="60" width="140" height="52" rx="10"/>
+  <text class="t-b mid" x="100" y="91">명령어 인출</text>
+  <path class="ln blue" d="M170 86 H195" marker-end="url(#ah-blue)"/>
+  <rect class="box blue" x="200" y="60" width="140" height="52" rx="10"/>
+  <text class="t-b mid" x="270" y="91">해독</text>
+  <path class="ln blue" d="M340 86 H365" marker-end="url(#ah-blue)"/>
+  <rect class="box blue" x="370" y="60" width="140" height="52" rx="10"/>
+  <text class="t-b mid" x="440" y="91">실행</text>
+  <path class="ln blue" d="M510 86 H535" marker-end="url(#ah-blue)"/>
+  <rect class="solid" x="540" y="60" width="190" height="52" rx="26"/>
+  <text class="t-b t-on mid" x="635" y="91">인터럽트 요청 확인</text>
+
+  <!-- 인터럽트를 받아들이는 길 -->
+  <path class="ln warm" d="M635 112 V159" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm" x="645" y="140">요청 있음, IF=1</text>
+
+  <rect class="box warm" x="540" y="164" width="190" height="64" rx="10"/>
+  <text class="t-b" x="554" y="190">① 벡터 번호를 받는다</text>
+  <text class="t-xs" x="554" y="212">인터럽트 컨트롤러가 알려 준다</text>
+  <path class="ln warm" d="M540 196 H515" marker-end="url(#ah-warm)"/>
+
+  <rect class="box warm" x="285" y="164" width="225" height="64" rx="10"/>
+  <text class="t-b" x="299" y="190">② 돌아올 자리를 스택에 저장</text>
+  <text class="t-code" x="299" y="212">SS RSP RFLAGS CS RIP</text>
+  <path class="ln warm" d="M285 196 H260" marker-end="url(#ah-warm)"/>
+
+  <rect class="box warm" x="30" y="164" width="225" height="64" rx="10"/>
+  <text class="t-b" x="44" y="190">③ 핸들러로 점프</text>
+  <text class="t-xs" x="44" y="212">IDT[벡터]에 적힌 주소가 새 RIP</text>
+  <path class="ln warm" d="M100 164 V117" marker-end="url(#ah-warm)"/>
+
+  <!-- 예외 -->
+  <path class="ln red dash" d="M440 112 V159" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red end" x="430" y="140">예외: 벡터는 CPU가 안다</text>
+
+  <path class="ln thin muted" d="M30 252 H730"/>
+  <text class="t-s" x="30" y="276">인터럽트는 명령어와 명령어 사이에서만 받아들인다. 실행하던 명령어는 끝난 상태다.</text>
+  <text class="t-s" x="30" y="298">예외(0으로 나누기, 페이지 폴트)는 실행 단계 안에서 생긴다. 컨트롤러를 거치지 않고 ②로 들어간다.</text>
+</svg>

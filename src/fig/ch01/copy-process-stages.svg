@@ -1,0 +1,78 @@
+<svg viewBox="0 0 760 566" xmlns="http://www.w3.org/2000/svg">
+  <title>copy_process()의 단계: 플래그 검사, dup_task_struct, 자격 증명과 한도 검사, sched_fork, 플래그에 따라 공유하거나 복사하는 자원들, 네임스페이스, copy_thread, PID 할당, cgroup 확인, 마지막으로 tasklist_lock을 쥐고 태스크 목록에 연결한다. 실패하면 역순으로 되돌린다.</title>
+
+  <!-- 되돌리기 화살표 -->
+  <path class="ln thin red dash" d="M28 470 V28" marker-end="url(#ah-red)"/>
+
+  <!-- 1 -->
+  <rect class="box" x="48" y="16" width="232" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="60" y="38">플래그 조합 검사</text>
+  <text class="t-s" x="294" y="38">CLONE_THREAD는 CLONE_SIGHAND를, 그것은 CLONE_VM을 요구</text>
+
+  <!-- 2 -->
+  <rect class="box yellow" x="48" y="58" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="80">dup_task_struct()</text>
+  <text class="t-s" x="294" y="80">task_struct와 커널 스택을 새로 할당하고 부모 것을 통째로 복사</text>
+
+  <!-- 3 -->
+  <rect class="box yellow" x="48" y="100" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="122">copy_creds() · 한도 검사</text>
+  <text class="t-s" x="294" y="122">자격 증명. RLIMIT_NPROC나 max_threads를 넘으면 -EAGAIN</text>
+
+  <!-- 4 -->
+  <rect class="box yellow" x="48" y="142" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="164">sched_fork()</text>
+  <text class="t-s" x="294" y="164">상태를 TASK_NEW로. 스케줄링 클래스와 우선순위를 정한다</text>
+
+  <!-- 5: 자원 -->
+  <rect class="panel purple" x="48" y="184" width="692" height="118" rx="12"/>
+  <text class="t-s t-ink t-b" x="62" y="207">자원 묶음: 플래그가 서 있으면 참조 카운트만 올려 공유하고, 없으면 새로 복사한다</text>
+
+  <rect class="box" x="62" y="218" width="216" height="32" rx="6"/>
+  <text class="t-code" x="74" y="239">copy_files</text>
+  <text class="t-code tc-purple end" x="268" y="239">CLONE_FILES</text>
+  <rect class="box" x="286" y="218" width="216" height="32" rx="6"/>
+  <text class="t-code" x="298" y="239">copy_fs</text>
+  <text class="t-code tc-purple end" x="492" y="239">CLONE_FS</text>
+  <rect class="box" x="510" y="218" width="216" height="32" rx="6"/>
+  <text class="t-code" x="522" y="239">copy_sighand</text>
+  <text class="t-code tc-purple end" x="716" y="239">CLONE_SIGHAND</text>
+
+  <rect class="box" x="62" y="258" width="216" height="32" rx="6"/>
+  <text class="t-code" x="74" y="279">copy_signal</text>
+  <text class="t-code tc-purple end" x="268" y="279">CLONE_THREAD</text>
+  <rect class="box" x="286" y="258" width="216" height="32" rx="6"/>
+  <text class="t-code" x="298" y="279">copy_mm</text>
+  <text class="t-code tc-purple end" x="492" y="279">CLONE_VM</text>
+  <rect class="box" x="510" y="258" width="216" height="32" rx="6"/>
+  <text class="t-code" x="522" y="279">copy_io</text>
+  <text class="t-code tc-purple end" x="716" y="279">CLONE_IO</text>
+
+  <!-- 6 -->
+  <rect class="box yellow" x="48" y="310" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="332">copy_namespaces()</text>
+  <text class="t-s" x="294" y="332">뜻이 반대다. CLONE_NEW*가 서 있으면 새 네임스페이스를 만든다</text>
+
+  <!-- 7 -->
+  <rect class="box yellow" x="48" y="352" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="374">copy_thread()</text>
+  <text class="t-s" x="294" y="374">자식의 pt_regs와 첫 실행 주소를 꾸민다. 아키텍처별 코드</text>
+
+  <!-- 8 -->
+  <rect class="box yellow" x="48" y="394" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="416">alloc_pid()</text>
+  <text class="t-s" x="294" y="416">PID를 받는다. CLONE_PIDFD면 pidfd도 여기서 준비한다</text>
+
+  <!-- 9 -->
+  <rect class="box yellow" x="48" y="436" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="458">cgroup_can_fork()</text>
+  <text class="t-s" x="294" y="458">cgroup 한도 확인. pids 컨트롤러가 여기서 거절할 수 있다</text>
+
+  <!-- 10 -->
+  <rect class="box green" x="48" y="478" width="232" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="60" y="500">tasklist_lock을 쥔 구간</text>
+  <text class="t-s" x="294" y="500">부모의 children 리스트와 PID 해시에 연결. 이제 남에게 보인다</text>
+
+  <text class="t-s tc-red" x="20" y="540">↑ 어디서든 실패하면 goto로 내려가 그때까지 한 일을 역순으로 되돌린다</text>
+  <text class="t-s tc-green end" x="740" y="540">연결을 시작하면 더는 실패하지 않는다</text>
+</svg>

@@ -1,0 +1,55 @@
+<svg viewBox="0 0 760 296" xmlns="http://www.w3.org/2000/svg">
+  <title>가중치가 3 대 1인 두 태스크 P와 Q. 실제 실행 시간은 4ms마다 3ms와 1ms로 나뉘지만 두 태스크의 vruntime은 같은 높이로 올라간다.</title>
+
+  <rect class="box blue" x="100" y="10" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink" x="122" y="22">P · 가중치 3</text>
+  <rect class="box warm" x="230" y="10" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink" x="252" y="22">Q · 가중치 1</text>
+  <text class="t-xs end" x="740" y="22">nice 0과 nice 5의 가중치가 대략 이 비율이다</text>
+
+  <!-- 실행 시간선: 1ms = 40px -->
+  <text class="t-s t-ink t-b" x="20" y="60">CPU</text>
+  <rect class="box blue" x="100" y="40" width="120" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="160" y="60">P 3ms</text>
+  <rect class="box warm" x="220" y="40" width="40" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="240" y="60">Q</text>
+  <rect class="box blue" x="260" y="40" width="120" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="320" y="60">P 3ms</text>
+  <rect class="box warm" x="380" y="40" width="40" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="400" y="60">Q</text>
+  <rect class="box blue" x="420" y="40" width="120" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="480" y="60">P 3ms</text>
+  <rect class="box warm" x="540" y="40" width="40" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="560" y="60">Q</text>
+  <rect class="box blue" x="580" y="40" width="120" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="640" y="60">P 3ms</text>
+  <rect class="box warm" x="700" y="40" width="40" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="720" y="60">Q</text>
+
+  <!-- vruntime 그래프: 세로 1 = 30px, 0은 y=250 -->
+  <text class="t-s t-ink t-b" x="20" y="176">vruntime</text>
+  <path class="ln thin muted" d="M100 250 H740"/>
+  <path class="ln thin muted" d="M100 250 V112"/>
+  <path class="ln thin muted dash" d="M100 220 H740"/>
+  <path class="ln thin muted dash" d="M100 190 H740"/>
+  <path class="ln thin muted dash" d="M100 160 H740"/>
+  <path class="ln thin muted dash" d="M100 130 H740"/>
+  <text class="t-code end" x="92" y="254">0</text>
+  <text class="t-code end" x="92" y="224">1</text>
+  <text class="t-code end" x="92" y="194">2</text>
+  <text class="t-code end" x="92" y="164">3</text>
+  <text class="t-code end" x="92" y="134">4</text>
+
+  <path class="ln thick blue" d="M100 250 L220 220 H260 L380 190 H420 L540 160 H580 L700 130 H740"/>
+  <path class="ln thick warm" d="M100 250 H220 L260 220 H380 L420 190 H540 L580 160 H700 L740 130"/>
+
+  <text class="t-xs tc-blue" x="112" y="212">P: 3ms 돌아야 1 오른다</text>
+  <text class="t-xs tc-warm" x="270" y="244">Q: 1ms 돌면 1 오른다</text>
+
+  <text class="t-code" x="100" y="270">0</text>
+  <text class="t-code mid" x="260" y="270">4</text>
+  <text class="t-code mid" x="420" y="270">8</text>
+  <text class="t-code mid" x="580" y="270">12</text>
+  <text class="t-code end" x="740" y="270">16ms</text>
+  <text class="t-xs mid" x="420" y="290">실제 시간. 4ms마다 두 선이 다시 만난다</text>
+</svg>

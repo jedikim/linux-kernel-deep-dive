@@ -1,0 +1,60 @@
+<svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg">
+  <title>스레드 셋으로 된 프로세스의 PID와 TGID: 세 태스크는 pid가 2001, 2002, 2003으로 서로 다르고 tgid는 모두 2001이다. getpid()는 tgid를, gettid()는 pid를 돌려준다. 세 태스크가 signal_struct 하나를 함께 가리킨다.</title>
+
+  <text class="t-xs mid" x="135" y="22">메인 스레드 (그룹 리더)</text>
+  <text class="t-xs mid" x="380" y="22">두 번째 스레드</text>
+  <text class="t-xs mid" x="625" y="22">세 번째 스레드</text>
+
+  <!-- 태스크 셋 -->
+  <rect class="box blue" x="30" y="30" width="210" height="100" rx="10"/>
+  <text class="t-code t-b" x="44" y="52">task_struct</text>
+  <text class="t-mono t-b" x="44" y="76">pid  = 2001</text>
+  <text class="t-xs end" x="228" y="76">gettid()의 값</text>
+  <text class="t-mono t-b tc-purple" x="44" y="98">tgid = 2001</text>
+  <text class="t-xs end" x="228" y="98">getpid()의 값</text>
+  <text class="t-xs" x="44" y="119">group_leader: 자기 자신</text>
+
+  <rect class="box blue" x="275" y="30" width="210" height="100" rx="10"/>
+  <text class="t-code t-b" x="289" y="52">task_struct</text>
+  <text class="t-mono t-b" x="289" y="76">pid  = 2002</text>
+  <text class="t-xs end" x="473" y="76">gettid()의 값</text>
+  <text class="t-mono t-b tc-purple" x="289" y="98">tgid = 2001</text>
+  <text class="t-xs end" x="473" y="98">getpid()의 값</text>
+  <text class="t-xs" x="289" y="119">group_leader: 2001번 태스크</text>
+
+  <rect class="box blue" x="520" y="30" width="210" height="100" rx="10"/>
+  <text class="t-code t-b" x="534" y="52">task_struct</text>
+  <text class="t-mono t-b" x="534" y="76">pid  = 2003</text>
+  <text class="t-xs end" x="718" y="76">gettid()의 값</text>
+  <text class="t-mono t-b tc-purple" x="534" y="98">tgid = 2001</text>
+  <text class="t-xs end" x="718" y="98">getpid()의 값</text>
+  <text class="t-xs" x="534" y="119">group_leader: 2001번 태스크</text>
+
+  <!-- signal_struct -->
+  <path class="ln thin purple" d="M135 130 V168" marker-end="url(#ah-purple)"/>
+  <path class="ln thin purple" d="M380 130 V168" marker-end="url(#ah-purple)"/>
+  <path class="ln thin purple" d="M625 130 V168" marker-end="url(#ah-purple)"/>
+  <text class="t-code" x="145" y="154">signal</text>
+  <text class="t-code" x="390" y="154">signal</text>
+  <text class="t-code" x="635" y="154">signal</text>
+
+  <rect class="box purple" x="30" y="174" width="700" height="76" rx="10"/>
+  <text class="t-code t-b" x="44" y="197">signal_struct</text>
+  <text class="t-s" x="160" y="197">세 태스크가 같은 signal_struct를 가리킨다. 이것이 스레드 그룹의 정의다</text>
+  <text class="t-code" x="44" y="218">nr_threads = 3</text>
+  <text class="t-code" x="44" y="238">thread_head</text>
+  <text class="t-xs" x="170" y="218">그룹에 속한 태스크 수</text>
+  <text class="t-xs" x="170" y="238">세 태스크를 잇는 리스트의 머리</text>
+  <text class="t-code" x="420" y="218">shared_pending</text>
+  <text class="t-xs" x="540" y="218">프로세스 전체로 온 시그널</text>
+  <text class="t-code" x="420" y="238">rlim[]</text>
+  <text class="t-xs" x="540" y="238">자원 한도</text>
+
+  <!-- 도구가 보는 모습 -->
+  <text class="t-code" x="30" y="282">ps -e</text>
+  <text class="t-s" x="100" y="282">한 줄 (PID 2001)</text>
+  <text class="t-code" x="280" y="282">ps -eL</text>
+  <text class="t-s" x="350" y="282">세 줄 (LWP 2001, 2002, 2003)</text>
+  <text class="t-code" x="30" y="308">/proc/2001/task/</text>
+  <text class="t-s" x="170" y="308">디렉터리 셋: 2001, 2002, 2003</text>
+</svg>

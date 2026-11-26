@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg">
+  <title>ops 테이블 디스패치: VFS의 호출부는 struct file이 가리키는 file_operations 테이블을 거쳐 fsync를 호출하고, ext4와 파이프와 proc 파일은 각자 자기 함수로 채운 테이블을 가진다. 구현하지 않은 연산은 NULL이다.</title>
+
+  <!-- 호출부 -->
+  <rect class="box yellow" x="20" y="116" width="190" height="84" rx="12"/>
+  <text class="t-b" x="34" y="141">호출부 · VFS</text>
+  <text class="t-code" x="34" y="164">file-&gt;f_op-&gt;fsync</text>
+  <text class="t-xs" x="34" y="186">구조체의 타입만 안다</text>
+
+  <!-- struct file 셋 -->
+  <rect class="box gray" x="262" y="36" width="126" height="44" rx="8"/>
+  <text class="t-code mid" x="325" y="55">struct file</text>
+  <text class="t-xs mid" x="325" y="72">.f_op</text>
+  <rect class="box gray" x="262" y="136" width="126" height="44" rx="8"/>
+  <text class="t-code mid" x="325" y="155">struct file</text>
+  <text class="t-xs mid" x="325" y="172">.f_op</text>
+  <rect class="box gray" x="262" y="236" width="126" height="44" rx="8"/>
+  <text class="t-code mid" x="325" y="255">struct file</text>
+  <text class="t-xs mid" x="325" y="272">.f_op</text>
+
+  <path class="ln" d="M210 140 H236 V58 H258" marker-end="url(#ah)"/>
+  <path class="ln" d="M210 158 H258" marker-end="url(#ah)"/>
+  <path class="ln" d="M210 176 H236 V258 H258" marker-end="url(#ah)"/>
+
+  <!-- 테이블 셋 -->
+  <rect class="box blue" x="440" y="16" width="300" height="84" rx="10"/>
+  <text class="t-mono t-b" x="454" y="40">ext4_file_operations</text>
+  <text class="t-code" x="454" y="64">.fsync     = ext4_sync_file</text>
+  <text class="t-code" x="454" y="84">.read_iter = ext4_file_read_iter</text>
+
+  <rect class="box green" x="440" y="116" width="300" height="84" rx="10"/>
+  <text class="t-mono t-b" x="454" y="140">pipefifo_fops</text>
+  <text class="t-code tc-muted" x="454" y="164">.fsync     = NULL</text>
+  <text class="t-code" x="454" y="184">.read_iter = fifo_pipe_read</text>
+
+  <rect class="box purple" x="440" y="216" width="300" height="84" rx="10"/>
+  <text class="t-mono t-b" x="454" y="240">proc_reg_file_ops</text>
+  <text class="t-code tc-muted" x="454" y="264">.fsync     = NULL</text>
+  <text class="t-code" x="454" y="284">.read      = proc_reg_read</text>
+
+  <path class="ln blue" d="M388 58 H436" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M388 158 H436" marker-end="url(#ah-green)"/>
+  <path class="ln purple" d="M388 258 H436" marker-end="url(#ah-purple)"/>
+
+  <text class="t-s mid" x="380" y="326">인터페이스는 struct file_operations 하나, 구현은 const 인스턴스 여럿. 적지 않은 멤버는 NULL이 된다</text>
+</svg>

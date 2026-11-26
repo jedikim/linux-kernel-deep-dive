@@ -1,0 +1,71 @@
+<svg viewBox="0 0 760 446" xmlns="http://www.w3.org/2000/svg">
+  <title>start_kernel()이 부르는 초기화 함수의 순서와 각 서브시스템을 다루는 장. 인터럽트는 IRQ·타이머·softirq·시계가 준비된 뒤에 켜진다.</title>
+
+  <text class="t-mono t-b" x="20" y="26">start_kernel()</text>
+  <text class="t-s end" x="740" y="26">위에서 아래로 실행된다</text>
+  <path class="ln thin muted" d="M32 40 V426"/>
+
+  <rect x="24" y="44" width="16" height="262" rx="4" fill="url(#hatch-red)"/>
+  <text class="t-xs tc-red" x="560" y="313">↑ 여기까지 인터럽트가 꺼져 있다</text>
+
+  <circle class="f-ink" cx="32" cy="56" r="4"/>
+  <text class="t-code" x="52" y="60">setup_arch()</text>
+  <text class="t-s" x="380" y="60">CPU와 메모리 지도 파악</text>
+
+  <circle class="f-ink" cx="32" cy="82" r="4"/>
+  <text class="t-code" x="52" y="86">trap_init()</text>
+  <text class="t-s" x="380" y="86">예외 핸들러 등록 · <tspan class="tc-brand t-b">9장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="108" r="4"/>
+  <text class="t-code" x="52" y="112">mm_core_init()</text>
+  <text class="t-s" x="380" y="112">페이지 할당자와 슬랩 · <tspan class="tc-brand t-b">18장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="134" r="4"/>
+  <text class="t-code" x="52" y="138">sched_init()</text>
+  <text class="t-s" x="380" y="138">런큐와 스케줄링 클래스 · <tspan class="tc-brand t-b">4장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="160" r="4"/>
+  <text class="t-code" x="52" y="164">workqueue_init_early()</text>
+  <text class="t-s" x="380" y="164">워크큐 · <tspan class="tc-brand t-b">11장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="186" r="4"/>
+  <text class="t-code" x="52" y="190">rcu_init()</text>
+  <text class="t-s" x="380" y="190">RCU · <tspan class="tc-brand t-b">16장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="212" r="4"/>
+  <text class="t-code" x="52" y="216">early_irq_init(), init_IRQ()</text>
+  <text class="t-s" x="380" y="216">IRQ 디스크립터, 인터럽트 컨트롤러 · <tspan class="tc-brand t-b">9–10장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="238" r="4"/>
+  <text class="t-code" x="52" y="242">tick_init(), timers_init(), hrtimers_init()</text>
+  <text class="t-s" x="380" y="242">틱과 타이머 · <tspan class="tc-brand t-b">8장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="264" r="4"/>
+  <text class="t-code" x="52" y="268">softirq_init()</text>
+  <text class="t-s" x="380" y="268">softirq · <tspan class="tc-brand t-b">11장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="290" r="4"/>
+  <text class="t-code" x="52" y="294">timekeeping_init()</text>
+  <text class="t-s" x="380" y="294">시계 · <tspan class="tc-brand t-b">8장</tspan></text>
+
+  <rect class="box green" x="46" y="304" width="200" height="26" rx="6"/>
+  <circle class="f-green" cx="32" cy="317" r="5"/>
+  <text class="t-code" x="54" y="321">local_irq_enable()</text>
+  <text class="t-s tc-green" x="262" y="321">인터럽트를 처음 켠다</text>
+
+  <circle class="f-ink" cx="32" cy="346" r="4"/>
+  <text class="t-code" x="52" y="350">fork_init()</text>
+  <text class="t-s" x="380" y="350">태스크 생성 준비 · <tspan class="tc-brand t-b">1장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="372" r="4"/>
+  <text class="t-code" x="52" y="376">vfs_caches_init()</text>
+  <text class="t-s" x="380" y="376">dentry와 inode 캐시 · <tspan class="tc-brand t-b">20장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="398" r="4"/>
+  <text class="t-code" x="52" y="402">cgroup_init()</text>
+  <text class="t-s" x="380" y="402">cgroup · <tspan class="tc-brand t-b">22장</tspan></text>
+
+  <circle class="f-ink" cx="32" cy="424" r="4"/>
+  <text class="t-code" x="52" y="428">rest_init()</text>
+  <text class="t-s" x="380" y="428">PID 1과 PID 2를 만들고 idle 태스크가 된다</text>
+</svg>

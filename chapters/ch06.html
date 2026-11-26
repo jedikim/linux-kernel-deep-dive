@@ -1,0 +1,1201 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>커널 선점 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="preempt_count, 선점 모델, 그리고 PREEMPT_LAZY">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="커널 선점 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="preempt_count, 선점 모델, 그리고 PREEMPT_LAZY">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch06" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html" aria-current="page"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">2부 스케줄러 › <b>6장 커널 선점</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-green">
+<div class="ch-kicker"><span class="ch-no">06</span><span class="part">2부 · 스케줄러</span></div>
+<h1>커널 선점</h1>
+<p class="ch-sub">preempt_count, 선점 모델, 그리고 PREEMPT_LAZY</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 50분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c" target="_blank" rel="noopener">kernel/sched/core.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/preempt.h" target="_blank" rel="noopener">include/linux/preempt.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/preempt.h" target="_blank" rel="noopener">arch/x86/include/asm/preempt.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/spinlock_api_smp.h" target="_blank" rel="noopener">include/linux/spinlock_api_smp.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/entry/common.c" target="_blank" rel="noopener">kernel/entry/common.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c" target="_blank" rel="noopener">kernel/sched/fair.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/Kconfig.preempt" target="_blank" rel="noopener">kernel/Kconfig.preempt</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/locking/spinlock_rt.c" target="_blank" rel="noopener">kernel/locking/spinlock_rt.c</a></div>
+</header><div class="lead">
+<p>유저 프로그램은 어느 명령어에서든 끊길 수 있습니다. 타이머 인터럽트가 오면 커널이 CPU를 가져가 다른 태스크에 넘깁니다. 그러면 커널 코드는 어떨까요. 시스템 콜을 처리하던 커널 함수 한가운데에서 다른 태스크로 넘어가도 될까요. 리눅스는 이 질문에 "안 된다"로 시작해서 "스케줄러가 정한다"까지 왔습니다. 이 장은 그 판단이 코드 어디에서 내려지는지 따라갑니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>커널 모드에서 실행 중인 태스크를 끊어도 되는지는 무엇으로 판단하는가?</li>
+<li><code>preempt_count</code>의 비트는 각각 무엇을 세는가?</li>
+<li><code>spin_lock()</code>은 왜 선점을 끄는가?</li>
+<li>선점 모델 NONE, VOLUNTARY, FULL, LAZY, RT는 코드에서 어디가 다른가?</li>
+<li>7.0부터 x86과 arm64에서 NONE과 VOLUNTARY를 고를 수 없게 된 까닭은 무엇인가?</li>
+</ul>
+</div>
+<section class="level2" id="user-vs-kernel">
+<h2><span class="sec-n">6.1</span>유저 선점과 커널 선점<a aria-label="이 절의 링크" class="anchor" href="#user-vs-kernel">#</a></h2>
+<p><strong>선점</strong>(preemption)은 실행 중인 태스크가 스스로 양보하지 않았는데 스케줄러가 CPU를 빼앗아 다른 태스크에 주는 일입니다. 태스크가 <code>read()</code>에서 데이터를 기다리며 잠드는 것은 선점이 아닙니다. 그것은 자발적인 양보입니다.</p>
+<p>선점은 태스크가 끊긴 자리에 따라 둘로 나뉩니다.</p>
+<ul>
+<li><strong>유저 선점</strong>: 태스크가 유저 모드로 돌아가려는 순간에 일어납니다. 시스템 콜이 끝났거나 인터럽트 처리가 끝나 유저 코드로 복귀하기 직전입니다. 이때 커널은 자기 일을 다 마친 상태이므로 언제나 안전합니다. 리눅스는 처음부터 유저 선점을 했습니다.</li>
+<li><strong>커널 선점</strong>: 태스크가 커널 모드에서 실행되는 도중에 일어납니다. 시스템 콜을 처리하던 함수 한가운데일 수 있습니다. 커널이 자료구조를 고치던 중이었다면 위험합니다.</li>
+</ul>
+<figure class="fig" id="fig-return-paths"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 408" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>인터럽트에서 돌아가는 두 갈래 길: 유저 모드로 복귀할 때의 유저 선점과 커널 모드로 복귀할 때의 커널 선점</title>
+
+  <rect class="box yellow" x="290" y="14" width="180" height="42" rx="10"/>
+  <use href="#i-bolt" x="304" y="21" width="28" height="28" class="ic yellow"/>
+  <text class="t-b" x="340" y="41">인터럽트 발생</text>
+  <path class="ln" d="M380 56 V74" marker-end="url(#ah)"/>
+
+  <rect class="box" x="180" y="78" width="400" height="52" rx="10"/>
+  <text class="t-b mid" x="380" y="100">인터럽트 핸들러</text>
+  <text class="t-s mid" x="380" y="120">깨어난 태스크가 있으면 재스케줄 요청 플래그를 세운다</text>
+  <path class="ln" d="M380 130 V148" marker-end="url(#ah)"/>
+
+  <rect class="solid" x="280" y="152" width="200" height="36" rx="18"/>
+  <text class="t-b t-on mid" x="380" y="175">끊긴 자리는 어디였나</text>
+  <path class="ln blue" d="M280 170 H195 V210" marker-end="url(#ah-blue)"/>
+  <path class="ln warm" d="M480 170 H565 V210" marker-end="url(#ah-warm)"/>
+
+  <!-- 왼쪽: 유저 선점 -->
+  <rect class="panel blue" x="20" y="216" width="350" height="180" rx="14"/>
+  <text class="t-b tc-blue" x="36" y="241">유저 모드였다 → 유저 선점</text>
+  <rect class="box" x="36" y="252" width="318" height="58" rx="10"/>
+  <text class="t-b" x="50" y="276">끊어야 하는가</text>
+  <text class="t-code end" x="342" y="276">TIF_NEED_RESCHED</text>
+  <text class="t-s" x="50" y="298">유저 모드로 가는 길은 언제나 안전하다</text>
+  <path class="ln" d="M120 310 V328" marker-end="url(#ah)"/>
+  <path class="ln" d="M279 310 V328" marker-end="url(#ah)"/>
+  <rect class="box green" x="36" y="332" width="168" height="52" rx="10"/>
+  <text class="t-b mid" x="120" y="354">요청 있음</text>
+  <text class="t-code mid" x="120" y="373">schedule()</text>
+  <rect class="box gray" x="214" y="332" width="140" height="52" rx="10"/>
+  <text class="t-b mid" x="284" y="354">요청 없음</text>
+  <text class="t-s mid" x="284" y="373">유저 코드로 복귀</text>
+
+  <!-- 오른쪽: 커널 선점 -->
+  <rect class="panel warm" x="390" y="216" width="350" height="180" rx="14"/>
+  <text class="t-b tc-warm" x="406" y="241">커널 모드였다 → 커널 선점</text>
+  <rect class="box" x="406" y="252" width="318" height="58" rx="10"/>
+  <text class="t-b" x="420" y="276">① 끊어도 되는가</text>
+  <text class="t-code end" x="712" y="276">preempt_count == 0</text>
+  <text class="t-b" x="420" y="298">② 끊어야 하는가</text>
+  <text class="t-code end" x="712" y="298">need_resched()</text>
+  <path class="ln" d="M500 310 V328" marker-end="url(#ah)"/>
+  <path class="ln" d="M660 310 V328" marker-end="url(#ah)"/>
+  <rect class="box green" x="406" y="332" width="190" height="52" rx="10"/>
+  <text class="t-b mid" x="501" y="354">둘 다 참</text>
+  <text class="t-code mid" x="501" y="373">preempt_schedule_irq()</text>
+  <rect class="box gray" x="606" y="332" width="118" height="52" rx="10"/>
+  <text class="t-b mid" x="665" y="354">하나라도 거짓</text>
+  <text class="t-s mid" x="665" y="373">커널 코드로 복귀</text>
+</svg></div><figcaption><b>그림 6-1</b>인터럽트 처리를 마친 커널은 끊긴 자리가 유저 모드였는지 커널 모드였는지에 따라 다른 길로 돌아갑니다. 커널 선점은 오른쪽 길에서 일어납니다.</figcaption></figure>
+<p>그림의 왼쪽 길은 조건이 하나입니다. 다시 스케줄해 달라는 요청이 있으면 <code>schedule()</code>을 부릅니다. 오른쪽 길은 조건이 둘입니다. 요청이 있어야 하고, <strong>지금 끊어도 안전해야</strong> 합니다. 커널 선점을 이해한다는 것은 이 두 번째 조건을 이해하는 일입니다.</p>
+<p>커널 선점이 없으면 어떻게 될까요. 우선순위가 낮은 태스크가 커널 안에서 긴 반복문을 돌고 있다고 합시다. 그 사이에 오디오 재생 태스크가 깨어나도, 앞의 태스크가 유저 모드로 돌아가거나 스스로 잠들 때까지 기다려야 합니다. 이 기다림이 수십 밀리초가 되면 소리가 끊깁니다. 반대로 커널 선점을 켜면 응답은 빨라지지만 컨텍스트 스위치가 늘고, 커널 곳곳에 "여기서는 끊지 마시오" 표시를 정확히 해 두어야 합니다.</p>
+</section>
+<section class="level2" id="two-variables">
+<h2><span class="sec-n">6.2</span>두 개의 변수<a aria-label="이 절의 링크" class="anchor" href="#two-variables">#</a></h2>
+<p>커널 선점 여부는 변수 두 개로 정해집니다.</p>
+<ol type="1">
+<li><strong><code>preempt_count</code></strong>: 지금 끊어도 <em>되는가</em>. 0이면 됩니다. 0이 아니면 락을 쥐고 있거나 인터럽트를 처리하는 중이라는 뜻입니다.</li>
+<li><strong><code>TIF_NEED_RESCHED</code></strong>: 지금 끊어야 <em>하는가</em>. 이 플래그가 서 있으면 더 급한 태스크가 기다리고 있다는 뜻입니다.</li>
+</ol>
+<figure class="fig" id="fig-two-variables"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>커널 선점의 두 조건: preempt_count가 0이고 TIF_NEED_RESCHED가 서 있어야 한다</title>
+
+  <rect class="box blue" x="20" y="16" width="410" height="88" rx="12"/>
+  <use href="#i-lock" x="34" y="38" width="40" height="40" class="ic blue"/>
+  <text class="t-l" x="90" y="44">끊어도 되는가</text>
+  <text class="t-mono" x="90" y="67">preempt_count == 0</text>
+  <text class="t-s" x="90" y="90">0이 아니면 락을 쥐었거나 인터럽트를 처리하는 중</text>
+
+  <rect class="box warm" x="20" y="120" width="410" height="88" rx="12"/>
+  <use href="#i-hourglass" x="34" y="142" width="40" height="40" class="ic warm"/>
+  <text class="t-l" x="90" y="148">끊어야 하는가</text>
+  <text class="t-mono" x="90" y="171">TIF_NEED_RESCHED</text>
+  <text class="t-s" x="90" y="194">더 급한 태스크가 기다린다는 스케줄러의 표시</text>
+
+  <path class="ln blue" d="M430 60 H492 V82" marker-end="url(#ah-blue)"/>
+  <path class="ln warm" d="M430 164 H492 V142" marker-end="url(#ah-warm)"/>
+  <circle class="solid" cx="492" cy="112" r="26"/>
+  <text class="t-b t-on mid" x="492" y="117">AND</text>
+  <path class="ln green" d="M518 112 H552" marker-end="url(#ah-green)"/>
+
+  <rect class="box green" x="556" y="76" width="184" height="72" rx="12"/>
+  <text class="t-l mid" x="648" y="106">커널 선점</text>
+  <text class="t-code mid" x="648" y="130">__schedule(SM_PREEMPT)</text>
+
+  <text class="t-s mid" x="380" y="236">한쪽이라도 거짓이면 실행 중인 커널 코드는 끊기지 않고 계속된다</text>
+</svg></div><figcaption><b>그림 6-2</b>두 조건이 모두 참일 때만 커널 선점이 일어납니다. 한쪽이라도 거짓이면 실행 중인 커널 코드는 계속 갑니다.</figcaption></figure>
+<p><code>TIF_NEED_RESCHED</code>는 태스크마다 있는 <code>thread_info</code>의 플래그 비트입니다. 스케줄러가 "지금 도는 태스크를 바꿔야겠다"고 판단하면 이 비트를 세웁니다. 판단이 내려지는 곳은 주로 두 군데입니다.</p>
+<ul>
+<li>태스크가 깨어날 때. 깨어난 태스크가 현재 태스크보다 먼저 돌아야 하면 세웁니다.</li>
+<li>틱마다. 현재 태스크가 자기 몫의 시간을 다 썼으면 세웁니다.</li>
+</ul>
+<p>비트를 세우는 함수가 <code>resched_curr()</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L1195" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="1195" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="dt">static</span> <span class="dt">void</span> __resched_curr<span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="dt">int</span> tif<span class="op">)</span></span>
+<span id="cb1-2"><span class="op">{</span></span>
+<span id="cb1-3">    <span class="kw">struct</span> task_struct <span class="op">*</span>curr <span class="op">=</span> rq<span class="op">-&gt;</span>curr<span class="op">;</span></span>
+<span id="cb1-4">    <span class="kw">struct</span> thread_info <span class="op">*</span>cti <span class="op">=</span> task_thread_info<span class="op">(</span>curr<span class="op">);</span></span>
+<span id="cb1-5">    <span class="dt">int</span> cpu<span class="op">;</span></span>
+<span id="cb1-6">    <span class="co">/* ... */</span></span>
+<span id="cb1-7">    <span class="cf">if</span> <span class="op">(</span>cti<span class="op">-&gt;</span>flags <span class="op">&amp;</span> <span class="op">((</span><span class="dv">1</span> <span class="op">&lt;&lt;</span> tif<span class="op">)</span> <span class="op">|</span> _TIF_NEED_RESCHED<span class="op">))</span></span>
+<span id="cb1-8">        <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb1-9"></span>
+<span id="cb1-10">    cpu <span class="op">=</span> cpu_of<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb1-11"></span>
+<span id="cb1-12">    trace_sched_set_need_resched_tp<span class="op">(</span>curr<span class="op">,</span> cpu<span class="op">,</span> tif<span class="op">);</span></span>
+<span id="cb1-13">    <span class="cf">if</span> <span class="op">(</span>cpu <span class="op">==</span> smp_processor_id<span class="op">())</span> <span class="op">{</span></span>
+<span id="cb1-14">        set_ti_thread_flag<span class="op">(</span>cti<span class="op">,</span> tif<span class="op">);</span></span>
+<span id="cb1-15">        <span class="cf">if</span> <span class="op">(</span>tif <span class="op">==</span> TIF_NEED_RESCHED<span class="op">)</span></span>
+<span id="cb1-16">            set_preempt_need_resched<span class="op">();</span></span>
+<span id="cb1-17">        <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb1-18">    <span class="op">}</span></span>
+<span id="cb1-19"></span>
+<span id="cb1-20">    <span class="cf">if</span> <span class="op">(</span>set_nr_and_not_polling<span class="op">(</span>cti<span class="op">,</span> tif<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb1-21">        <span class="cf">if</span> <span class="op">(</span>tif <span class="op">==</span> TIF_NEED_RESCHED<span class="op">)</span></span>
+<span id="cb1-22">            smp_send_reschedule<span class="op">(</span>cpu<span class="op">);</span></span>
+<span id="cb1-23">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb1-24">        trace_sched_wake_idle_without_ipi<span class="op">(</span>cpu<span class="op">);</span></span>
+<span id="cb1-25">    <span class="op">}</span></span>
+<span id="cb1-26"><span class="op">}</span></span>
+<span id="cb1-27"><span class="co">/* ... */</span></span>
+<span id="cb1-28"><span class="dt">void</span> resched_curr<span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">)</span></span>
+<span id="cb1-29"><span class="op">{</span></span>
+<span id="cb1-30">    __resched_curr<span class="op">(</span>rq<span class="op">,</span> TIF_NEED_RESCHED<span class="op">);</span></span>
+<span id="cb1-31"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li>이 함수는 <strong>플래그만 세웁니다.</strong> 태스크를 바꾸지 않습니다. 실제 전환은 나중에 누군가 이 플래그를 확인하고 <code>schedule()</code>을 부를 때 일어납니다.</li>
+<li>대상이 다른 CPU에서 도는 태스크라면 <code>smp_send_reschedule()</code>로 그 CPU에 인터럽트(IPI)를 보냅니다. 인터럽트를 받은 CPU는 처리를 마치고 돌아가는 길에 플래그를 확인합니다. 그림 6-1의 바로 그 갈림길입니다.</li>
+<li>인자 <code>tif</code>가 있습니다. 예전에는 플래그가 하나였지만 지금은 <code>TIF_NEED_RESCHED</code>와 <code>TIF_NEED_RESCHED_LAZY</code> 둘 중 하나를 고릅니다. 뒤의 <a href="#lazy">PREEMPT_LAZY 절</a>에서 다룹니다.</li>
+</ul>
+</section>
+<section class="level2" id="preempt-count">
+<h2><span class="sec-n">6.3</span>preempt_count의 비트<a aria-label="이 절의 링크" class="anchor" href="#preempt-count">#</a></h2>
+<p><code>preempt_count</code>는 단순한 카운터가 아닙니다. 정수 하나를 여러 칸으로 나눠 서로 다른 것을 셉니다.</p>
+<figure class="fig" id="fig-preempt-count-bits"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 292" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>x86-64 v7.3의 preempt_count 비트 배치: 선점 0–7, softirq 8–15, hardirq 비활성 16–23, hardirq 24–27, NMI 28–31, 비트 63에 PREEMPT_NEED_RESCHED</title>
+
+  <text class="t-h" x="20" y="30">preempt_count</text>
+  <text class="t-s" x="158" y="30">x86-64에서는 CPU별 변수 __preempt_count</text>
+
+  <!-- 비트 번호 -->
+  <text class="t-code mid tc-muted" x="48" y="62">63</text>
+  <text class="t-code mid tc-muted" x="140" y="62">31–28</text>
+  <text class="t-code mid tc-muted" x="220" y="62">27–24</text>
+  <text class="t-code mid tc-muted" x="340" y="62">23–16</text>
+  <text class="t-code mid tc-muted" x="500" y="62">15–8</text>
+  <text class="t-code mid tc-muted" x="660" y="62">7–0</text>
+
+  <!-- 칸 -->
+  <rect class="box gray" x="20" y="70" width="56" height="48"/>
+  <text class="t-b mid" x="48" y="99">NR</text>
+  <text class="t-s mid" x="88" y="99">⋯</text>
+  <rect class="box red" x="100" y="70" width="80" height="48"/>
+  <text class="t-b mid" x="140" y="99">NMI</text>
+  <rect class="box warm" x="180" y="70" width="80" height="48"/>
+  <text class="t-b mid" x="220" y="99">hardirq</text>
+  <rect class="box yellow" x="260" y="70" width="160" height="48"/>
+  <text class="t-b mid" x="340" y="99">hardirq 비활성</text>
+  <rect class="box purple" x="420" y="70" width="160" height="48"/>
+  <text class="t-b mid" x="500" y="99">softirq</text>
+  <rect class="box blue" x="580" y="70" width="160" height="48"/>
+  <text class="t-b mid" x="660" y="99">선점</text>
+
+  <!-- 마스크 -->
+  <text class="t-code mid tc-muted" x="140" y="136">0xf0000000</text>
+  <text class="t-code mid tc-muted" x="220" y="136">0x0f000000</text>
+  <text class="t-code mid tc-muted" x="340" y="136">0x00ff0000</text>
+  <text class="t-code mid tc-muted" x="500" y="136">0x0000ff00</text>
+  <text class="t-code mid tc-muted" x="660" y="136">0x000000ff</text>
+
+  <path class="ln thin muted" d="M20 154 H740"/>
+
+  <!-- 범례: 누가 올리는가 -->
+  <rect class="box blue" x="20" y="170" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="44" y="182">선점 카운트</text>
+  <text class="t-code" x="200" y="182">preempt_disable(), spin_lock()</text>
+
+  <rect class="box purple" x="20" y="196" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="44" y="208">softirq 카운트</text>
+  <text class="t-code" x="200" y="208">local_bh_disable()</text>
+
+  <rect class="box yellow" x="20" y="222" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="44" y="234">hardirq 비활성 카운트</text>
+  <text class="t-code" x="200" y="234">local_interrupt_disable()</text>
+
+  <rect class="box warm" x="430" y="170" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="454" y="182">hardirq 카운트</text>
+  <text class="t-code" x="566" y="182">irq_enter()</text>
+
+  <rect class="box red" x="430" y="196" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="454" y="208">NMI</text>
+  <text class="t-code" x="566" y="208">nmi_enter()</text>
+
+  <rect class="box gray" x="430" y="222" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="454" y="234">NR (비트 63)</text>
+  <text class="t-code" x="566" y="234">PREEMPT_NEED_RESCHED</text>
+
+  <text class="t-s mid" x="380" y="272">NR은 재스케줄 요청을 뒤집어 저장한다. 요청이 있으면 0, 없으면 1이다.</text>
+</svg></div><figcaption><b>그림 6-3</b>v7.3의 <code>preempt_count</code> 비트 배치. 어느 칸이든 0이 아니면 선점할 수 없습니다.</figcaption></figure>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/preempt.h#L14" rel="noopener" target="_blank">include/linux/preempt.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/preempt.h" data-line="14" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><span class="co">/*</span></span>
+<span id="cb2-2"><span class="co"> * We put the hardirq and softirq counter into the preemption</span></span>
+<span id="cb2-3"><span class="co"> * counter. The bitmask has the following meaning:</span></span>
+<span id="cb2-4"><span class="co"> *</span></span>
+<span id="cb2-5"><span class="co"> * - bits 0-7 are the preemption count (max preemption depth: 256)</span></span>
+<span id="cb2-6"><span class="co"> * - bits 8-15 are the softirq count (max # of softirqs: 256)</span></span>
+<span id="cb2-7"><span class="co"> * - bits 16-23 are the hardirq disable count (max # of hardirq disable: 256)</span></span>
+<span id="cb2-8"><span class="co"> * - bits 24-27 are the hardirq count (max # of hardirqs: 16)</span></span>
+<span id="cb2-9"><span class="co"> * - bit 28 is the NMI flag (no nesting count, tracked separately)</span></span>
+<span id="cb2-10"><span class="co"> * ...</span></span>
+<span id="cb2-11"><span class="co"> */</span></span>
+<span id="cb2-12"><span class="pp">#define PREEMPT_BITS    </span><span class="dv">8</span></span>
+<span id="cb2-13"><span class="pp">#define SOFTIRQ_BITS    </span><span class="dv">8</span></span>
+<span id="cb2-14"><span class="pp">#define HARDIRQ_DISABLE_BITS    </span><span class="dv">8</span></span>
+<span id="cb2-15"><span class="pp">#define HARDIRQ_BITS    </span><span class="dv">4</span></span>
+<span id="cb2-16"><span class="pp">#define NMI_BITS    </span><span class="op">(</span><span class="dv">1</span><span class="pp"> </span><span class="op">+</span><span class="pp"> </span><span class="dv">3</span><span class="op">*</span><span class="pp">IS_ENABLED</span><span class="op">(</span><span class="pp">CONFIG_HAS_SEPARATE_PREEMPT_RESCHED_BITS</span><span class="op">))</span></span></code></pre></div></div>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+</colgroup>
+<thead>
+<tr>
+<th>칸</th>
+<th>비트</th>
+<th>올리는 코드</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>선점 카운트</td>
+<td>0–7</td>
+<td><code>preempt_disable()</code>, <code>spin_lock()</code></td>
+<td>선점을 끈 횟수. 중첩될 수 있어 카운터입니다.</td>
+</tr>
+<tr>
+<td>softirq 카운트</td>
+<td>8–15</td>
+<td><code>local_bh_disable()</code>, softirq 진입</td>
+<td>softirq를 실행 중이거나 막아 둔 상태 (<a href="ch11.html">11장</a>)</td>
+</tr>
+<tr>
+<td>hardirq 비활성 카운트</td>
+<td>16–23</td>
+<td><code>local_interrupt_disable()</code></td>
+<td>인터럽트를 끈 횟수. 중첩을 세기 위한 칸입니다.</td>
+</tr>
+<tr>
+<td>hardirq 카운트</td>
+<td>24–27</td>
+<td><code>irq_enter()</code></td>
+<td>하드웨어 인터럽트 핸들러 안 (<a href="ch10.html">10장</a>)</td>
+</tr>
+<tr>
+<td>NMI</td>
+<td>28–</td>
+<td><code>nmi_enter()</code></td>
+<td>마스크할 수 없는 인터럽트 안</td>
+</tr>
+</tbody>
+</table></div>
+<p>한 정수에 모아 둔 덕분에 "지금 어떤 컨텍스트인가"를 묻는 질문이 모두 비트 연산 한 번으로 끝납니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/preempt.h#L154" rel="noopener" target="_blank">include/linux/preempt.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/preempt.h" data-line="154" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><span class="pp">#define in_nmi</span><span class="op">()</span><span class="pp">        </span><span class="op">(</span><span class="pp">nmi_count</span><span class="op">())</span></span>
+<span id="cb3-2"><span class="pp">#define in_hardirq</span><span class="op">()</span><span class="pp">        </span><span class="op">(</span><span class="pp">hardirq_count</span><span class="op">())</span></span>
+<span id="cb3-3"><span class="pp">#define in_serving_softirq</span><span class="op">()</span><span class="pp">    </span><span class="op">(</span><span class="pp">softirq_count</span><span class="op">()</span><span class="pp"> </span><span class="op">&amp;</span><span class="pp"> SOFTIRQ_OFFSET</span><span class="op">)</span></span>
+<span id="cb3-4"><span class="pp">#ifdef CONFIG_PREEMPT_RT</span></span>
+<span id="cb3-5"><span class="pp"># define in_task</span><span class="op">()</span><span class="pp">      </span><span class="op">(!((</span><span class="pp">preempt_count</span><span class="op">()</span><span class="pp"> </span><span class="op">&amp;</span><span class="pp"> </span><span class="op">(</span><span class="pp">NMI_MASK </span><span class="op">|</span><span class="pp"> HARDIRQ_MASK</span><span class="op">))</span><span class="pp"> </span><span class="op">|</span><span class="pp"> in_serving_softirq</span><span class="op">()))</span></span>
+<span id="cb3-6"><span class="pp">#else</span></span>
+<span id="cb3-7"><span class="pp"># define in_task</span><span class="op">()</span><span class="pp">      </span><span class="op">(!(</span><span class="pp">preempt_count</span><span class="op">()</span><span class="pp"> </span><span class="op">&amp;</span><span class="pp"> </span><span class="op">(</span><span class="pp">NMI_MASK </span><span class="op">|</span><span class="pp"> HARDIRQ_MASK </span><span class="op">|</span><span class="pp"> SOFTIRQ_OFFSET</span><span class="op">)))</span></span>
+<span id="cb3-8"><span class="pp">#endif</span></span>
+<span id="cb3-9"><span class="co">/* ... */</span></span>
+<span id="cb3-10"><span class="pp">#define preemptible</span><span class="op">()</span><span class="pp">   </span><span class="op">(</span><span class="pp">preempt_count</span><span class="op">()</span><span class="pp"> </span><span class="op">==</span><span class="pp"> </span><span class="dv">0</span><span class="pp"> </span><span class="op">&amp;&amp;</span><span class="pp"> </span><span class="op">!</span><span class="pp">irqs_disabled</span><span class="op">())</span></span></code></pre></div></div>
+<p><code>preemptible()</code>이 이 절의 결론입니다. 모든 칸이 0이고 인터럽트가 켜져 있을 때만 끊을 수 있습니다. 인터럽트 핸들러 안에서는 hardirq 칸이 0이 아니므로, 인터럽트 핸들러가 선점당하는 일은 없습니다. 인터럽트 컨텍스트와 태스크 컨텍스트의 차이는 <a href="ch13.html">13장</a>에서 자세히 봅니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>많은 자료가 hardirq 카운트를 비트 16–19에, NMI 카운트를 비트 20–23에 그립니다. v7.3에서는 그 자리에 hardirq 비활성 카운트 8비트가 들어왔고, hardirq 카운트는 24–27로 밀렸습니다. NMI는 중첩 깊이를 따로 떼어 CPU별 변수 <code>nmi_nesting</code>에 두고, <code>preempt_count</code>에는 "NMI 안"이라는 사실만 남겼습니다. 비트 번호를 외우지 말고 <code>include/linux/preempt.h</code>의 주석을 확인하는 편이 안전합니다.</p>
+</div>
+<section class="level3" id="need_resched를-같은-변수에-접어-넣기">
+<h3>need_resched를 같은 변수에 접어 넣기</h3>
+<p>x86에서는 <code>preempt_count</code>가 CPU별 변수 <code>__preempt_count</code>입니다. 여기에 요령이 하나 있습니다. "끊어야 하는가"를 나타내는 비트를 <code>preempt_count</code>의 맨 위 비트에 <strong>뒤집어서</strong> 같이 넣어 둡니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/preempt.h#L68" rel="noopener" target="_blank">arch/x86/include/asm/preempt.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/include/asm/preempt.h" data-line="68" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="co">/*</span></span>
+<span id="cb4-2"><span class="co"> * We fold the NEED_RESCHED bit into the preempt count such that</span></span>
+<span id="cb4-3"><span class="co"> * preempt_enable() can decrement and test for needing to reschedule with a</span></span>
+<span id="cb4-4"><span class="co"> * single instruction.</span></span>
+<span id="cb4-5"><span class="co"> *</span></span>
+<span id="cb4-6"><span class="co"> * We invert the actual bit, so that when the decrement hits 0 we know we both</span></span>
+<span id="cb4-7"><span class="co"> * need to resched (the bit is cleared) and can resched (no preempt count).</span></span>
+<span id="cb4-8"><span class="co"> */</span></span>
+<span id="cb4-9"><span class="co">/* ... */</span></span>
+<span id="cb4-10"><span class="dt">static</span> __always_inline <span class="dt">bool</span> __preempt_count_dec_and_test<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb4-11"><span class="op">{</span></span>
+<span id="cb4-12">    <span class="cf">return</span> GEN_UNARY_RMWcc<span class="op">(</span>__pc_dec<span class="op">,</span> __my_cpu_var<span class="op">(</span>__preempt_count<span class="op">),</span> e<span class="op">,</span></span>
+<span id="cb4-13">                   __percpu_arg<span class="op">([</span>var<span class="op">]));</span></span>
+<span id="cb4-14"><span class="op">}</span></span></code></pre></div></div>
+<p>맨 위 비트는 평소에 1입니다. 재스케줄 요청이 오면 0으로 내립니다. 그러면 "카운터가 0이고 요청이 있다"는 두 조건이 "변수 전체가 0이다"라는 조건 하나로 합쳐집니다. <code>preempt_enable()</code>은 <code>dec</code> 명령어 하나로 카운터를 내리고, 그 결과가 0인지 CPU의 제로 플래그만 보면 됩니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p><code>preempt_enable()</code>은 커널에서 가장 자주 실행되는 코드에 속합니다. 락을 풀 때마다 불리기 때문입니다. 이런 경로에서는 조건 두 개를 따로 읽고 비교하는 비용도 아깝습니다. 그래서 두 조건을 한 변수에 접어 넣어 명령어 하나로 판정하게 했습니다. 자주 도는 경로일수록 자료의 표현을 바꿔 검사를 싸게 만든다는 발상은 커널 곳곳에 반복해서 나옵니다. 다만 이런 최적화는 읽기 어렵게 만드는 값을 치릅니다. 그래서 위 코드처럼 주석이 구현보다 긴 것이 보통입니다.</p>
+</div>
+</section>
+</section>
+<section class="level2" id="disable">
+<h2><span class="sec-n">6.4</span>선점을 끄는 코드<a aria-label="이 절의 링크" class="anchor" href="#disable">#</a></h2>
+<p>커널 코드가 "여기서는 끊지 마시오"라고 표시하는 방법이 <code>preempt_disable()</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/preempt.h#L239" rel="noopener" target="_blank">include/linux/preempt.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/preempt.h" data-line="239" id="cb5"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb5-1"><span class="pp">#define preempt_disable</span><span class="op">()</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb5-2"><span class="cf">do</span><span class="pp"> </span><span class="op">{</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb5-3"><span class="pp">    preempt_count_inc</span><span class="op">();</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb5-4"><span class="pp">    barrier</span><span class="op">();</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb5-5"><span class="op">}</span><span class="pp"> </span><span class="cf">while</span><span class="pp"> </span><span class="op">(</span><span class="dv">0</span><span class="op">)</span></span>
+<span id="cb5-6"></span>
+<span id="cb5-7"><span class="co">/* ... */</span></span>
+<span id="cb5-8"><span class="pp">#define preempt_enable</span><span class="op">()</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb5-9"><span class="cf">do</span><span class="pp"> </span><span class="op">{</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb5-10"><span class="pp">    barrier</span><span class="op">();</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb5-11"><span class="pp">    </span><span class="cf">if</span><span class="pp"> </span><span class="op">(</span>unlikely<span class="op">(</span><span class="pp">preempt_count_dec_and_test</span><span class="op">()))</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb5-12"><span class="pp">        __preempt_schedule</span><span class="op">();</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb5-13"><span class="op">}</span><span class="pp"> </span><span class="cf">while</span><span class="pp"> </span><span class="op">(</span><span class="dv">0</span><span class="op">)</span></span></code></pre></div></div>
+<p>끄는 쪽은 카운터를 올리기만 합니다. 켜는 쪽이 중요합니다. 카운터를 내렸더니 0이 되었고 그 사이에 재스케줄 요청이 와 있었다면, 그 자리에서 바로 스케줄러를 부릅니다. 선점을 꺼 둔 동안 미뤄진 요청이 선점을 다시 켜는 순간 처리되는 구조입니다.</p>
+<p><code>barrier()</code>는 컴파일러에게 "이 지점을 넘어 코드를 재배치하지 마시오"라고 알리는 표시입니다. 보호하려는 코드가 최적화 과정에서 카운터 증가보다 앞으로 옮겨지면 안 되기 때문입니다.</p>
+<section class="level3" id="spin_lock이-선점을-끄는-이유">
+<h3>spin_lock()이 선점을 끄는 이유</h3>
+<p><code>preempt_disable()</code>을 직접 부르는 코드는 많지 않습니다. 대부분은 스핀락을 통해 부릅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/spinlock_api_smp.h#L186" rel="noopener" target="_blank">include/linux/spinlock_api_smp.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/spinlock_api_smp.h" data-line="186" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">void</span> __raw_spin_lock<span class="op">(</span>raw_spinlock_t <span class="op">*</span>lock<span class="op">)</span></span>
+<span id="cb6-2">    __acquires<span class="op">(</span>lock<span class="op">)</span> __no_context_analysis</span>
+<span id="cb6-3"><span class="op">{</span></span>
+<span id="cb6-4">    preempt_disable<span class="op">();</span></span>
+<span id="cb6-5">    spin_acquire<span class="op">(&amp;</span>lock<span class="op">-&gt;</span>dep_map<span class="op">,</span> <span class="dv">0</span><span class="op">,</span> <span class="dv">0</span><span class="op">,</span> _RET_IP_<span class="op">);</span></span>
+<span id="cb6-6">    LOCK_CONTENDED<span class="op">(</span>lock<span class="op">,</span> do_raw_spin_trylock<span class="op">,</span> do_raw_spin_lock<span class="op">);</span></span>
+<span id="cb6-7"><span class="op">}</span></span></code></pre></div></div>
+<p>첫 줄이 <code>preempt_disable()</code>입니다. 락을 잡기도 전에 선점부터 끕니다. 이유는 두 가지입니다.</p>
+<figure class="fig" id="fig-lock-holder-preemption"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>락 주인 선점: 스핀락을 쥔 태스크 A가 선점당하면 다른 CPU의 태스크 C가 헛돈다. spin_lock()이 선점을 끄면 A는 락을 풀 때까지 끊기지 않는다.</title>
+
+  <!-- 위: 선점을 끄지 않는다면 -->
+  <text class="t-b" x="20" y="26">선점을 끄지 않는다면</text>
+  <text class="t-xs tc-red" x="224" y="44">↓ B가 깨어나 A를 선점</text>
+
+  <text class="t-s t-ink t-b" x="20" y="70">CPU 0</text>
+  <rect class="box blue" x="110" y="50" width="110" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="165" y="70">A · 락 획득</text>
+  <rect class="box gray" x="220" y="50" width="300" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="370" y="70">B 실행 (A는 락을 쥔 채 쫓겨나 있다)</text>
+  <rect class="box blue" x="520" y="50" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="570" y="70">A · 락 해제</text>
+
+  <text class="t-s t-ink t-b" x="20" y="110">CPU 1</text>
+  <rect class="box red" x="250" y="90" width="370" height="30" rx="6"/>
+  <rect x="250" y="90" width="370" height="30" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box green" x="620" y="90" width="120" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="680" y="110">C · 락 획득</text>
+  <text class="t-s tc-red mid" x="435" y="142">C는 A가 다시 실행될 때까지 spin_lock()에서 CPU 1을 태운다</text>
+
+  <path class="ln thin muted dash" d="M20 164 H740"/>
+
+  <!-- 아래: spin_lock()이 선점을 끄면 -->
+  <text class="t-b" x="20" y="194">spin_lock()이 선점을 끄면</text>
+  <text class="t-xs tc-blue" x="204" y="212">↓ B가 깨어남: 플래그만 선다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="240">CPU 0</text>
+  <rect class="box blue" x="110" y="220" width="190" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="240">A · 락 쥔 구간, 선점 꺼짐</text>
+  <rect class="box gray" x="300" y="220" width="220" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="410" y="240">B 실행</text>
+
+  <text class="t-s t-ink t-b" x="20" y="280">CPU 1</text>
+  <rect class="box red" x="250" y="260" width="50" height="30" rx="6"/>
+  <rect x="250" y="260" width="50" height="30" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box green" x="300" y="260" width="160" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="380" y="280">C · 락 획득</text>
+
+  <path class="ln thin blue dash" d="M300 214 V296"/>
+  <text class="t-s mid" x="380" y="316">A가 락을 푸는 순간 C가 락을 얻고, 미뤄 둔 B로의 전환도 그때 일어난다</text>
+</svg></div><figcaption><b>그림 6-4</b>스핀락을 쥔 태스크가 선점당하면, 그 락을 기다리는 다른 CPU는 락 주인이 다시 실행될 때까지 헛돕니다.</figcaption></figure>
+<p><strong>첫째, 락 주인이 선점당하면 기다리는 쪽이 CPU를 태웁니다.</strong> 스핀락은 잠들지 않고 반복문을 돌며 기다립니다. 락 주인이 CPU에서 쫓겨나 있으면 기다리는 쪽은 락이 풀릴 가망이 없는데도 계속 돕니다. 그림의 위쪽이 이 상황입니다. 이것을 <strong>락 주인 선점</strong>(lock holder preemption)이라고 합니다.</p>
+<p><strong>둘째, 같은 CPU 안에서 교착이 생깁니다.</strong> 태스크 A가 락을 쥔 채 선점당하고, 같은 CPU에서 이어 실행된 태스크 B가 같은 락을 잡으려 한다고 합시다. B는 돌면서 기다리고, A는 B가 CPU를 놓아야 실행되는데 B는 놓지 않습니다. 스핀락은 "기다리는 동안 락 주인은 다른 CPU에서 실행 중이다"라는 가정 위에서만 성립합니다.</p>
+<p>두 문제 모두 락을 쥔 동안 선점을 꺼서 막습니다. 그래서 스핀락으로 보호되는 구간은 짧아야 하고, 그 안에서 잠들면 안 됩니다. 스핀락과 뮤텍스의 내부는 <a href="ch14.html">14장</a>에서 다룹니다.</p>
+</section>
+<section class="level3" id="cpu별-데이터">
+<h3>CPU별 데이터</h3>
+<p>선점을 끄는 또 하나의 이유는 CPU별 데이터입니다. 커널은 락 경합을 피하려고 CPU마다 따로 두는 변수를 많이 씁니다. 그런데 선점을 켜 둔 채로 CPU 0의 변수를 읽고, 선점당해 CPU 1로 옮겨진 뒤에 값을 쓰면, 읽은 것과 쓴 것이 서로 다른 CPU의 변수가 됩니다. 그래서 CPU별 데이터를 만질 때는 <code>get_cpu()</code>와 <code>put_cpu()</code>로 감싸 선점을 끕니다.</p>
+<p>선점을 끄는 대신 <strong>다른 CPU로 옮겨지는 것만</strong> 막는 방법도 있습니다. <code>migrate_disable()</code>입니다. 이 경우 태스크는 선점당할 수 있지만 다시 실행될 때 같은 CPU에서 실행됩니다. 실시간 커널에서 선점을 꺼 두는 구간을 줄이려고 들어온 도구이고, 뒤의 <a href="#rt">PREEMPT_RT 절</a>에서 다시 나옵니다.</p>
+</section>
+</section>
+<section class="level2" id="where">
+<h2><span class="sec-n">6.5</span>선점이 일어나는 자리<a aria-label="이 절의 링크" class="anchor" href="#where">#</a></h2>
+<p>재스케줄 요청은 플래그일 뿐이라고 했습니다. 그 플래그를 확인하는 자리는 정해져 있습니다.</p>
+<figure class="fig" id="fig-entry-points"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 326" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>스케줄러로 들어가는 네 가지 길: 유저 모드 복귀, 인터럽트에서 커널로 복귀, preempt_enable(), 자발적 양보</title>
+
+  <rect class="box blue" x="20" y="16" width="480" height="58" rx="10"/>
+  <text class="t-b" x="34" y="40">① 유저 모드로 돌아갈 때</text>
+  <text class="t-code" x="34" y="61">__exit_to_user_mode_loop() → schedule()</text>
+  <text class="t-xs tc-blue end" x="488" y="40">유저 선점</text>
+
+  <rect class="box warm" x="20" y="86" width="480" height="58" rx="10"/>
+  <text class="t-b" x="34" y="110">② 인터럽트에서 커널 코드로 돌아갈 때</text>
+  <text class="t-code" x="34" y="131">raw_irqentry_exit_cond_resched() → preempt_schedule_irq()</text>
+  <text class="t-xs tc-warm end" x="488" y="110">커널 선점</text>
+
+  <rect class="box warm" x="20" y="156" width="480" height="58" rx="10"/>
+  <text class="t-b" x="34" y="180">③ preempt_enable()에서 카운터가 0이 될 때</text>
+  <text class="t-code" x="34" y="201">__preempt_schedule() → preempt_schedule()</text>
+  <text class="t-xs tc-warm end" x="488" y="180">커널 선점</text>
+
+  <rect class="box green" x="20" y="226" width="480" height="58" rx="10"/>
+  <text class="t-b" x="34" y="250">④ 스스로 양보할 때</text>
+  <text class="t-code" x="34" y="271">schedule(), cond_resched()</text>
+  <text class="t-xs tc-green end" x="488" y="250">자발적</text>
+
+  <path class="ln blue" d="M500 45 H604" marker-end="url(#ah-blue)"/>
+  <text class="t-code mid" x="552" y="37">SM_NONE</text>
+  <path class="ln warm" d="M500 115 H604" marker-end="url(#ah-warm)"/>
+  <text class="t-code mid" x="552" y="107">SM_PREEMPT</text>
+  <path class="ln warm" d="M500 185 H604" marker-end="url(#ah-warm)"/>
+  <text class="t-code mid" x="552" y="177">SM_PREEMPT</text>
+  <path class="ln green" d="M500 255 H604" marker-end="url(#ah-green)"/>
+  <text class="t-code mid" x="552" y="247">SM_NONE</text>
+
+  <rect class="box" x="608" y="16" width="132" height="268" rx="12"/>
+  <text class="t-mono t-b mid" x="674" y="136">__schedule()</text>
+  <text class="t-s mid" x="674" y="160">다음 태스크 고르기</text>
+  <text class="t-s mid" x="674" y="178">컨텍스트 스위치</text>
+
+  <text class="t-s mid" x="380" y="310">②와 ③은 NONE·VOLUNTARY에서 닫혀 있고 FULL·LAZY·RT에서 열린다</text>
+</svg></div><figcaption><b>그림 6-5</b>스케줄러로 들어가는 네 가지 길. 가운데 두 길이 커널 선점이고, 선점 모델에 따라 열리거나 닫힙니다.</figcaption></figure>
+<p><strong>① 유저 모드로 돌아갈 때.</strong> 유저 선점입니다. 모든 선점 모델에서 열려 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/entry/common.c#L42" rel="noopener" target="_blank">kernel/entry/common.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/entry/common.c" data-line="42" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="dt">static</span> __always_inline <span class="dt">unsigned</span> <span class="dt">long</span> __exit_to_user_mode_loop<span class="op">(</span><span class="kw">struct</span> pt_regs <span class="op">*</span>regs<span class="op">,</span></span>
+<span id="cb7-2">                                  <span class="dt">unsigned</span> <span class="dt">long</span> ti_work<span class="op">)</span></span>
+<span id="cb7-3"><span class="op">{</span></span>
+<span id="cb7-4">    <span class="co">/*</span></span>
+<span id="cb7-5"><span class="co">     * Before returning to user space ensure that all pending work</span></span>
+<span id="cb7-6"><span class="co">     * items have been completed.</span></span>
+<span id="cb7-7"><span class="co">     */</span></span>
+<span id="cb7-8">    <span class="cf">while</span> <span class="op">(</span>ti_work <span class="op">&amp;</span> EXIT_TO_USER_MODE_WORK_LOOP<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb7-9"></span>
+<span id="cb7-10">        local_irq_enable<span class="op">();</span></span>
+<span id="cb7-11"></span>
+<span id="cb7-12">        <span class="cf">if</span> <span class="op">(</span>ti_work <span class="op">&amp;</span> <span class="op">(</span>_TIF_NEED_RESCHED <span class="op">|</span> _TIF_NEED_RESCHED_LAZY<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb7-13">            <span class="cf">if</span> <span class="op">(!</span>rseq_grant_slice_extension<span class="op">(</span>ti_work<span class="op">,</span> TIF_SLICE_EXT_DENY<span class="op">))</span></span>
+<span id="cb7-14">                schedule<span class="op">();</span></span>
+<span id="cb7-15">        <span class="op">}</span></span>
+<span id="cb7-16">    <span class="co">/* ... */</span></span>
+<span id="cb7-17">    <span class="op">}</span></span>
+<span id="cb7-18"><span class="co">/* ... */</span></span>
+<span id="cb7-19"><span class="op">}</span></span></code></pre></div></div>
+<p><strong>② 인터럽트를 마치고 커널 코드로 돌아갈 때.</strong> 커널 선점의 대표적인 자리입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/entry/common.c#L137" rel="noopener" target="_blank">kernel/entry/common.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/entry/common.c" data-line="137" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="dt">void</span> raw_irqentry_exit_cond_resched<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb8-2"><span class="op">{</span></span>
+<span id="cb8-3">    <span class="cf">if</span> <span class="op">(!</span>preempt_count<span class="op">())</span> <span class="op">{</span></span>
+<span id="cb8-4">        <span class="co">/* Sanity check RCU and thread stack */</span></span>
+<span id="cb8-5">        rcu_irq_exit_check_preempt<span class="op">();</span></span>
+<span id="cb8-6">        <span class="cf">if</span> <span class="op">(</span>IS_ENABLED<span class="op">(</span>CONFIG_DEBUG_ENTRY<span class="op">))</span></span>
+<span id="cb8-7">            WARN_ON_ONCE<span class="op">(!</span>on_thread_stack<span class="op">());</span></span>
+<span id="cb8-8">        <span class="cf">if</span> <span class="op">(</span>need_resched<span class="op">()</span> <span class="op">&amp;&amp;</span> arch_irqentry_exit_need_resched<span class="op">())</span></span>
+<span id="cb8-9">            preempt_schedule_irq<span class="op">();</span></span>
+<span id="cb8-10">    <span class="op">}</span></span>
+<span id="cb8-11"><span class="op">}</span></span></code></pre></div></div>
+<p>앞에서 본 두 조건이 그대로 있습니다. <code>!preempt_count()</code>가 "끊어도 되는가"이고 <code>need_resched()</code>가 "끊어야 하는가"입니다.</p>
+<p><strong>③ <code>preempt_enable()</code>에서 카운터가 0이 될 때.</strong> 선점을 꺼 둔 동안 요청이 와 있었으면 여기서 처리합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L7445" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="7445" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="dt">static</span> <span class="dt">void</span> __sched notrace preempt_schedule_common<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb9-2"><span class="op">{</span></span>
+<span id="cb9-3">    <span class="cf">do</span> <span class="op">{</span></span>
+<span id="cb9-4">        <span class="co">/* ... */</span></span>
+<span id="cb9-5">        preempt_disable_notrace<span class="op">();</span></span>
+<span id="cb9-6">        preempt_latency_start<span class="op">(</span><span class="dv">1</span><span class="op">);</span></span>
+<span id="cb9-7">        __schedule<span class="op">(</span>SM_PREEMPT<span class="op">);</span></span>
+<span id="cb9-8">        preempt_latency_stop<span class="op">(</span><span class="dv">1</span><span class="op">);</span></span>
+<span id="cb9-9">        preempt_enable_no_resched_notrace<span class="op">();</span></span>
+<span id="cb9-10"></span>
+<span id="cb9-11">        <span class="co">/*</span></span>
+<span id="cb9-12"><span class="co">         * Check again in case we missed a preemption opportunity</span></span>
+<span id="cb9-13"><span class="co">         * between schedule and now.</span></span>
+<span id="cb9-14"><span class="co">         */</span></span>
+<span id="cb9-15">    <span class="op">}</span> <span class="cf">while</span> <span class="op">(</span>need_resched<span class="op">());</span></span>
+<span id="cb9-16"><span class="op">}</span></span>
+<span id="cb9-17"><span class="co">/* ... */</span></span>
+<span id="cb9-18">asmlinkage __visible <span class="dt">void</span> __sched notrace preempt_schedule<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb9-19"><span class="op">{</span></span>
+<span id="cb9-20">    <span class="co">/*</span></span>
+<span id="cb9-21"><span class="co">     * If there is a non-zero preempt_count or interrupts are disabled,</span></span>
+<span id="cb9-22"><span class="co">     * we do not want to preempt the current task. Just return..</span></span>
+<span id="cb9-23"><span class="co">     */</span></span>
+<span id="cb9-24">    <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(!</span>preemptible<span class="op">()))</span></span>
+<span id="cb9-25">        <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb9-26">    preempt_schedule_common<span class="op">();</span></span>
+<span id="cb9-27"><span class="op">}</span></span></code></pre></div></div>
+<p><strong>④ 스스로 양보할 때.</strong> 태스크가 잠들면서 <code>schedule()</code>을 부르거나, 긴 반복문 중간에 <code>cond_resched()</code>를 부르는 경우입니다. 이것은 선점이 아니라 자발적 양보입니다.</p>
+<section class="level3" id="sm_preempt가-구분하는-것">
+<h3>SM_PREEMPT가 구분하는 것</h3>
+<p>②와 ③은 <code>__schedule(SM_PREEMPT)</code>를, ①과 ④는 <code>__schedule(SM_NONE)</code>을 부릅니다. 이 인자는 태스크가 <strong>왜</strong> 스케줄러에 들어왔는지 알려 줍니다.</p>
+<p>태스크가 잠들 때는 보통 이렇게 합니다. 먼저 자기 상태를 <code>TASK_INTERRUPTIBLE</code>로 바꾸고, 조건을 한 번 더 확인하고, <code>schedule()</code>을 부릅니다. 스케줄러는 상태가 <code>TASK_RUNNING</code>이 아닌 태스크를 런큐에서 뺍니다. 그런데 상태를 바꾼 직후, <code>schedule()</code>을 부르기 전에 선점당하면 어떻게 될까요. 스케줄러가 이 태스크를 런큐에서 빼 버리면 아직 조건 확인도 못 한 태스크가 영영 잠들 수 있습니다.</p>
+<p>그래서 <code>SM_PREEMPT</code>로 들어온 경우에는 태스크 상태가 무엇이든 런큐에서 빼지 않습니다. 선점당한 태스크는 여전히 실행 가능한 태스크입니다. 태스크 상태와 대기 큐는 <a href="ch03.html">3장</a>, <code>__schedule()</code>의 전체 흐름은 <a href="ch04.html">4장</a>에서 봅니다.</p>
+</section>
+</section>
+<section class="level2" id="models">
+<h2><span class="sec-n">6.6</span>선점 모델<a aria-label="이 절의 링크" class="anchor" href="#models">#</a></h2>
+<p>그림 6-5의 가운데 두 길을 얼마나 열어 둘지가 <strong>선점 모델</strong>입니다. 커널을 빌드할 때 고릅니다.</p>
+<figure class="fig" id="fig-models-timeline"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 476" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>선점 모델별로 깨어난 태스크 D가 CPU를 받는 시점: NONE은 유저 모드 복귀, VOLUNTARY는 양보 지점, LAZY는 다음 틱, FULL은 스핀락 해제, RT는 인터럽트 복귀 직후</title>
+
+  <!-- 기준 줄: C가 하던 일 -->
+  <text class="t-s" x="20" y="54">C가 하던 일</text>
+  <text class="t-xs mid" x="280" y="24">스핀락 구간</text>
+  <text class="t-xs mid" x="400" y="24">틱</text>
+  <text class="t-xs mid" x="480" y="24">might_sleep()</text>
+  <rect class="box yellow" x="150" y="34" width="490" height="30" rx="6"/>
+  <rect x="230" y="34" width="100" height="30" fill="url(#hatch)"/>
+  <path class="ln thin" d="M400 28 V34"/>
+  <path class="ln thin" d="M480 28 V34"/>
+  <text class="t-s t-ink mid" x="560" y="54">커널 모드</text>
+  <rect class="box gray" x="640" y="34" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="54">유저 모드</text>
+
+  <!-- 깨어나는 시점 안내선 -->
+  <path class="ln thin muted dash" d="M260 68 V436"/>
+
+  <!-- NONE -->
+  <text class="t-b" x="20" y="120">NONE</text>
+  <rect class="box yellow" x="150" y="100" width="490" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="120">C</text>
+  <rect x="290" y="100" width="350" height="30" fill="url(#hatch-red)"/>
+  <rect class="solid" x="260" y="100" width="30" height="30"/>
+  <text class="t-xs t-on mid" x="275" y="120">ISR</text>
+  <rect class="box green" x="640" y="100" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="120">D 실행</text>
+  <text class="t-xs" x="296" y="148">유저 모드로 돌아갈 때까지 기다린다</text>
+
+  <!-- VOLUNTARY -->
+  <text class="t-b" x="20" y="188">VOLUNTARY</text>
+  <rect class="box yellow" x="150" y="168" width="330" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="188">C</text>
+  <rect x="290" y="168" width="190" height="30" fill="url(#hatch-red)"/>
+  <rect class="solid" x="260" y="168" width="30" height="30"/>
+  <text class="t-xs t-on mid" x="275" y="188">ISR</text>
+  <rect class="box green" x="480" y="168" width="260" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="610" y="188">D 실행</text>
+  <text class="t-xs" x="296" y="216">다음 양보 지점에서 스스로 넘긴다</text>
+
+  <!-- LAZY -->
+  <text class="t-b" x="20" y="256">LAZY</text>
+  <rect class="box yellow" x="150" y="236" width="250" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="256">C</text>
+  <rect x="290" y="236" width="110" height="30" fill="url(#hatch-red)"/>
+  <rect class="solid" x="260" y="236" width="30" height="30"/>
+  <text class="t-xs t-on mid" x="275" y="256">ISR</text>
+  <rect class="box green" x="400" y="236" width="340" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="570" y="256">D 실행</text>
+  <text class="t-xs" x="296" y="284">D가 일반 태스크면 다음 틱까지 미룬다. 실시간 태스크면 FULL과 같다</text>
+
+  <!-- FULL -->
+  <text class="t-b" x="20" y="324">FULL</text>
+  <rect class="box yellow" x="150" y="304" width="180" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="324">C</text>
+  <rect x="290" y="304" width="40" height="30" fill="url(#hatch-red)"/>
+  <rect class="solid" x="260" y="304" width="30" height="30"/>
+  <text class="t-xs t-on mid" x="275" y="324">ISR</text>
+  <rect class="box green" x="330" y="304" width="410" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="324">D 실행</text>
+  <text class="t-xs" x="296" y="352">스핀락을 푸는 preempt_enable()에서 끊긴다</text>
+
+  <!-- RT -->
+  <text class="t-b" x="20" y="392">RT</text>
+  <rect class="box yellow" x="150" y="372" width="140" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="392">C</text>
+  <rect class="solid" x="260" y="372" width="30" height="30"/>
+  <text class="t-xs t-on mid" x="275" y="392">ISR</text>
+  <rect class="box green" x="290" y="372" width="450" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="515" y="392">D 실행</text>
+  <text class="t-xs" x="296" y="420">인터럽트 복귀 길에서 바로 끊긴다. 스핀락 구간이어도 끊는다</text>
+
+  <!-- 범례 -->
+  <path class="ln thin muted dash" d="M150 456 H176"/>
+  <text class="t-xs" x="184" y="460">인터럽트가 와서 D가 깨어난 시점</text>
+  <rect class="box red" x="400" y="448" width="26" height="14" rx="3"/>
+  <rect x="400" y="448" width="26" height="14" rx="3" fill="url(#hatch-red)"/>
+  <text class="t-xs" x="434" y="460">D가 기다리는 시간</text>
+  <rect class="box" x="560" y="448" width="26" height="14" rx="3"/>
+  <rect x="560" y="448" width="26" height="14" rx="3" fill="url(#hatch)"/>
+  <text class="t-xs" x="594" y="460">C가 스핀락을 쥔 구간</text>
+</svg></div><figcaption><b>그림 6-6</b>태스크 C가 커널 모드에서 실행되는 도중에 태스크 D가 깨어났을 때, D가 CPU를 받는 시점이 선점 모델마다 다릅니다.</figcaption></figure>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+</colgroup>
+<thead>
+<tr>
+<th>모델</th>
+<th>Kconfig</th>
+<th>커널 코드가 끊기는 자리</th>
+<th>겨냥한 용도</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>NONE</td>
+<td><code>PREEMPT_NONE</code></td>
+<td>스스로 잠들 때, <code>cond_resched()</code></td>
+<td>처리량이 중요한 서버</td>
+</tr>
+<tr>
+<td>VOLUNTARY</td>
+<td><code>PREEMPT_VOLUNTARY</code></td>
+<td>위에 더해 <code>might_sleep()</code> 자리</td>
+<td>데스크톱</td>
+</tr>
+<tr>
+<td>FULL</td>
+<td><code>PREEMPT</code></td>
+<td><code>preempt_count</code>가 0인 모든 자리</td>
+<td>지연 시간이 중요한 데스크톱·임베디드</td>
+</tr>
+<tr>
+<td>LAZY</td>
+<td><code>PREEMPT_LAZY</code></td>
+<td>FULL과 같지만 일반 태스크는 틱 하나만큼 미룸</td>
+<td>FULL의 응답성과 NONE의 처리량 사이</td>
+</tr>
+<tr>
+<td>RT</td>
+<td><code>PREEMPT_RT</code></td>
+<td>스핀락을 쥔 구간까지 포함</td>
+<td>실시간 보장이 필요한 시스템</td>
+</tr>
+</tbody>
+</table></div>
+<p>NONE과 VOLUNTARY에는 그림 6-5의 ②와 ③이 없습니다. 대신 커널 코드 곳곳에 <code>cond_resched()</code>가 심어져 있습니다. 긴 반복문을 도는 코드가 "혹시 양보할 일이 있으면 지금 하겠다"고 스스로 확인하는 자리입니다. VOLUNTARY는 <code>might_sleep()</code>도 같은 확인 자리로 씁니다. <code>might_sleep()</code>은 원래 "이 함수는 잠들 수 있으니 원자적 컨텍스트에서 부르지 마시오"라는 디버깅용 표시인데, 잠들어도 되는 자리라면 양보해도 되는 자리이기 때문입니다.</p>
+<section class="level3" id="preempt_dynamic-부팅할-때-고르기">
+<h3>PREEMPT_DYNAMIC: 부팅할 때 고르기</h3>
+<p>배포판은 커널 바이너리 하나로 서버와 데스크톱을 모두 지원하고 싶어 합니다. <code>PREEMPT_DYNAMIC</code>은 선점 모델을 부팅 인자 <code>preempt=</code>로 고르게 해 줍니다. 구현은 소스의 주석에 표로 정리되어 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L7938" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="7938" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"> <span class="op">*</span> NONE<span class="op">:</span></span>
+<span id="cb10-2"> <span class="op">*</span>   cond_resched               <span class="op">&lt;-</span> __cond_resched</span>
+<span id="cb10-3"> <span class="op">*</span>   might_resched              <span class="op">&lt;-</span> RET0</span>
+<span id="cb10-4"> <span class="op">*</span>   preempt_schedule           <span class="op">&lt;-</span> NOP</span>
+<span id="cb10-5"> <span class="op">*</span>   preempt_schedule_notrace   <span class="op">&lt;-</span> NOP</span>
+<span id="cb10-6"> <span class="op">*</span>   irqentry_exit_cond_resched <span class="op">&lt;-</span> NOP</span>
+<span id="cb10-7"> <span class="op">*</span>   dynamic_preempt_lazy       <span class="op">&lt;-</span> <span class="kw">false</span></span>
+<span id="cb10-8"> <span class="op">*</span></span>
+<span id="cb10-9"> <span class="op">*</span> VOLUNTARY<span class="op">:</span></span>
+<span id="cb10-10"> <span class="op">*</span>   cond_resched               <span class="op">&lt;-</span> __cond_resched</span>
+<span id="cb10-11"> <span class="op">*</span>   might_resched              <span class="op">&lt;-</span> __cond_resched</span>
+<span id="cb10-12"> <span class="op">*</span>   preempt_schedule           <span class="op">&lt;-</span> NOP</span>
+<span id="cb10-13"> <span class="op">*</span>   preempt_schedule_notrace   <span class="op">&lt;-</span> NOP</span>
+<span id="cb10-14"> <span class="op">*</span>   irqentry_exit_cond_resched <span class="op">&lt;-</span> NOP</span>
+<span id="cb10-15"> <span class="op">*</span>   dynamic_preempt_lazy       <span class="op">&lt;-</span> <span class="kw">false</span></span>
+<span id="cb10-16"> <span class="op">*</span></span>
+<span id="cb10-17"> <span class="op">*</span> FULL<span class="op">:</span></span>
+<span id="cb10-18"> <span class="op">*</span>   cond_resched               <span class="op">&lt;-</span> RET0</span>
+<span id="cb10-19"> <span class="op">*</span>   might_resched              <span class="op">&lt;-</span> RET0</span>
+<span id="cb10-20"> <span class="op">*</span>   preempt_schedule           <span class="op">&lt;-</span> preempt_schedule</span>
+<span id="cb10-21"> <span class="op">*</span>   preempt_schedule_notrace   <span class="op">&lt;-</span> preempt_schedule_notrace</span>
+<span id="cb10-22"> <span class="op">*</span>   irqentry_exit_cond_resched <span class="op">&lt;-</span> irqentry_exit_cond_resched</span>
+<span id="cb10-23"> <span class="op">*</span>   dynamic_preempt_lazy       <span class="op">&lt;-</span> <span class="kw">false</span></span>
+<span id="cb10-24"> <span class="op">*</span></span>
+<span id="cb10-25"> <span class="op">*</span> LAZY<span class="op">:</span></span>
+<span id="cb10-26"> <span class="op">*</span>   cond_resched               <span class="op">&lt;-</span> RET0</span>
+<span id="cb10-27"> <span class="op">*</span>   might_resched              <span class="op">&lt;-</span> RET0</span>
+<span id="cb10-28"> <span class="op">*</span>   preempt_schedule           <span class="op">&lt;-</span> preempt_schedule</span>
+<span id="cb10-29"> <span class="op">*</span>   preempt_schedule_notrace   <span class="op">&lt;-</span> preempt_schedule_notrace</span>
+<span id="cb10-30"> <span class="op">*</span>   irqentry_exit_cond_resched <span class="op">&lt;-</span> irqentry_exit_cond_resched</span>
+<span id="cb10-31"> <span class="op">*</span>   dynamic_preempt_lazy       <span class="op">&lt;-</span> <span class="kw">true</span></span></code></pre></div></div>
+<p>이 표가 선점 모델의 정의입니다. 모델의 차이는 함수 다섯 개와 스위치 하나를 켜고 끄는 것이 전부입니다. NONE에서 <code>preempt_schedule</code>이 <code>NOP</code>라는 것은 <code>preempt_enable()</code>이 스케줄러를 부르지 않는다는 뜻이고, FULL에서 <code>cond_resched</code>가 <code>RET0</code>이라는 것은 어차피 어디서든 끊을 수 있으니 자발적 확인이 필요 없다는 뜻입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>모델을 실행 중에 고르게 하려면 가장 단순한 방법은 전역 변수를 읽어 <code>if</code>로 가르는 것입니다. 그런데 이 분기는 <code>preempt_enable()</code>과 인터럽트 복귀 경로에 놓입니다. 초당 수백만 번 도는 자리입니다. 그래서 커널은 <strong>스태틱 콜</strong>(static call)을 씁니다. 함수 호출 명령어의 목적지 주소를 부팅 때 직접 고쳐 써서, 실행 중에는 분기도 간접 호출도 없이 보통의 직접 호출과 같은 비용만 듭니다. 설정 가능성과 성능을 맞바꾸지 않고, 코드를 고쳐 쓰는 복잡함으로 둘 다 얻은 사례입니다. 스태틱 콜을 지원하지 않는 아키텍처는 같은 일을 스태틱 키로 합니다. 이 기법은 <a href="ch25.html">25장</a>에서 다시 봅니다.</p>
+</div>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>실행 중인 커널의 선점 모델을 확인합니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ uname -v
+#1 SMP PREEMPT_DYNAMIC Sun Oct 18 ...
+
+$ sudo dmesg | grep -i 'dynamic preempt'
+[    0.041] Dynamic Preempt: lazy
+
+$ sudo cat /sys/kernel/debug/sched/preempt
+full (lazy)</code></pre></div>
+<p>마지막 파일에서 괄호로 묶인 것이 현재 모델입니다. 이 파일에 <code>full</code>을 쓰면 재부팅 없이 바뀝니다. x86이나 arm64의 v7.x 커널에서는 목록에 <code>none</code>과 <code>voluntary</code>가 나오지 않습니다. 까닭은 다음 절에 있습니다.</p>
+<p>빌드할 때 고른 값은 <code>grep PREEMPT /boot/config-$(uname -r)</code>로 봅니다.</p>
+</div>
+</section>
+</section>
+<section class="level2" id="lazy">
+<h2><span class="sec-n">6.7</span>PREEMPT_LAZY: 스케줄러가 정하는 선점<a aria-label="이 절의 링크" class="anchor" href="#lazy">#</a></h2>
+<p>오랫동안 선택지는 NONE, VOLUNTARY, FULL 셋이었습니다. 셋 다 불만이 있었습니다.</p>
+<ul>
+<li><strong>FULL은 너무 성급합니다.</strong> 일반 태스크 하나가 깨어났다는 이유만으로, 커널 안에서 뮤텍스를 쥐고 일하던 태스크를 즉시 끊습니다. 그 뮤텍스를 기다리던 다른 태스크들은 락 주인이 다시 실행될 때까지 함께 밀립니다. 컨텍스트 스위치도 늘어납니다. 처리량이 중요한 서버에서 FULL이 꺼려진 이유입니다.</li>
+<li><strong>NONE과 VOLUNTARY는 <code>cond_resched()</code>에 기댑니다.</strong> 지연 시간이 "누군가 그 반복문에 <code>cond_resched()</code>를 넣었는가"에 달려 있습니다. 긴 지연이 보고될 때마다 <code>cond_resched()</code>를 하나씩 더 심는 방식으로 수십 년을 버텼고, 그 수는 계속 늘었습니다. 어디에 넣어야 하는지는 원칙이 아니라 경험으로 정해졌습니다.</li>
+</ul>
+<p><code>PREEMPT_LAZY</code>의 발상은 <strong>요청을 두 단계로 나누는 것</strong>입니다.</p>
+<ul>
+<li><code>TIF_NEED_RESCHED</code>: 지금 당장 바꿔 달라. 커널 코드 안이라도 끊습니다.</li>
+<li><code>TIF_NEED_RESCHED_LAZY</code>: 급하지 않으니 적당한 때에 바꿔 달라. 커널 코드는 끊지 않고, 유저 모드로 돌아갈 때 처리합니다.</li>
+</ul>
+<p>누가 어느 쪽을 쓰는지는 스케줄링 클래스가 정합니다. 일반 태스크를 다루는 fair 클래스는 느긋한 쪽을, 실시간 클래스(RT, deadline)는 급한 쪽을 씁니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L1259" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="1259" id="cb12"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb12-1"><span class="dt">static</span> __always_inline <span class="dt">int</span> get_lazy_tif_bit<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb12-2"><span class="op">{</span></span>
+<span id="cb12-3">    <span class="cf">if</span> <span class="op">(</span>dynamic_preempt_lazy<span class="op">())</span></span>
+<span id="cb12-4">        <span class="cf">return</span> TIF_NEED_RESCHED_LAZY<span class="op">;</span></span>
+<span id="cb12-5"></span>
+<span id="cb12-6">    <span class="cf">return</span> TIF_NEED_RESCHED<span class="op">;</span></span>
+<span id="cb12-7"><span class="op">}</span></span>
+<span id="cb12-8"></span>
+<span id="cb12-9"><span class="dt">void</span> resched_curr_lazy<span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">)</span></span>
+<span id="cb12-10"><span class="op">{</span></span>
+<span id="cb12-11">    __resched_curr<span class="op">(</span>rq<span class="op">,</span> get_lazy_tif_bit<span class="op">());</span></span>
+<span id="cb12-12"><span class="op">}</span></span></code></pre></div></div>
+<p>fair 클래스에서 현재 태스크가 자기 몫을 다 썼을 때 부르는 코드를 보면 <code>resched_curr()</code>가 아니라 <code>resched_curr_lazy()</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L2223" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="2223" id="cb13"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1"><span class="dt">static</span> <span class="dt">void</span> update_curr<span class="op">(</span><span class="kw">struct</span> cfs_rq <span class="op">*</span>cfs_rq<span class="op">)</span></span>
+<span id="cb13-2"><span class="op">{</span></span>
+<span id="cb13-3">    <span class="co">/* ... */</span></span>
+<span id="cb13-4">    <span class="cf">if</span> <span class="op">(</span>resched <span class="op">||</span> <span class="op">!</span>protect_slice<span class="op">(</span>curr<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb13-5">        resched_curr_lazy<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb13-6">        clear_buddies<span class="op">(</span>cfs_rq<span class="op">,</span> curr<span class="op">);</span></span>
+<span id="cb13-7">    <span class="op">}</span></span>
+<span id="cb13-8"><span class="op">}</span></span></code></pre></div></div>
+<p>그런데 느긋한 요청을 받은 태스크가 커널 안에서 유저 모드로 돌아가지 않고 계속 돌면 어떻게 될까요. 기한이 있습니다. <strong>다음 틱</strong>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L5782" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="5782" id="cb14"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb14-1"><span class="dt">void</span> sched_tick<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb14-2"><span class="op">{</span></span>
+<span id="cb14-3">    <span class="co">/* ... */</span></span>
+<span id="cb14-4">    <span class="cf">if</span> <span class="op">(</span>dynamic_preempt_lazy<span class="op">()</span> <span class="op">&amp;&amp;</span> tif_test_bit<span class="op">(</span>TIF_NEED_RESCHED_LAZY<span class="op">))</span></span>
+<span id="cb14-5">        resched_curr<span class="op">(</span>rq<span class="op">);</span></span>
+<span id="cb14-6"></span>
+<span id="cb14-7">    donor<span class="op">-&gt;</span>sched_class<span class="op">-&gt;</span>task_tick<span class="op">(</span>rq<span class="op">,</span> donor<span class="op">,</span> <span class="dv">0</span><span class="op">);</span></span>
+<span id="cb14-8">    <span class="co">/* ... */</span></span>
+<span id="cb14-9"><span class="op">}</span></span></code></pre></div></div>
+<p>틱이 왔는데 느긋한 요청이 아직 남아 있으면 급한 요청으로 올립니다. 그러면 이 틱 인터럽트에서 돌아가는 길(그림 6-5의 ②)에 태스크가 끊깁니다.</p>
+<figure class="fig" id="fig-lazy-flow"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>PREEMPT_LAZY: 일반 태스크가 깨어나면 LAZY 비트만 서고 유저 모드 복귀나 다음 틱에 전환된다. 실시간 태스크가 깨어나면 NEED_RESCHED가 바로 선다.</title>
+
+  <text class="t-xs mid" x="180" y="20">깨어남</text>
+  <text class="t-xs mid" x="520" y="20">틱</text>
+  <path class="ln thin muted dash" d="M180 26 V36 M180 56 V132 M180 152 V228 M180 248 V300"/>
+  <path class="ln thin muted dash" d="M520 26 V196"/>
+
+  <!-- 1: 곧 유저 모드로 -->
+  <text class="t-s t-ink t-b" x="20" y="50">일반 태스크 B가 깨어남 · A가 곧 유저 모드로 돌아가는 경우</text>
+  <rect class="box yellow" x="40" y="58" width="290" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="110" y="78">A · 커널 모드</text>
+  <rect class="box green" x="330" y="58" width="410" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="78">B 실행</text>
+  <rect class="solid purple" x="180" y="92" width="150" height="6" rx="3"/>
+  <text class="t-xs tc-purple" x="186" y="114">LAZY 비트만 선다 → 유저 모드로 돌아가는 길에 schedule()</text>
+
+  <!-- 2: 커널 안에 오래 -->
+  <text class="t-s t-ink t-b" x="20" y="146">일반 태스크 B가 깨어남 · A가 커널 안에 오래 머무는 경우</text>
+  <rect class="box yellow" x="40" y="154" width="500" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="110" y="174">A · 커널 모드</text>
+  <rect class="box green" x="540" y="154" width="200" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="640" y="174">B 실행</text>
+  <rect class="solid purple" x="180" y="188" width="340" height="6" rx="3"/>
+  <rect class="solid red" x="520" y="188" width="20" height="6" rx="3"/>
+  <text class="t-xs tc-purple" x="186" y="210">LAZY 비트</text>
+  <text class="t-xs tc-red end" x="736" y="210">틱이 NEED_RESCHED로 올린다 → 인터럽트 복귀 길에 선점</text>
+
+  <!-- 3: 실시간 태스크 -->
+  <text class="t-s t-ink t-b" x="20" y="242">실시간 태스크 R이 깨어남</text>
+  <rect class="box yellow" x="40" y="250" width="160" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="110" y="270">A · 커널 모드</text>
+  <rect class="box red" x="200" y="250" width="540" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="470" y="270">R 실행</text>
+  <rect class="solid red" x="180" y="284" width="20" height="6" rx="3"/>
+  <text class="t-xs tc-red" x="186" y="308">RT·deadline 클래스는 resched_curr()를 쓴다 → NEED_RESCHED가 바로 선다</text>
+</svg></div><figcaption><b>그림 6-7</b>PREEMPT_LAZY에서 일반 태스크가 깨어났을 때. 현재 태스크는 최대 한 틱 동안 커널 안의 일을 마칠 기회를 얻습니다. 실시간 태스크가 깨어나면 기다리지 않고 바로 끊습니다.</figcaption></figure>
+<p>정리하면 LAZY는 이렇게 동작합니다.</p>
+<ul>
+<li>실시간 태스크가 깨어나면 FULL과 똑같이 즉시 끊습니다. 응답성은 그대로입니다.</li>
+<li>일반 태스크가 깨어나면 현재 태스크에게 최대 한 틱(<code>HZ=1000</code>이면 1ms)을 줍니다. 그 사이에 쥐고 있던 락을 풀고 유저 모드로 돌아가면 거기서 바뀝니다. 락 주인 선점이 줄어듭니다.</li>
+<li>지연 시간의 상한이 <code>cond_resched()</code>가 심어진 위치가 아니라 틱 주기로 정해집니다. <code>cond_resched()</code>가 필요 없어집니다.</li>
+</ul>
+<section class="level3" id="에서-none과-voluntary가-사라진-까닭">
+<h3>7.0에서 NONE과 VOLUNTARY가 사라진 까닭</h3>
+<p>LAZY가 NONE과 VOLUNTARY가 하던 일을 대신할 수 있다면, 선택지를 줄일 수 있습니다. v7.0에서 그렇게 되었습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/Kconfig.preempt#L17" rel="noopener" target="_blank">kernel/Kconfig.preempt</a><span class="code-ver">v7.3</span></div><pre class="kconfig" data-file="kernel/Kconfig.preempt" data-line="17"><code>choice
+    prompt "Preemption Model"
+    default PREEMPT_LAZY if ARCH_HAS_PREEMPT_LAZY
+    default PREEMPT_NONE
+
+config PREEMPT_NONE
+    bool "No Forced Preemption (Server)"
+    depends on !PREEMPT_RT
+    depends on ARCH_NO_PREEMPT
+    # ...
+
+config PREEMPT_VOLUNTARY
+    bool "Voluntary Kernel Preemption (Desktop)"
+    depends on !ARCH_HAS_PREEMPT_LAZY
+    depends on !ARCH_NO_PREEMPT
+    # ...</code></pre></div>
+<p><code>depends on</code> 줄을 읽으면 됩니다. NONE은 선점을 아예 지원하지 않는 아키텍처(<code>ARCH_NO_PREEMPT</code>)에서만, VOLUNTARY는 LAZY를 지원하지 않는 아키텍처에서만 고를 수 있습니다. v7.3에서 LAZY를 지원하는 아키텍처는 x86, arm64, riscv, s390, powerpc, loongarch입니다. 이 아키텍처들에서는 FULL, LAZY, RT만 남았고 기본값은 LAZY입니다.</p>
+<p>이 변화의 목적지는 커널 소스에서 <code>cond_resched()</code>를 걷어 내는 것입니다. 선점 모델이 하나의 메커니즘으로 모이면, 곳곳에 흩어진 자발적 양보 지점과 그것을 둘러싼 "여기에도 넣어야 하나"라는 판단이 사라집니다.</p>
+<div class="callout note"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-book"></use></svg>참고 · 기본값을 바꾼 대가</div>
+<p>기본값이 바뀌자 회귀 보고가 나왔습니다. v7.0 무렵, LAZY가 기본값이 된 뒤 PostgreSQL 벤치마크의 성능이 절반으로 떨어졌다는 보고가 메일링 리스트에 올라왔습니다. 보고자는 PostgreSQL이 유저 공간에서 쓰는 자체 스핀락의 경합이 크게 늘었다고 했습니다. 락을 쥔 스레드가 선점당해 나머지가 헛도는, 앞에서 본 락 주인 선점이 유저 공간에서 일어난다는 해석이었습니다.</p>
+<p>스케줄러 메인테이너는 기본값을 되돌리는 대신 같은 릴리스에 들어간 <strong>타임 슬라이스 연장</strong>을 쓰라고 권했습니다. 유저 프로그램이 짧은 임계 구역에 들어가며 "잠깐만 끊지 말아 달라"고 표시해 두면, 커널이 유저 모드 복귀 길에서 선점을 잠깐 미뤄 주는 기능입니다. 미루는 시간은 기본 5마이크로초이고 50마이크로초까지 늘릴 수 있습니다. 앞의 <code>__exit_to_user_mode_loop()</code>에 있던 <code>rseq_grant_slice_extension()</code>이 그 자리입니다.</p>
+<p>그런데 PostgreSQL 개발자가 재현해 보니 조건이 하나 더 있었습니다. 문제는 100GB쯤 되는 버퍼 풀을 huge page 없이 쓸 때만 나타났고, huge page를 켜면 사라졌습니다. huge page가 없으면 TLB 미스와 페이지 폴트가 늘어 임계 구역이 길어지고, 그만큼 임계 구역 안에서 선점당할 가능성이 커진 것입니다. 유저 공간 스핀락을 쓰지 않아도 같은 현상이 났으므로 타임 슬라이스 연장은 이 경우의 답이 아니었습니다. 기본값은 되돌려지지 않았습니다.</p>
+<p>볼 것은 둘입니다. 커널 내부의 선택지를 줄인 결정이 유저 공간 프로그램의 성능 특성을 바꿀 수 있다는 점, 그리고 처음의 그럴듯한 진단이 재현 실험에서 뒤집혔다는 점입니다. 경과는 LWN의 <a href="https://lwn.net/Articles/1067029/" rel="noopener" target="_blank">The 7.0 scheduler regression that wasn't</a>에 정리되어 있습니다. 커널이 회귀를 어떻게 다루는지는 <a href="ch26.html">26장</a>에서 봅니다.</p>
+</div>
+</section>
+</section>
+<section class="level2" id="rt">
+<h2><span class="sec-n">6.8</span>PREEMPT_RT: 스핀락을 쥔 구간도 끊는 커널<a aria-label="이 절의 링크" class="anchor" href="#rt">#</a></h2>
+<p>FULL에서도 끊을 수 없는 구간이 남습니다. 스핀락을 쥔 구간, 인터럽트 핸들러, softirq입니다. 이 구간의 길이가 곧 최악의 지연 시간입니다. 공장 로봇이나 오디오 장비처럼 "100마이크로초 안에 반드시 반응한다"는 보장이 필요한 시스템에는 이것도 깁니다.</p>
+<p><code>PREEMPT_RT</code>는 그 남은 구간을 끊을 수 있게 만듭니다. 방법은 <strong>끊을 수 없는 것들을 끊을 수 있는 것으로 바꿔치기</strong>하는 것입니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>대상</th>
+<th>일반 커널</th>
+<th>PREEMPT_RT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>spinlock_t</code></td>
+<td>돌면서 기다림, 선점 끔</td>
+<td>잠들 수 있는 락(<code>rt_mutex</code> 기반), 선점 유지</td>
+</tr>
+<tr>
+<td><code>raw_spinlock_t</code></td>
+<td>돌면서 기다림, 선점 끔</td>
+<td>그대로. 정말 끊기면 안 되는 곳에만 씁니다.</td>
+</tr>
+<tr>
+<td>인터럽트 핸들러</td>
+<td>인터럽트 컨텍스트에서 실행</td>
+<td>커널 스레드에서 실행 (<a href="ch11.html">11장</a>)</td>
+</tr>
+<tr>
+<td>softirq</td>
+<td>인터럽트 복귀 길에 실행</td>
+<td>선점 가능한 태스크 컨텍스트에서 실행</td>
+</tr>
+</tbody>
+</table></div>
+<p>RT 커널의 <code>spin_lock()</code>은 이렇게 생겼습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/locking/spinlock_rt.c#L46" rel="noopener" target="_blank">kernel/locking/spinlock_rt.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/locking/spinlock_rt.c" data-line="46" id="cb16"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb16-1"><span class="dt">static</span> __always_inline <span class="dt">void</span> __rt_spin_lock<span class="op">(</span>spinlock_t <span class="op">*</span>lock<span class="op">)</span></span>
+<span id="cb16-2"><span class="op">{</span></span>
+<span id="cb16-3">    rtlock_might_resched<span class="op">();</span></span>
+<span id="cb16-4">    rtlock_lock<span class="op">(&amp;</span>lock<span class="op">-&gt;</span>lock<span class="op">);</span></span>
+<span id="cb16-5">    rcu_read_lock<span class="op">();</span></span>
+<span id="cb16-6">    migrate_disable<span class="op">();</span></span>
+<span id="cb16-7"><span class="op">}</span></span></code></pre></div></div>
+<p>앞에서 본 <code>__raw_spin_lock()</code>과 견주어 보면 <code>preempt_disable()</code>이 없습니다. 대신 <code>migrate_disable()</code>이 있습니다. 락을 쥔 태스크는 선점당할 수 있고, 다만 다른 CPU로 옮겨지지 않습니다. 락을 기다리는 쪽은 돌지 않고 잠듭니다. 그래서 락 주인 선점으로 CPU를 태우는 일도, 같은 CPU 안의 교착도 생기지 않습니다. 락을 쥔 낮은 우선순위 태스크 때문에 높은 우선순위 태스크가 오래 기다리는 문제는 우선순위 상속으로 풉니다. <a href="ch15.html">15장</a>의 주제입니다.</p>
+<p>이 설계에서 주목할 점은 드라이버 코드가 바뀌지 않았다는 것입니다. 수만 군데의 <code>spin_lock()</code> 호출은 그대로이고, 그 뜻만 빌드 설정에 따라 달라집니다. 대신 20년에 걸쳐 "여기는 정말 돌면서 기다려야 한다"는 자리를 찾아 <code>raw_spinlock_t</code>로 바꾸는 작업이 필요했습니다.</p>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"실시간 커널은 더 빠른 커널이다." 아닙니다. PREEMPT_RT는 평균 처리량을 내주고 최악의 지연 시간을 줄입니다. 스핀락이 잠드는 락이 되면서 락 하나의 비용은 오히려 늘어납니다. 실시간의 뜻은 "빠르다"가 아니라 "기한을 넘기지 않는다"입니다.</p>
+</div>
+</section>
+<section class="level2" id="tradeoff">
+<h2><span class="sec-n">6.9</span>지연 시간과 처리량<a aria-label="이 절의 링크" class="anchor" href="#tradeoff">#</a></h2>
+<p>선점 모델은 결국 하나의 축 위에서 자리를 고르는 일입니다. 한쪽 끝은 처리량, 다른 쪽 끝은 최악의 지연 시간입니다.</p>
+<div class="table-wrap"><table style="width:100%;">
+<colgroup>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+</colgroup>
+<thead>
+<tr>
+<th></th>
+<th>NONE</th>
+<th>VOLUNTARY</th>
+<th>LAZY</th>
+<th>FULL</th>
+<th>RT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>커널 선점</td>
+<td>없음</td>
+<td>없음</td>
+<td>있음</td>
+<td>있음</td>
+<td>있음</td>
+</tr>
+<tr>
+<td>일반 태스크가 기다리는 최대 시간</td>
+<td>양보 지점까지</td>
+<td>양보 지점까지</td>
+<td>약 한 틱</td>
+<td>선점 불가 구간</td>
+<td>선점 불가 구간</td>
+</tr>
+<tr>
+<td>선점 불가 구간</td>
+<td>커널 코드 전체</td>
+<td>커널 코드 전체</td>
+<td>락·IRQ 구간</td>
+<td>락·IRQ 구간</td>
+<td>raw 락·저수준 코드만</td>
+</tr>
+<tr>
+<td>컨텍스트 스위치</td>
+<td>적음</td>
+<td>적음</td>
+<td>중간</td>
+<td>많음</td>
+<td>가장 많음</td>
+</tr>
+</tbody>
+</table></div>
+<p>선점을 더 허용할수록 급한 태스크는 빨리 실행되지만, 전체가 단위 시간에 처리하는 일은 줄어드는 경향이 있습니다. 컨텍스트 스위치 자체의 비용, 캐시가 식는 비용, 락 주인이 끊겨 다른 태스크가 밀리는 비용 때문입니다. LAZY는 "실시간 태스크에게는 FULL처럼, 일반 태스크에게는 NONE에 가깝게"라는 절충입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>선점이 꺼져 있던 가장 긴 구간을 <code>ftrace</code>로 잽니다. 커널이 <code>CONFIG_PREEMPT_TRACER</code>로 빌드되어 있어야 합니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># cd /sys/kernel/tracing
+# echo preemptoff &gt; current_tracer
+# echo 1 &gt; tracing_on
+# sleep 10
+# cat tracing_max_latency
+217
+# cat trace | head -30</code></pre></div>
+<p><code>tracing_max_latency</code>는 마이크로초 단위이고, <code>trace</code>에는 그 구간이 어느 함수에서 시작해 어디서 끝났는지가 남습니다. <code>irqsoff</code>는 인터럽트가 꺼져 있던 구간을, <code>preemptirqsoff</code>는 둘 중 하나라도 꺼져 있던 구간을 잽니다.</p>
+<p>유저 공간에서 본 지연은 <code>cyclictest</code>나 <code>rtla timerlat</code>으로 잽니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># rtla timerlat top -d 30s</code></pre></div>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.5.4 · 2002</dt>
+<dd>
+커널 선점(<code>CONFIG_PREEMPT</code>)이 들어옵니다. SMP용으로 이미 표시해 둔 스핀락 구간을 "선점하면 안 되는 구간"으로 다시 쓴다는 발상이었습니다.
+</dd>
+<dt>2.6.13 · 2005</dt>
+<dd>
+<code>PREEMPT_VOLUNTARY</code>. <code>might_sleep()</code> 자리를 양보 지점으로 씁니다.
+</dd>
+<dt>5.12 · 2021</dt>
+<dd>
+<code>PREEMPT_DYNAMIC</code>. 스태틱 콜로 부팅 때 모델을 고릅니다.
+</dd>
+<dt>6.12 · 2024</dt>
+<dd>
+<code>PREEMPT_RT</code>가 메인라인에서 켤 수 있게 됩니다. 20년 가까이 커널 바깥 패치로 관리되던 실시간 지원이 x86, arm64, riscv에서 완성되었습니다.
+</dd>
+<dt>6.13 · 2025</dt>
+<dd>
+<code>PREEMPT_LAZY</code>와 <code>TIF_NEED_RESCHED_LAZY</code>.
+</dd>
+<dt>7.0 · 2026</dt>
+<dd>
+LAZY를 지원하는 아키텍처에서 NONE과 VOLUNTARY 선택지가 빠지고 LAZY가 기본값이 됩니다. rseq 타임 슬라이스 연장이 들어옵니다.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>커널 선점은 두 조건이 모두 참일 때 일어납니다. <code>preempt_count</code>가 0이고(끊어도 된다), 재스케줄 요청이 있을 때(끊어야 한다)입니다.</li>
+<li><code>preempt_count</code>는 선점 끔, softirq, hardirq 비활성, hardirq, NMI를 한 정수의 칸으로 나눠 셉니다. 실행 컨텍스트를 묻는 매크로는 모두 이 정수를 봅니다.</li>
+<li><code>spin_lock()</code>은 락을 잡기 전에 선점부터 끕니다. 락 주인 선점과 같은 CPU 안의 교착을 막기 위해서입니다.</li>
+<li>재스케줄 요청은 플래그일 뿐이고, 확인하는 자리는 유저 모드 복귀, 인터럽트 복귀, <code>preempt_enable()</code>, 자발적 양보 넷입니다.</li>
+<li>선점 모델은 이 자리들 가운데 어느 것을 열어 둘지를 정합니다. <code>PREEMPT_DYNAMIC</code>은 스태틱 콜로 부팅 때 고르게 합니다.</li>
+<li><code>PREEMPT_LAZY</code>는 요청을 급한 것과 느긋한 것으로 나눕니다. 일반 태스크의 요청은 유저 모드 복귀나 다음 틱까지 미룹니다. v7.0부터 주요 아키텍처의 기본값입니다.</li>
+<li><code>PREEMPT_RT</code>는 <code>spinlock_t</code>를 잠들 수 있는 락으로 바꿔 락 구간까지 선점할 수 있게 합니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p>인터럽트 핸들러 안에서 <code>resched_curr()</code>가 불려 <code>TIF_NEED_RESCHED</code>가 섰습니다. 태스크 전환은 언제 일어납니까? 핸들러 안에서 바로 일어나지 않는 이유는 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>핸들러가 끝나고 인터럽트에서 복귀하는 길에 일어납니다. 핸들러 안에서는 <code>preempt_count</code>의 hardirq 칸이 0이 아니므로 <code>preemptible()</code>이 거짓입니다. <code>resched_curr()</code>는 플래그만 세우고, 복귀 길의 <code>raw_irqentry_exit_cond_resched()</code>(커널로 복귀)나 <code>__exit_to_user_mode_loop()</code>(유저로 복귀)가 그 플래그를 확인합니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>spin_lock()</code>으로 보호되는 구간 안에서 <code>kmalloc(size, GFP_KERNEL)</code>을 부르면 안 되는 이유를 <code>preempt_count</code>로 설명해 보세요.</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>GFP_KERNEL</code> 할당은 메모리가 부족하면 잠들 수 있습니다. 잠든다는 것은 <code>schedule()</code>을 부른다는 뜻입니다. 그런데 <code>spin_lock()</code>이 <code>preempt_count</code>를 올려 둔 상태이므로 지금은 다른 태스크로 넘어가면 안 되는 구간입니다. 락을 쥔 채 잠들면 그 락을 기다리는 다른 CPU가 한없이 돕니다. 디버그 옵션을 켠 커널은 이때 "scheduling while atomic" 경고를 냅니다. RT 커널에서는 <code>spinlock_t</code>가 잠들 수 있는 락이 되므로 사정이 달라지지만, <code>raw_spinlock_t</code> 구간에서는 여전히 안 됩니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>PREEMPT_LAZY 커널에서 일반 태스크 A가 커널 모드로 긴 작업을 하고 있습니다. (1) 일반 태스크 B가 깨어난 경우와 (2) <code>SCHED_FIFO</code> 태스크 R이 깨어난 경우, A는 각각 언제 CPU를 내줍니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<ol type="1">
+<li>fair 클래스가 <code>resched_curr_lazy()</code>를 불러 <code>TIF_NEED_RESCHED_LAZY</code>만 섭니다. A는 계속 실행하다가 유저 모드로 돌아가는 길에 내주거나, 그 전에 틱이 오면 <code>sched_tick()</code>이 요청을 <code>TIF_NEED_RESCHED</code>로 올려 그 틱 인터럽트의 복귀 길에 내줍니다. 최대 한 틱쯤 걸립니다. (2) RT 클래스는 <code>resched_curr()</code>를 불러 <code>TIF_NEED_RESCHED</code>를 바로 세웁니다. A가 <code>preempt_count</code> 0인 자리에 있으면 즉시, 선점을 꺼 둔 구간이면 그 구간이 끝나는 <code>preempt_enable()</code>에서 내줍니다.</li>
+</ol>
+</div></details></div><div class="q"><div class="q-body">
+<p>x86에서 <code>PREEMPT_NEED_RESCHED</code> 비트를 뒤집어서 <code>preempt_count</code>에 넣어 두는 이유는 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>"카운터가 0이다"와 "재스케줄 요청이 있다"를 한 번에 판정하기 위해서입니다. 요청이 있을 때 비트가 0이 되도록 뒤집어 두면, 두 조건이 모두 참일 때 변수 전체가 0이 됩니다. <code>preempt_enable()</code>은 카운터를 내리는 <code>dec</code> 명령어의 제로 플래그만 보면 되므로, 가장 자주 도는 경로가 명령어 하나와 조건 분기 하나로 끝납니다.</p>
+</div></details></div></div>
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>선점<small>preemption</small></dt>
+<dd>
+실행 중인 태스크가 양보하지 않았는데 스케줄러가 CPU를 빼앗아 다른 태스크에 주는 일.
+</dd>
+<dt>커널 선점<small>kernel preemption</small></dt>
+<dd>
+태스크가 커널 모드에서 실행되는 도중에 일어나는 선점.
+</dd>
+<dt>preempt_count</dt>
+<dd>
+선점 끔, softirq, hardirq, NMI의 중첩 깊이를 한 정수에 나눠 담은 카운터. 0일 때만 선점할 수 있다.
+</dd>
+<dt>TIF_NEED_RESCHED</dt>
+<dd>
+현재 태스크를 바꿔야 한다는 요청을 나타내는 스레드 플래그.
+</dd>
+<dt>TIF_NEED_RESCHED_LAZY</dt>
+<dd>
+급하지 않은 재스케줄 요청. 유저 모드 복귀나 다음 틱에 처리한다.
+</dd>
+<dt>선점 모델<small>preemption model</small></dt>
+<dd>
+커널 코드를 어느 자리에서 끊을 수 있게 할지에 대한 빌드·부팅 설정.
+</dd>
+<dt>락 주인 선점<small>lock holder preemption</small></dt>
+<dd>
+락을 쥔 태스크가 선점당해, 그 락을 기다리는 쪽이 헛되이 기다리게 되는 현상.
+</dd>
+<dt>스태틱 콜<small>static call</small></dt>
+<dd>
+호출 명령어의 목적지를 실행 중에 고쳐 써서, 간접 호출 없이 호출 대상을 바꾸는 기법.
+</dd>
+<dt>cond_resched</dt>
+<dd>
+재스케줄 요청이 있으면 양보하는 자발적 확인 지점.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/locking/preempt-locking.html" rel="noopener" target="_blank"><code>Documentation/locking/preempt-locking.rst</code></a>: 선점 가능한 커널에서 지켜야 할 락 규칙.</li>
+<li><a href="https://docs.kernel.org/locking/locktypes.html" rel="noopener" target="_blank"><code>Documentation/locking/locktypes.rst</code></a>: 락 종류별로 일반 커널과 RT 커널에서의 동작 차이.</li>
+<li>LWN, <a href="https://lwn.net/Articles/994322/" rel="noopener" target="_blank">The long road to lazy preemption</a>: LAZY가 나오기까지의 논의.</li>
+<li>LWN, <a href="https://lwn.net/Articles/951337/" rel="noopener" target="_blank">The real realtime preemption end game</a>: PREEMPT_RT 병합 직전의 남은 과제.</li>
+<li><a href="https://docs.kernel.org/userspace-api/rseq.html" rel="noopener" target="_blank"><code>Documentation/userspace-api/rseq.rst</code></a>: rseq와 타임 슬라이스 연장.</li>
+<li><a href="https://docs.kernel.org/trace/ftrace.html" rel="noopener" target="_blank"><code>Documentation/trace/ftrace.rst</code></a>: <code>preemptoff</code>, <code>irqsoff</code> 트레이서.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch05.html"><small>← 5장</small><b>CFS에서 EEVDF로</b></a><a class="next" href="ch07.html"><small>7장 →</small><b>멀티코어 스케줄링</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#user-vs-kernel">유저 선점과 커널 선점</a><a href="#two-variables">두 개의 변수</a><a href="#preempt-count">preempt_count의 비트</a><a href="#disable">선점을 끄는 코드</a><a href="#where">선점이 일어나는 자리</a><a href="#models">선점 모델</a><a href="#lazy">PREEMPT_LAZY: 스케줄러가 정하는 선점</a><a href="#rt">PREEMPT_RT: 스핀락을 쥔 구간도 끊는 커널</a><a href="#tradeoff">지연 시간과 처리량</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

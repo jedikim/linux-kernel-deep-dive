@@ -1,0 +1,85 @@
+<svg viewBox="0 0 760 344" xmlns="http://www.w3.org/2000/svg">
+  <title>노드, 존, free_area의 관계와 워터마크: 노드 안에 존이 있고, 존마다 order별 빈 블록 목록과 min·low·high 워터마크가 있다</title>
+
+  <!-- 노드 -->
+  <rect class="panel" x="20" y="16" width="200" height="312" rx="14"/>
+  <text class="t-b" x="34" y="42">노드 0</text>
+  <text class="t-code" x="88" y="42">pg_data_t</text>
+  <rect class="box" x="34" y="54" width="172" height="34" rx="6"/>
+  <text class="t-code" x="46" y="76">ZONE_DMA</text>
+  <rect class="box" x="34" y="94" width="172" height="52" rx="6"/>
+  <text class="t-code" x="46" y="116">ZONE_DMA32</text>
+  <text class="t-xs" x="46" y="134">4GB 아래</text>
+  <rect class="box yellow" x="34" y="152" width="172" height="124" rx="6"/>
+  <text class="t-code t-b" x="46" y="176">ZONE_NORMAL</text>
+  <text class="t-xs" x="46" y="196">free_area[11]</text>
+  <text class="t-xs" x="46" y="214">_watermark[]</text>
+  <text class="t-xs" x="46" y="232">per_cpu_pageset</text>
+  <rect class="box gray" x="34" y="284" width="172" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="120" y="305">kswapd0 스레드</text>
+
+  <path class="ln thin muted dash" d="M206 152 L250 30"/>
+  <path class="ln thin muted dash" d="M206 276 L250 262"/>
+
+  <!-- free_area -->
+  <text class="t-mono t-b" x="250" y="34">zone-&gt;free_area[]</text>
+
+  <rect class="box" x="250" y="46" width="88" height="28" rx="6"/>
+  <text class="t-code mid" x="294" y="65">order 0</text>
+  <path class="ln thin green" d="M338 60 H556"/>
+  <rect class="box green" x="356" y="52" width="14" height="16"/>
+  <rect class="box green" x="384" y="52" width="14" height="16"/>
+  <rect class="box green" x="412" y="52" width="14" height="16"/>
+  <rect class="box green" x="440" y="52" width="14" height="16"/>
+  <text class="t-xs end" x="572" y="80">4KB</text>
+
+  <rect class="box" x="250" y="88" width="88" height="28" rx="6"/>
+  <text class="t-code mid" x="294" y="107">order 1</text>
+  <path class="ln thin green" d="M338 102 H556"/>
+  <rect class="box green" x="356" y="94" width="24" height="16"/>
+  <rect class="box green" x="394" y="94" width="24" height="16"/>
+  <rect class="box green" x="432" y="94" width="24" height="16"/>
+  <text class="t-xs end" x="572" y="122">8KB</text>
+
+  <rect class="box" x="250" y="130" width="88" height="28" rx="6"/>
+  <text class="t-code mid" x="294" y="149">order 2</text>
+  <path class="ln thin green" d="M338 144 H556"/>
+  <rect class="box green" x="356" y="136" width="40" height="16"/>
+  <rect class="box green" x="410" y="136" width="40" height="16"/>
+  <text class="t-xs end" x="572" y="164">16KB</text>
+
+  <text class="t-s mid" x="294" y="186">⋮</text>
+
+  <rect class="box" x="250" y="198" width="88" height="28" rx="6"/>
+  <text class="t-code mid" x="294" y="217">order 9</text>
+  <path class="ln thin green" d="M338 212 H556"/>
+  <rect class="box green" x="356" y="204" width="80" height="16"/>
+  <rect class="box green" x="450" y="204" width="80" height="16"/>
+  <text class="t-xs end" x="572" y="232">2MB</text>
+
+  <rect class="box" x="250" y="240" width="88" height="28" rx="6"/>
+  <text class="t-code mid" x="294" y="259">order 10</text>
+  <path class="ln thin green" d="M338 254 H556"/>
+  <rect class="box green" x="356" y="246" width="150" height="16"/>
+  <text class="t-xs end" x="572" y="274">4MB</text>
+
+  <rect class="box green" x="250" y="300" width="14" height="14"/>
+  <text class="t-xs" x="272" y="312">빈 블록. 같은 크기끼리 한 목록에 걸린다</text>
+
+  <!-- 워터마크 -->
+  <text class="t-s t-ink t-b mid" x="645" y="34">빈 페이지 수</text>
+  <rect class="box green" x="620" y="46" width="50" height="84"/>
+  <rect class="box" x="620" y="130" width="50" height="50"/>
+  <rect class="box yellow" x="620" y="180" width="50" height="50"/>
+  <rect class="box red" x="620" y="230" width="50" height="60"/>
+  <text class="t-code end" x="612" y="134">high</text>
+  <text class="t-code end" x="612" y="184">low</text>
+  <text class="t-code end" x="612" y="234">min</text>
+  <text class="t-code end" x="612" y="294">0</text>
+  <text class="t-xs" x="678" y="92">넉넉함</text>
+  <text class="t-xs" x="678" y="159">할당 통과</text>
+  <text class="t-xs" x="678" y="200">kswapd가</text>
+  <text class="t-xs" x="678" y="216">회수한다</text>
+  <text class="t-xs" x="678" y="256">예비분</text>
+  <text class="t-xs" x="678" y="272">직접 회수</text>
+</svg>

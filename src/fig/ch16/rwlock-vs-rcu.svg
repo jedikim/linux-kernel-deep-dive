@@ -1,0 +1,63 @@
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+  <title>rwlock에서는 읽는 CPU마다 락 워드에 써서 캐시 라인이 오가고, RCU에서는 읽는 CPU가 공유 메모리에 아무것도 쓰지 않는다</title>
+
+  <!-- 왼쪽: rwlock -->
+  <rect class="panel gray" x="20" y="14" width="350" height="272" rx="14"/>
+  <text class="t-l" x="36" y="42">rwlock</text>
+  <text class="t-xs" x="100" y="42">읽는 쪽도 락 워드를 고쳐 쓴다</text>
+
+  <rect class="box" x="32" y="64" width="326" height="36" rx="8"/>
+  <text class="t-s t-ink mid" x="195" y="87">락 워드 · 읽는 쪽 수를 센다</text>
+
+  <rect class="box blue" x="32" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="66" y="193">CPU 0</text>
+  <text class="t-xs mid" x="66" y="212">읽는 쪽</text>
+  <rect class="box blue" x="118" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="152" y="193">CPU 1</text>
+  <text class="t-xs mid" x="152" y="212">읽는 쪽</text>
+  <rect class="box blue" x="204" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="238" y="193">CPU 2</text>
+  <text class="t-xs mid" x="238" y="212">읽는 쪽</text>
+  <rect class="box blue" x="290" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="324" y="193">CPU 3</text>
+  <text class="t-xs mid" x="324" y="212">읽는 쪽</text>
+
+  <path class="ln red" d="M66 170 V104" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M152 170 V104" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M238 170 V104" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M324 170 V104" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="162" y="142">모두 쓴다</text>
+
+  <text class="t-s mid" x="195" y="252">read_lock()마다 원자 연산으로 쓴다.</text>
+  <text class="t-s mid" x="195" y="271">캐시 라인이 읽는 CPU 사이를 오간다</text>
+
+  <!-- 오른쪽: RCU -->
+  <rect class="panel gray" x="390" y="14" width="350" height="272" rx="14"/>
+  <text class="t-l" x="406" y="42">RCU</text>
+  <text class="t-xs" x="450" y="42">읽는 쪽은 공유 메모리에 쓰지 않는다</text>
+
+  <rect class="box" x="402" y="64" width="326" height="36" rx="8"/>
+  <text class="t-s t-ink mid" x="565" y="87">공유 포인터 → 데이터</text>
+
+  <rect class="box blue" x="402" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="436" y="193">CPU 0</text>
+  <text class="t-xs mid" x="436" y="212">읽는 쪽</text>
+  <rect class="box blue" x="488" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="522" y="193">CPU 1</text>
+  <text class="t-xs mid" x="522" y="212">읽는 쪽</text>
+  <rect class="box blue" x="574" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="608" y="193">CPU 2</text>
+  <text class="t-xs mid" x="608" y="212">읽는 쪽</text>
+  <rect class="box blue" x="660" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="694" y="193">CPU 3</text>
+  <text class="t-xs mid" x="694" y="212">읽는 쪽</text>
+
+  <path class="ln blue dash" d="M436 170 V104" marker-end="url(#ah-blue)"/>
+  <path class="ln blue dash" d="M522 170 V104" marker-end="url(#ah-blue)"/>
+  <path class="ln blue dash" d="M608 170 V104" marker-end="url(#ah-blue)"/>
+  <path class="ln blue dash" d="M694 170 V104" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="532" y="142">읽기만 한다</text>
+
+  <text class="t-s mid" x="565" y="252">캐시 라인은 모든 CPU에 사본으로 머문다.</text>
+  <text class="t-s mid" x="565" y="271">CPU가 늘어도 읽기 비용이 그대로다</text>
+</svg>

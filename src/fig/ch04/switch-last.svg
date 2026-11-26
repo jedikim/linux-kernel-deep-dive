@@ -1,0 +1,43 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>태스크 A가 B로 전환했다가 나중에 C에서 전환되어 다시 실행된다. A의 스택에 남은 prev는 A지만 방금 CPU를 내준 태스크는 C이고, 그 값은 __switch_to의 반환값으로 전달된다.</title>
+
+  <text class="t-code mid" x="250" y="24">context_switch(rq, A, B)</text>
+  <text class="t-code mid" x="580" y="24">context_switch(rq, C, A)</text>
+  <path class="ln thin muted dash" d="M250 30 V168"/>
+  <path class="ln thin muted dash" d="M580 30 V168"/>
+
+  <text class="t-s t-ink t-b" x="20" y="64">CPU</text>
+  <rect class="box blue" x="80" y="44" width="170" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="165" y="65">A 실행</text>
+  <rect class="box gray" x="250" y="44" width="140" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="320" y="65">B 실행</text>
+  <rect class="box gray" x="390" y="44" width="50" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="415" y="65">⋯</text>
+  <rect class="box purple" x="440" y="44" width="140" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="510" y="65">C 실행</text>
+  <rect class="box blue" x="580" y="44" width="160" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="660" y="65">A 실행</text>
+
+  <text class="t-s t-ink t-b" x="20" y="116">A의 스택</text>
+  <rect class="ghost blue dash" x="250" y="96" width="330" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="415" y="117">얼어 있다: prev = A, next = B</text>
+
+  <!-- 내주기 직전 -->
+  <rect class="box blue" x="80" y="172" width="250" height="124" rx="10"/>
+  <text class="t-b" x="94" y="196">A가 CPU를 내주기 직전</text>
+  <text class="t-code" x="94" y="220">prev = A</text>
+  <text class="t-code" x="94" y="240">next = B</text>
+  <text class="t-code" x="94" y="260">switch_to(prev, next, prev)</text>
+  <text class="t-xs" x="94" y="282">__switch_to_asm 안에서 멈춘다</text>
+
+  <!-- 다시 실행된 직후 -->
+  <rect class="box blue" x="410" y="172" width="330" height="124" rx="10"/>
+  <text class="t-b" x="424" y="196">A가 다시 실행된 직후</text>
+  <text class="t-code" x="424" y="220">스택의 prev = A</text>
+  <text class="t-xs end" x="728" y="220">옛 값. 쓸모가 없다</text>
+  <text class="t-code tc-purple" x="424" y="240">%rax = C</text>
+  <text class="t-xs end" x="728" y="240">__switch_to(C, A)의 반환값</text>
+  <text class="t-code t-b" x="424" y="260">prev = %rax</text>
+  <text class="t-xs end" x="728" y="260">매크로가 덮어쓴다</text>
+  <text class="t-code" x="424" y="282">finish_task_switch(C)</text>
+</svg>

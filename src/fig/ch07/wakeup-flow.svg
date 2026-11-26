@@ -1,0 +1,59 @@
+<svg viewBox="0 0 760 384" xmlns="http://www.w3.org/2000/svg">
+  <title>깨울 CPU를 고르는 흐름: select_task_rq_fair가 에너지 경로를 먼저 시도하고, wake_affine으로 후보를 prev_cpu와 깨우는 CPU 가운데 하나로 줄인 뒤, select_idle_sibling이 그 CPU의 LLC 안에서 놀고 있는 CPU를 싼 순서대로 찾는다.</title>
+
+  <!-- 왼쪽: 흐름 -->
+  <rect class="box blue" x="20" y="16" width="340" height="38" rx="8"/>
+  <text class="t-code t-b" x="34" y="40">try_to_wake_up(p)</text>
+  <text class="t-xs end" x="348" y="40">클래스에 CPU를 묻는다</text>
+  <path class="ln" d="M190 54 V68" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="20" y="72" width="340" height="38" rx="8"/>
+  <text class="t-mono t-b" x="34" y="96">select_task_rq_fair()</text>
+  <path class="ln" d="M190 110 V124" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="20" y="128" width="340" height="56" rx="8"/>
+  <text class="t-b" x="34" y="150">에너지 경로</text>
+  <text class="t-code end" x="348" y="150">find_energy_efficient_cpu()</text>
+  <text class="t-xs" x="34" y="172">크기가 다른 코어가 있고 시스템에 여유가 있을 때만</text>
+  <path class="ln" d="M190 184 V198" marker-end="url(#ah)"/>
+
+  <rect class="box" x="20" y="202" width="340" height="56" rx="8"/>
+  <text class="t-b" x="34" y="224">후보를 둘로 줄인다</text>
+  <text class="t-code end" x="348" y="224">wake_affine()</text>
+  <text class="t-xs" x="34" y="246">prev_cpu 아니면 깨우는 CPU. 고른 것이 target이다</text>
+  <path class="ln" d="M190 258 V272" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="20" y="276" width="340" height="38" rx="8"/>
+  <text class="t-mono t-b" x="34" y="300">select_idle_sibling()</text>
+  <text class="t-xs end" x="348" y="300">빠른 길</text>
+  <path class="ln green" d="M360 295 H396" marker-end="url(#ah-green)"/>
+
+  <rect class="box gray" x="20" y="330" width="340" height="38" rx="8"/>
+  <text class="t-s t-ink" x="34" y="354">fork · exec는 느린 길: 도메인 전체에서 찾는다</text>
+
+  <!-- 오른쪽: select_idle_sibling -->
+  <rect class="panel green" x="400" y="16" width="340" height="352" rx="14"/>
+  <text class="t-b" x="416" y="42">target의 LLC 안에서, 싼 것부터</text>
+
+  <rect class="box" x="416" y="56" width="308" height="44" rx="8"/>
+  <text class="t-s t-ink" x="428" y="83">① target이 놀고 있다</text>
+  <text class="t-xs tc-green end" x="712" y="83">→ target</text>
+
+  <rect class="box" x="416" y="108" width="308" height="44" rx="8"/>
+  <text class="t-s t-ink" x="428" y="135">② prev가 같은 캐시에서 놀고 있다</text>
+  <text class="t-xs tc-green end" x="712" y="135">→ prev</text>
+
+  <rect class="box" x="416" y="160" width="308" height="44" rx="8"/>
+  <text class="t-s t-ink" x="428" y="187">③ 최근에 쓴 CPU가 놀고 있다</text>
+  <text class="t-xs tc-green end" x="712" y="187">→ 그 CPU</text>
+
+  <rect class="box" x="416" y="212" width="308" height="62" rx="8"/>
+  <text class="t-s t-ink" x="428" y="236">④ LLC를 훑는다: 빈 코어, 그다음 빈 CPU</text>
+  <text class="t-xs" x="428" y="258">훑는 수에 상한이 있다 (nr_idle_scan)</text>
+
+  <rect class="box gray" x="416" y="282" width="308" height="44" rx="8"/>
+  <text class="t-s t-ink" x="428" y="309">⑤ 없다</text>
+  <text class="t-xs end" x="712" y="309">→ target의 런큐에서 기다린다</text>
+
+  <text class="t-xs" x="416" y="350">LLC 밖은 찾지 않는다. 멀리 가면 캐시를 잃는다</text>
+</svg>

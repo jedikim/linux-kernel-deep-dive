@@ -1,0 +1,31 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>NAPI의 두 상태와 전이: 패킷이 오면 인터럽트 모드에서 폴링 모드로 넘어가고, poll이 budget보다 적게 처리하면 인터럽트 모드로 돌아간다</title>
+
+  <text class="t-s mid" x="380" y="26">패킷 도착 → hardirq 핸들러가 장치 인터럽트를 막고 napi_schedule()</text>
+  <path class="ln warm" d="M160 70 V40 H600 V64" marker-end="url(#ah-warm)"/>
+
+  <rect class="box warm" x="30" y="70" width="260" height="108" rx="12"/>
+  <text class="t-l mid" x="160" y="96">인터럽트 모드</text>
+  <text class="t-s mid" x="160" y="120">장치 인터럽트 켜짐</text>
+  <text class="t-code mid" x="160" y="142">NAPI_STATE_SCHED = 0</text>
+  <text class="t-s mid" x="160" y="164">패킷이 오면 IRQ가 CPU를 끊는다</text>
+
+  <rect class="box purple" x="470" y="70" width="260" height="108" rx="12"/>
+  <text class="t-l mid" x="600" y="96">폴링 모드</text>
+  <text class="t-s mid" x="600" y="120">장치 인터럽트 꺼짐</text>
+  <text class="t-code mid" x="600" y="142">NAPI_STATE_SCHED = 1</text>
+  <text class="t-s mid" x="600" y="164">softirq가 poll()로 링을 훑는다</text>
+
+  <path class="ln purple" d="M470 100 H436 V148 H464" marker-end="url(#ah-purple)"/>
+  <text class="t-xs tc-purple end" x="426" y="118">budget을 다 썼다</text>
+  <text class="t-xs tc-purple end" x="426" y="136">→ 다시 poll()</text>
+
+  <path class="ln green" d="M600 178 V208 H160 V184" marker-end="url(#ah-green)"/>
+  <text class="t-s mid" x="380" y="230">poll()이 budget보다 적게 처리했다 → napi_complete_done() 뒤 장치 인터럽트를 다시 켠다</text>
+
+  <path class="ln thin muted" d="M30 262 H730" marker-end="url(#ah-muted)"/>
+  <text class="t-s t-ink t-b" x="30" y="284">부하가 낮을 때</text>
+  <text class="t-xs" x="30" y="302">패킷마다 인터럽트 한 번. 지연이 짧다</text>
+  <text class="t-s t-ink t-b end" x="730" y="284">부하가 높을 때</text>
+  <text class="t-xs end" x="730" y="302">인터럽트 없이 묶어서 처리. 처리량이 높다</text>
+</svg>

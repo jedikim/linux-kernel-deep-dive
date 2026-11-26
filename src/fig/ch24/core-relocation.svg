@@ -1,0 +1,36 @@
+<svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg">
+  <title>CO-RE 재배치: 컴파일러는 필드 오프셋 대신 재배치 기록을 남기고, 로더가 각 커널의 BTF에서 task_struct의 pid 필드 위치를 찾아 명령어의 오프셋을 그 커널에 맞게 고친다.</title>
+
+  <!-- 오브젝트 -->
+  <rect class="box blue" x="130" y="16" width="500" height="78" rx="12"/>
+  <text class="t-b" x="146" y="40">오브젝트 파일 · 한 번 컴파일한 것</text>
+  <text class="t-code" x="146" y="62">r0 = *(u32 *)(r6 + 2432)</text>
+  <text class="t-xs tc-blue" x="340" y="62">← 컴파일한 쪽 헤더 기준의 오프셋</text>
+  <text class="t-xs" x="146" y="82">재배치 기록: 이 명령어의 오프셋은 task_struct의 pid 필드 위치</text>
+
+  <path class="ln blue" d="M250 94 V126" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M510 94 V126" marker-end="url(#ah-blue)"/>
+  <text class="t-s t-ink mid" x="380" y="116">로드할 때 로더가 고친다</text>
+
+  <!-- 커널 A -->
+  <rect class="panel yellow" x="20" y="130" width="350" height="150" rx="14"/>
+  <text class="t-b tc-yellow" x="36" y="154">커널 A</text>
+  <rect class="box yellow" x="36" y="164" width="318" height="48" rx="8"/>
+  <text class="t-xs" x="48" y="182">/sys/kernel/btf/vmlinux</text>
+  <text class="t-code" x="48" y="201">task_struct.pid  →  오프셋 2456</text>
+  <path class="ln" d="M195 212 V228" marker-end="url(#ah)"/>
+  <rect class="box green" x="36" y="232" width="318" height="36" rx="8"/>
+  <text class="t-code" x="48" y="255">r0 = *(u32 *)(r6 + 2456)</text>
+
+  <!-- 커널 B -->
+  <rect class="panel yellow" x="390" y="130" width="350" height="150" rx="14"/>
+  <text class="t-b tc-yellow" x="406" y="154">커널 B · 앞에 필드가 추가된 버전</text>
+  <rect class="box yellow" x="406" y="164" width="318" height="48" rx="8"/>
+  <text class="t-xs" x="418" y="182">/sys/kernel/btf/vmlinux</text>
+  <text class="t-code" x="418" y="201">task_struct.pid  →  오프셋 2520</text>
+  <path class="ln" d="M565 212 V228" marker-end="url(#ah)"/>
+  <rect class="box green" x="406" y="232" width="318" height="36" rx="8"/>
+  <text class="t-code" x="418" y="255">r0 = *(u32 *)(r6 + 2520)</text>
+
+  <text class="t-s mid" x="380" y="308">구조체와 필드를 이름으로 찾으므로 배치가 달라도 같은 필드를 읽는다. 오프셋 숫자는 예시다</text>
+</svg>

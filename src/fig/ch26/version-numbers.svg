@@ -1,0 +1,49 @@
+<svg viewBox="0 0 760 286" xmlns="http://www.w3.org/2000/svg">
+  <title>주 버전 번호가 바뀐 시점: 2.6은 2003년, 3.0은 2011년, 4.0은 2015년, 5.0은 2019년, 6.0은 2022년, 7.0은 2026년</title>
+
+  <!-- 연도 눈금 -->
+  <text class="t-xs mid" x="245" y="22">2005</text>
+  <text class="t-xs mid" x="357.5" y="22">2010</text>
+  <text class="t-xs mid" x="470" y="22">2015</text>
+  <text class="t-xs mid" x="582.5" y="22">2020</text>
+  <text class="t-xs mid" x="695" y="22">2025</text>
+  <path class="ln thin muted dash" d="M245 28 V240 M357.5 28 V240 M470 28 V240 M582.5 28 V240 M695 28 V206"/>
+
+  <!-- 2.6 -->
+  <text class="t-mono t-b" x="20" y="59">2.6.0 … 2.6.39</text>
+  <text class="t-xs" x="146" y="59">40개</text>
+  <rect class="box blue" x="221.6" y="42" width="170.8" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="307" y="58">2003-12 시작</text>
+
+  <!-- 3.x -->
+  <text class="t-mono t-b" x="20" y="93">3.0 … 3.19</text>
+  <text class="t-xs" x="146" y="93">20개</text>
+  <rect class="box blue" x="392.4" y="76" width="83.9" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="434.4" y="92">2011-07</text>
+
+  <!-- 4.x -->
+  <text class="t-mono t-b" x="20" y="127">4.0 … 4.20</text>
+  <text class="t-xs" x="146" y="127">21개</text>
+  <rect class="box blue" x="476.3" y="110" width="87.5" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="520" y="126">2015-04</text>
+
+  <!-- 5.x -->
+  <text class="t-mono t-b" x="20" y="161">5.0 … 5.19</text>
+  <text class="t-xs" x="146" y="161">20개</text>
+  <rect class="box blue" x="563.8" y="144" width="80.6" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="604.1" y="160">2019-03</text>
+
+  <!-- 6.x -->
+  <text class="t-mono t-b" x="20" y="195">6.0 … 6.19</text>
+  <text class="t-xs" x="146" y="195">20개</text>
+  <rect class="box blue" x="644.4" y="178" width="79.4" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="684.1" y="194">2022-10</text>
+
+  <!-- 7.x -->
+  <text class="t-mono t-b" x="20" y="229">7.0 … 7.3</text>
+  <text class="t-xs" x="146" y="229">진행 중</text>
+  <rect class="box green" x="723.8" y="212" width="16.2" height="24" rx="5"/>
+  <text class="t-xs tc-green end" x="716" y="228">2026-04 시작 →</text>
+
+  <text class="t-s mid" x="380" y="268">앞자리가 오른 다섯 번 모두 여느 릴리스와 같은 주기의 결과였다. 호환성이 끊긴 적은 없다.</text>
+</svg>

@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg">
+  <title>용량 400인 작은 코어 넷과 용량 1024인 큰 코어 넷. 이용률 100인 태스크는 작은 코어에 들어맞아 에너지가 덜 드는 작은 코어에 놓이고, 이용률 600인 태스크는 작은 코어에 들어맞지 않아 큰 코어로 간다.</title>
+
+  <rect class="solid blue" x="20" y="14" width="16" height="14" rx="3"/>
+  <text class="t-s t-ink" x="44" y="26">태스크 A · 이용률 100</text>
+  <rect class="solid warm" x="220" y="14" width="16" height="14" rx="3"/>
+  <text class="t-s t-ink" x="244" y="26">태스크 B · 이용률 600</text>
+
+  <!-- 눈금: 1024 = 160px, 바닥 y=220 -->
+  <path class="ln thin muted" d="M40 220 H720"/>
+
+  <!-- 작은 코어 -->
+  <rect class="box gray" x="60" y="158" width="44" height="62"/>
+  <rect class="solid blue" x="60" y="204" width="44" height="16"/>
+  <rect class="box gray" x="114" y="158" width="44" height="62"/>
+  <rect class="box gray" x="168" y="158" width="44" height="62"/>
+  <rect class="box gray" x="222" y="158" width="44" height="62"/>
+  <path class="ln thin red dash" d="M52 170 H274"/>
+  <text class="t-xs tc-red" x="282" y="174">용량의 80%</text>
+
+  <rect class="ghost red dash" x="114" y="126" width="44" height="94"/>
+  <text class="t-xs tc-red" x="100" y="118">B는 들어맞지 않는다</text>
+
+  <text class="t-b mid" x="163" y="244">작은 코어 넷</text>
+  <text class="t-xs mid" x="163" y="262">용량 400 · 전력이 적게 든다</text>
+
+  <!-- 큰 코어 -->
+  <rect class="box gray" x="440" y="60" width="44" height="160"/>
+  <rect class="solid warm" x="440" y="126" width="44" height="94"/>
+  <rect class="box gray" x="494" y="60" width="44" height="160"/>
+  <rect class="box gray" x="548" y="60" width="44" height="160"/>
+  <rect class="box gray" x="602" y="60" width="44" height="160"/>
+  <path class="ln thin red dash" d="M432 92 H654"/>
+  <text class="t-xs tc-red" x="662" y="96">용량의 80%</text>
+
+  <text class="t-b mid" x="543" y="244">큰 코어 넷</text>
+  <text class="t-xs mid" x="543" y="262">용량 1024 · 빠르다</text>
+
+  <text class="t-xs tc-blue" x="20" y="150">A</text>
+  <path class="ln thin blue" d="M30 154 L60 204"/>
+  <text class="t-xs tc-warm" x="412" y="118">B</text>
+  <path class="ln thin warm" d="M422 122 L440 134"/>
+
+  <text class="t-s t-ink mid" x="380" y="288">A는 어디에나 들어맞는다. 에너지 모델로 견주면 작은 코어가 싸다</text>
+  <text class="t-s t-ink mid" x="380" y="308">B는 600 &gt; 400 × 0.8이라 작은 코어에 들어맞지 않는다. 큰 코어로 간다</text>
+</svg>

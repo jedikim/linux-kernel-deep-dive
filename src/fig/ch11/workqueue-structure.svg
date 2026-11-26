@@ -1,0 +1,108 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>워크큐의 네 층: workqueue_struct가 pool_workqueue를 거쳐 worker_pool에 이어지고, 풀에 kworker 스레드가 붙는다. 같은 CPU의 여러 워크큐가 풀 하나를 함께 쓰고, BH 풀에는 스레드가 없다.</title>
+
+  <text class="t-code mid" x="115" y="22">workqueue_struct</text>
+  <text class="t-xs mid" x="115" y="40">코드가 일을 넣는 곳</text>
+  <text class="t-code mid" x="300" y="22">pool_workqueue</text>
+  <text class="t-xs mid" x="300" y="40">wq와 풀을 잇는다</text>
+  <text class="t-code mid" x="485" y="22">worker_pool</text>
+  <text class="t-xs mid" x="485" y="40">대기열과 스레드 묶음</text>
+  <text class="t-code mid" x="678" y="22">worker</text>
+  <text class="t-xs mid" x="678" y="40">kworker 스레드</text>
+
+  <!-- 워크큐 -->
+  <rect class="box gray" x="20" y="62" width="190" height="48" rx="8"/>
+  <text class="t-code t-b" x="32" y="82">"events"</text>
+  <text class="t-xs" x="32" y="100">system_percpu_wq</text>
+  <rect class="box gray" x="20" y="136" width="190" height="48" rx="8"/>
+  <text class="t-code t-b" x="32" y="156">"mydrv"</text>
+  <text class="t-xs" x="32" y="174">드라이버 전용 · WQ_PERCPU</text>
+  <rect class="box gray" x="20" y="222" width="190" height="48" rx="8"/>
+  <text class="t-code t-b" x="32" y="242">"events_unbound"</text>
+  <text class="t-xs" x="32" y="260">system_dfl_wq</text>
+  <rect class="box gray" x="20" y="300" width="190" height="48" rx="8"/>
+  <text class="t-code t-b" x="32" y="320">"events_bh"</text>
+  <text class="t-xs" x="32" y="338">system_bh_wq</text>
+
+  <!-- pwq -->
+  <rect class="box" x="262" y="64" width="76" height="20" rx="4"/>
+  <text class="t-xs mid" x="300" y="78">CPU 0</text>
+  <rect class="box" x="262" y="88" width="76" height="20" rx="4"/>
+  <text class="t-xs mid" x="300" y="102">CPU 1</text>
+  <rect class="box" x="262" y="138" width="76" height="20" rx="4"/>
+  <text class="t-xs mid" x="300" y="152">CPU 0</text>
+  <rect class="box" x="262" y="162" width="76" height="20" rx="4"/>
+  <text class="t-xs mid" x="300" y="176">CPU 1</text>
+  <rect class="box" x="262" y="236" width="76" height="20" rx="4"/>
+  <text class="t-xs mid" x="300" y="250">pod 0</text>
+  <rect class="box" x="262" y="314" width="76" height="20" rx="4"/>
+  <text class="t-xs mid" x="300" y="328">CPU 0</text>
+
+  <!-- wq → pwq -->
+  <path class="ln thin muted" d="M210 86 L262 74"/>
+  <path class="ln thin muted" d="M210 86 L262 98"/>
+  <path class="ln thin muted" d="M210 160 L262 148"/>
+  <path class="ln thin muted" d="M210 160 L262 172"/>
+  <path class="ln thin muted" d="M210 246 H262"/>
+  <path class="ln thin muted" d="M210 324 H262"/>
+
+  <!-- pwq → pool -->
+  <path class="ln thin blue" d="M338 74 H394" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M338 98 L394 150" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M338 148 L394 100" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M338 172 H394" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M338 246 H394" marker-end="url(#ah-blue)"/>
+  <path class="ln thin purple" d="M338 324 H394" marker-end="url(#ah-purple)"/>
+
+  <!-- 풀 -->
+  <rect class="box blue" x="400" y="56" width="170" height="60" rx="10"/>
+  <text class="t-s t-ink t-b" x="414" y="78">CPU 0 · 일반</text>
+  <text class="t-xs" x="414" y="102">worklist</text>
+  <rect class="solid blue" x="470" y="92" width="12" height="12" rx="2"/>
+  <rect class="solid blue" x="486" y="92" width="12" height="12" rx="2"/>
+  <rect class="solid blue" x="502" y="92" width="12" height="12" rx="2"/>
+
+  <rect class="box blue" x="400" y="132" width="170" height="60" rx="10"/>
+  <text class="t-s t-ink t-b" x="414" y="154">CPU 1 · 일반</text>
+  <text class="t-xs" x="414" y="178">worklist</text>
+  <rect class="solid blue" x="470" y="168" width="12" height="12" rx="2"/>
+
+  <rect class="box blue" x="400" y="216" width="170" height="60" rx="10"/>
+  <text class="t-s t-ink t-b" x="414" y="238">unbound · pod 0</text>
+  <text class="t-xs" x="414" y="262">worklist</text>
+  <rect class="solid blue" x="470" y="252" width="12" height="12" rx="2"/>
+  <rect class="solid blue" x="486" y="252" width="12" height="12" rx="2"/>
+
+  <rect class="box purple" x="400" y="296" width="170" height="56" rx="10"/>
+  <text class="t-s t-ink t-b" x="414" y="318">CPU 0 · BH</text>
+  <text class="t-xs" x="414" y="340">worklist</text>
+  <rect class="solid purple" x="470" y="330" width="12" height="12" rx="2"/>
+
+  <!-- 워커 -->
+  <path class="ln thin blue" d="M570 70 H616"/>
+  <path class="ln thin blue" d="M570 102 H616"/>
+  <rect class="box blue" x="616" y="58" width="124" height="24" rx="6"/>
+  <text class="t-code mid" x="678" y="74">kworker/0:0</text>
+  <rect class="box blue" x="616" y="90" width="124" height="24" rx="6"/>
+  <text class="t-code mid" x="678" y="106">kworker/0:1</text>
+
+  <path class="ln thin blue" d="M570 146 H616"/>
+  <path class="ln thin blue" d="M570 178 H616"/>
+  <rect class="box blue" x="616" y="134" width="124" height="24" rx="6"/>
+  <text class="t-code mid" x="678" y="150">kworker/1:0</text>
+  <rect class="box blue" x="616" y="166" width="124" height="24" rx="6"/>
+  <text class="t-code mid" x="678" y="182">kworker/1:1</text>
+
+  <path class="ln thin blue" d="M570 230 H616"/>
+  <path class="ln thin blue" d="M570 262 H616"/>
+  <rect class="box blue" x="616" y="218" width="124" height="24" rx="6"/>
+  <text class="t-code mid" x="678" y="234">kworker/u8:0</text>
+  <rect class="box blue" x="616" y="250" width="124" height="24" rx="6"/>
+  <text class="t-code mid" x="678" y="266">kworker/u8:3</text>
+
+  <path class="ln thin purple dash" d="M570 324 H616"/>
+  <rect class="ghost purple dash" x="616" y="306" width="124" height="36" rx="6"/>
+  <text class="t-xs tc-purple mid" x="678" y="328">softirq에서 실행</text>
+
+  <text class="t-s mid" x="380" y="376">워크큐는 이름표이고 스레드는 풀에 있다. 같은 CPU의 여러 워크큐가 풀 하나와 그 kworker를 함께 쓴다.</text>
+</svg>

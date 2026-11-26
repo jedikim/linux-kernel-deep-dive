@@ -1,0 +1,67 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>시스템 콜에서 장치까지의 층: 유저 프로세스, VFS, 파일시스템 구현, 그리고 그 아래의 블록 계층·네트워크 스택·커널 자료구조</title>
+
+  <!-- 유저 -->
+  <rect class="box blue" x="20" y="14" width="720" height="46" rx="10"/>
+  <text class="t-b" x="36" y="42">유저 프로세스</text>
+  <text class="t-mono end" x="724" y="42">open()  read()  write()  mmap()  close()</text>
+
+  <path class="ln" d="M380 60 V84" marker-end="url(#ah)"/>
+  <text class="t-xs" x="392" y="77">시스템 콜 (19장)</text>
+
+  <!-- VFS -->
+  <rect class="panel yellow" x="20" y="88" width="720" height="118" rx="14"/>
+  <text class="t-l" x="36" y="114">VFS</text>
+  <text class="t-s" x="76" y="114">모든 파일시스템에 공통인 일</text>
+
+  <rect class="box" x="36" y="126" width="224" height="64" rx="10"/>
+  <text class="t-b mid" x="148" y="152">경로 탐색</text>
+  <text class="t-code mid" x="148" y="174">namei.c · dcache.c</text>
+
+  <rect class="box" x="268" y="126" width="224" height="64" rx="10"/>
+  <text class="t-b mid" x="380" y="152">fd 테이블과 열린 파일</text>
+  <text class="t-code mid" x="380" y="174">file.c · read_write.c</text>
+
+  <rect class="box" x="500" y="126" width="224" height="64" rx="10"/>
+  <text class="t-b mid" x="612" y="152">페이지 캐시와 writeback</text>
+  <text class="t-code mid" x="612" y="174">filemap.c · fs-writeback.c</text>
+
+  <!-- ops 테이블로 넘김 -->
+  <path class="ln green" d="M105 206 V236" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M288 206 V236" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M471 206 V236" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M654 206 V236" marker-end="url(#ah-green)"/>
+  <text class="t-code mid tc-green" x="380" y="226">f_op · i_op · a_ops</text>
+
+  <!-- 파일시스템 구현 -->
+  <rect class="box green" x="20" y="240" width="171" height="64" rx="10"/>
+  <text class="t-b mid" x="105" y="266">디스크 파일시스템</text>
+  <text class="t-s mid" x="105" y="288">ext4 · XFS · btrfs</text>
+
+  <rect class="box green" x="203" y="240" width="171" height="64" rx="10"/>
+  <text class="t-b mid" x="288" y="266">네트워크·유저 공간</text>
+  <text class="t-s mid" x="288" y="288">NFS · SMB · FUSE</text>
+
+  <rect class="box green" x="386" y="240" width="171" height="64" rx="10"/>
+  <text class="t-b mid" x="471" y="266">가상 파일시스템</text>
+  <text class="t-s mid" x="471" y="288">procfs · sysfs · tmpfs</text>
+
+  <rect class="box green" x="569" y="240" width="171" height="64" rx="10"/>
+  <text class="t-b mid" x="654" y="266">파일시스템 밖의 파일</text>
+  <text class="t-s mid" x="654" y="288">파이프 · 소켓 · eventfd</text>
+
+  <!-- 그 아래 -->
+  <path class="ln muted" d="M105 304 V330" marker-end="url(#ah-muted)"/>
+  <path class="ln muted" d="M288 304 V330" marker-end="url(#ah-muted)"/>
+  <path class="ln muted" d="M471 304 V330" marker-end="url(#ah-muted)"/>
+  <path class="ln muted" d="M654 304 V330" marker-end="url(#ah-muted)"/>
+
+  <rect class="box gray" x="20" y="334" width="171" height="44" rx="10"/>
+  <text class="t-s t-ink mid" x="105" y="361">블록 계층 → 저장 장치</text>
+  <rect class="box gray" x="203" y="334" width="171" height="44" rx="10"/>
+  <text class="t-s t-ink mid" x="288" y="361">네트워크 · 유저 데몬</text>
+  <rect class="box gray" x="386" y="334" width="171" height="44" rx="10"/>
+  <text class="t-s t-ink mid" x="471" y="361">커널 자료구조 · 메모리</text>
+  <rect class="box gray" x="569" y="334" width="171" height="44" rx="10"/>
+  <text class="t-s t-ink mid" x="654" y="361">커널 안의 버퍼와 큐</text>
+</svg>

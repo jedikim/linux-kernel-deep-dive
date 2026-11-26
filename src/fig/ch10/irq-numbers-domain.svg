@@ -1,0 +1,53 @@
+<svg viewBox="0 0 760 396" xmlns="http://www.w3.org/2000/svg">
+  <title>인터럽트의 세 가지 번호: 리눅스 IRQ 번호 하나에 도메인마다 hwirq를 가진 irq_data가 사슬로 달리고, 맨 끝 벡터 도메인이 CPU와 벡터 번호를 정한다</title>
+
+  <!-- 예 1: MSI-X -->
+  <rect class="box blue" x="20" y="16" width="720" height="40" rx="10"/>
+  <text class="t-b" x="34" y="41">리눅스 IRQ 142</text>
+  <text class="t-s" x="160" y="41">드라이버가 request_irq()에 넘기는 번호. irq_desc 하나에 대응한다</text>
+
+  <rect class="box green" x="20" y="72" width="220" height="92" rx="10"/>
+  <text class="t-s t-ink t-b" x="34" y="94">PCI-MSIX 도메인</text>
+  <text class="t-code" x="34" y="116">hwirq = 1</text>
+  <text class="t-xs" x="34" y="136">장치 MSI-X 표의 1번 항목</text>
+  <text class="t-xs" x="34" y="154">irq_chip: PCI-MSIX</text>
+
+  <rect class="box yellow" x="270" y="72" width="220" height="92" rx="10"/>
+  <text class="t-s t-ink t-b" x="284" y="94">인터럽트 리매핑 도메인</text>
+  <text class="t-code" x="284" y="116">hwirq = 표 인덱스</text>
+  <text class="t-xs" x="284" y="136">IOMMU의 리매핑 표 항목</text>
+  <text class="t-xs" x="284" y="154">IOMMU가 있을 때만 낀다</text>
+
+  <rect class="box warm" x="520" y="72" width="220" height="92" rx="10"/>
+  <text class="t-s t-ink t-b" x="534" y="94">벡터 도메인</text>
+  <text class="t-code" x="534" y="116">CPU 3, 벡터 0x41</text>
+  <text class="t-xs" x="534" y="136">그 CPU의 벡터 공간에서 한 칸</text>
+  <text class="t-xs" x="534" y="154">irq_chip: APIC</text>
+
+  <path class="ln" d="M240 118 H265" marker-end="url(#ah)"/>
+  <path class="ln" d="M490 118 H515" marker-end="url(#ah)"/>
+  <text class="t-xs" x="20" y="186">상자 하나가 struct irq_data 하나다. 화살표는 parent_data 포인터이고, CPU에 가까운 쪽이 부모다.</text>
+
+  <!-- 예 2: 핀 -->
+  <rect class="box blue" x="20" y="210" width="720" height="40" rx="10"/>
+  <text class="t-b" x="34" y="235">리눅스 IRQ 1</text>
+  <text class="t-s" x="160" y="235">키보드 컨트롤러(i8042)</text>
+
+  <rect class="box green" x="20" y="266" width="220" height="72" rx="10"/>
+  <text class="t-s t-ink t-b" x="34" y="288">IO-APIC 도메인</text>
+  <text class="t-code" x="34" y="310">hwirq = 1</text>
+  <text class="t-xs" x="34" y="328">IO-APIC의 1번 핀</text>
+
+  <rect class="box yellow" x="270" y="266" width="220" height="72" rx="10"/>
+  <text class="t-s t-ink t-b" x="284" y="288">인터럽트 리매핑 도메인</text>
+  <text class="t-code" x="284" y="310">hwirq = 표 인덱스</text>
+
+  <rect class="box warm" x="520" y="266" width="220" height="72" rx="10"/>
+  <text class="t-s t-ink t-b" x="534" y="288">벡터 도메인</text>
+  <text class="t-code" x="534" y="310">CPU 0, 벡터 0x31</text>
+
+  <path class="ln" d="M240 302 H265" marker-end="url(#ah)"/>
+  <path class="ln" d="M490 302 H515" marker-end="url(#ah)"/>
+
+  <text class="t-s mid" x="380" y="372">인터럽트가 오면 거꾸로 찾는다: CPU가 받은 벡터 → 그 CPU의 vector_irq[벡터] → irq_desc</text>
+</svg>

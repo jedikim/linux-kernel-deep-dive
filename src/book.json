@@ -1,0 +1,58 @@
+{
+  "title": "리눅스 커널 깊이 읽기",
+  "subtitle": "소스 코드로 따라가는 운영체제의 구조와 개발 방법론",
+  "kernel": "7.3",
+  "source": "https://github.com/torvalds/linux/blob/v7.3/",
+  "repo": "https://github.com/jedikim/linux-kernel-deep-dive",
+  "site": "https://jedikim.github.io/linux-kernel-deep-dive/",
+  "author": "Jedi Kim",
+  "links": [
+    ["LinkedIn", "https://www.linkedin.com/in/jedikim/"],
+    ["jedikim.com", "https://jedikim.com"]
+  ],
+  "pages": [
+    {"id": "refs", "title": "참고 자료", "sym": "§"}
+  ],
+  "parts": [
+    {"id": "p0", "title": "길잡이", "color": "gray", "desc": "커널이 어떤 프로그램인지, 소스를 어떻게 읽는지"},
+    {"id": "p1", "title": "태스크", "color": "blue", "desc": "프로세스와 스레드가 커널 안에서 갖는 모습"},
+    {"id": "p2", "title": "스케줄러", "color": "green", "desc": "누가 다음에 CPU를 쓰는지 정하는 코드"},
+    {"id": "p3", "title": "시간과 인터럽트", "color": "warm", "desc": "하드웨어가 커널을 깨우는 길과 그 뒤처리"},
+    {"id": "p4", "title": "동시성", "color": "purple", "desc": "여러 CPU가 같은 데이터를 만질 때 지키는 규칙"},
+    {"id": "p5", "title": "메모리", "color": "red", "desc": "가상 주소와 물리 페이지를 잇는 구조"},
+    {"id": "p6", "title": "시스템 콜과 I/O", "color": "teal", "desc": "유저 프로그램의 요청이 장치에 닿기까지"},
+    {"id": "p7", "title": "격리와 확장", "color": "yellow", "desc": "컨테이너, 가상 머신, eBPF"},
+    {"id": "p8", "title": "개발 방법론", "color": "gray", "desc": "수천 명이 하나의 코드베이스를 고치는 방식"}
+  ],
+  "chapters": [
+    {"id": "ch00", "part": "p0", "title": "커널이라는 프로그램", "sub": "소스 트리와 버전, 유저와 커널의 경계, 소스를 읽는 방법"},
+    {"id": "ch01", "part": "p1", "title": "fork: 한 번 부르고 두 번 돌아온다", "sub": "fork·vfork·clone이 kernel_clone()으로 모이는 길"},
+    {"id": "ch02", "part": "p1", "title": "task_struct와 스레드", "sub": "프로세스와 스레드는 무엇을 공유하느냐로 갈린다"},
+    {"id": "ch03", "part": "p1", "title": "태스크의 상태와 대기", "sub": "잠들고, 깨어나고, 죽고, 거둬지기까지"},
+    {"id": "ch04", "part": "p2", "title": "스케줄러의 뼈대", "sub": "런큐, 스케줄링 클래스, __schedule()과 컨텍스트 스위치"},
+    {"id": "ch05", "part": "p2", "title": "CFS에서 EEVDF로", "sub": "공정함을 숫자로 만드는 법과 그 숫자가 바뀐 이유"},
+    {"id": "ch06", "part": "p2", "title": "커널 선점", "sub": "preempt_count, 선점 모델, 그리고 PREEMPT_LAZY"},
+    {"id": "ch07", "part": "p2", "title": "멀티코어 스케줄링", "sub": "어느 CPU에서 깨울 것인가, 언제 옮길 것인가"},
+    {"id": "ch08", "part": "p3", "title": "시간과 타이머", "sub": "jiffies와 틱에서 고해상도 타이머와 틱 없는 커널까지"},
+    {"id": "ch09", "part": "p3", "title": "인터럽트 하드웨어", "sub": "PIC에서 APIC·MSI로, IDT에서 FRED로"},
+    {"id": "ch10", "part": "p3", "title": "커널의 IRQ 계층", "sub": "irq_desc에서 핸들러까지, 여러 CPU가 같은 IRQ를 만날 때"},
+    {"id": "ch11", "part": "p3", "title": "Top half와 Bottom half", "sub": "softirq, 태스크릿, 워크큐, 스레드 IRQ의 변천사"},
+    {"id": "ch12", "part": "p3", "title": "패킷 하나의 여정", "sub": "NIC 인터럽트에서 소켓까지, NAPI가 푼 문제"},
+    {"id": "ch13", "part": "p4", "title": "경쟁 조건과 실행 컨텍스트", "sub": "누가 누구를 끊을 수 있는가"},
+    {"id": "ch14", "part": "p4", "title": "스핀락과 뮤텍스", "sub": "기다리는 두 가지 방법과 그 내부"},
+    {"id": "ch15", "part": "p4", "title": "우선순위 역전과 상속", "sub": "rt_mutex, PI futex, 프록시 실행"},
+    {"id": "ch16", "part": "p4", "title": "RCU", "sub": "읽는 쪽이 아무것도 기다리지 않는 동기화"},
+    {"id": "ch17", "part": "p5", "title": "가상 주소 공간", "sub": "페이지 테이블, VMA, 메이플 트리, 페이지 폴트"},
+    {"id": "ch18", "part": "p5", "title": "물리 메모리와 회수", "sub": "버디, 슬랩, 폴리오, 그리고 메모리가 모자랄 때"},
+    {"id": "ch19", "part": "p6", "title": "시스템 콜", "sub": "유저에서 커널로 들어오는 정문"},
+    {"id": "ch20", "part": "p6", "title": "VFS와 파일시스템", "sub": "모든 것을 파일로 보이게 하는 네 개의 객체"},
+    {"id": "ch21", "part": "p6", "title": "블록 계층과 io_uring", "sub": "bio에서 blk-mq까지, 그리고 시스템 콜을 줄이는 I/O"},
+    {"id": "ch22", "part": "p7", "title": "네임스페이스와 cgroup", "sub": "컨테이너를 이루는 두 가지 커널 기능"},
+    {"id": "ch23", "part": "p7", "title": "가상화와 KVM", "sub": "커널이 하이퍼바이저가 되는 방법"},
+    {"id": "ch24", "part": "p7", "title": "eBPF", "sub": "커널을 다시 빌드하지 않고 커널의 동작을 바꾸기"},
+    {"id": "ch25", "part": "p8", "title": "C로 쓴 객체지향", "sub": "커널 코드에 반복해서 나오는 설계 패턴"},
+    {"id": "ch26", "part": "p8", "title": "커널은 어떻게 만들어지는가", "sub": "릴리스 주기, 메인테이너 트리, 패치와 리뷰"},
+    {"id": "ch27", "part": "p8", "title": "품질을 지키는 장치", "sub": "lockdep, 새니타이저, 퍼저, 그리고 Rust"},
+    {"id": "ch28", "part": "p8", "title": "직접 해 보기", "sub": "빌드하고, 부팅하고, 추적하고, 첫 패치를 보내기"}
+  ]
+}

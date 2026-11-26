@@ -1,0 +1,68 @@
+<svg viewBox="0 0 760 384" xmlns="http://www.w3.org/2000/svg">
+  <title>write()에서 디스크까지: 페이지 캐시에 더티로 남은 폴리오를 플러셔 워커가 내보낸다. 더티 페이지가 10%를 넘으면 배경 writeback이 돌고 15%부터 쓰는 태스크가 느려지며 20%가 상한이다</title>
+
+  <!-- 파이프라인 -->
+  <rect class="box blue" x="20" y="16" width="124" height="56" rx="10"/>
+  <text class="t-mono t-b mid" x="82" y="40">write()</text>
+  <text class="t-xs mid" x="82" y="60">복사하고 복귀</text>
+  <path class="ln blue" d="M144 44 H170" marker-end="url(#ah-blue)"/>
+  <rect class="box yellow" x="174" y="16" width="170" height="56" rx="10"/>
+  <text class="t-b mid" x="259" y="40">페이지 캐시</text>
+  <text class="t-xs mid" x="259" y="60">더티 폴리오로 남는다</text>
+  <path class="ln" d="M344 44 H370" marker-end="url(#ah)"/>
+  <rect class="box" x="374" y="16" width="150" height="56" rx="10"/>
+  <text class="t-b mid" x="449" y="40">플러셔 워커</text>
+  <text class="t-code mid" x="449" y="60">wb_workfn()</text>
+  <path class="ln" d="M524 44 H550" marker-end="url(#ah)"/>
+  <rect class="box" x="554" y="16" width="112" height="56" rx="10"/>
+  <text class="t-code mid" x="610" y="40">writepages()</text>
+  <text class="t-xs mid" x="610" y="60">bio 제출</text>
+  <path class="ln" d="M666 44 H688" marker-end="url(#ah)"/>
+  <rect class="box gray" x="692" y="16" width="48" height="56" rx="10"/>
+  <use href="#i-disk" x="700" y="28" width="32" height="32" class="ic gray"/>
+
+  <!-- 게이지 -->
+  <text class="t-s t-ink t-b" x="20" y="108">더티 페이지의 양</text>
+  <text class="t-xs" x="134" y="108">쓸 수 있는 메모리에 대한 비율 · 기본값</text>
+  <rect class="box" x="20" y="120" width="288" height="30"/>
+  <text class="t-s t-ink mid" x="164" y="140">오래된 것만 내보낸다</text>
+  <rect class="box yellow" x="308" y="120" width="144" height="30"/>
+  <text class="t-s t-ink mid" x="380" y="140">플러셔가 계속 쓴다</text>
+  <rect class="box warm" x="452" y="120" width="144" height="30"/>
+  <text class="t-s t-ink mid" x="524" y="140">write()가 느려진다</text>
+  <rect class="box red" x="596" y="120" width="144" height="30"/>
+  <rect x="596" y="120" width="144" height="30" fill="url(#hatch-red)"/>
+  <path class="ln thin" d="M308 150 V158"/>
+  <path class="ln thin" d="M452 150 V158"/>
+  <path class="ln thin" d="M596 150 V158"/>
+  <text class="t-code" x="20" y="172">0</text>
+  <text class="t-code mid" x="308" y="172">10%</text>
+  <text class="t-code mid" x="452" y="172">15%</text>
+  <text class="t-code mid" x="596" y="172">20%</text>
+  <text class="t-code mid tc-muted" x="308" y="190">dirty_background_ratio</text>
+  <text class="t-xs mid" x="452" y="190">둘의 중간</text>
+  <text class="t-code mid tc-muted" x="596" y="190">dirty_ratio</text>
+  <text class="t-xs tc-red mid" x="668" y="172">넘지 못하는 상한</text>
+
+  <!-- 계기 셋 -->
+  <rect class="box" x="20" y="208" width="228" height="76" rx="10"/>
+  <text class="t-b" x="32" y="231">주기적 writeback</text>
+  <text class="t-code" x="32" y="251">wb_check_old_data_flush()</text>
+  <text class="t-xs" x="32" y="271">5초마다 깨어나 30초 넘은 것을 쓴다</text>
+
+  <rect class="box yellow" x="266" y="208" width="228" height="76" rx="10"/>
+  <text class="t-b" x="278" y="231">배경 writeback</text>
+  <text class="t-code" x="278" y="251">wb_check_background_flush()</text>
+  <text class="t-xs" x="278" y="271">10% 아래로 내려갈 때까지 쓴다</text>
+
+  <rect class="box warm" x="512" y="208" width="228" height="76" rx="10"/>
+  <text class="t-b" x="524" y="231">쓰는 쪽 늦추기</text>
+  <text class="t-code" x="524" y="251">balance_dirty_pages()</text>
+  <text class="t-xs" x="524" y="271">write() 안에서 최대 200ms씩 잠든다</text>
+
+  <!-- fsync -->
+  <rect class="box blue" x="20" y="302" width="720" height="64" rx="10"/>
+  <text class="t-mono t-b" x="32" y="328">fsync(fd)</text>
+  <text class="t-s t-ink" x="122" y="328">이 파일의 더티 폴리오를 지금 내보낸다 → 끝나기를 기다린다 → 저널 커밋 → 장치 캐시 비우기</text>
+  <text class="t-xs" x="122" y="350">임계값을 기다리지 않는다. 성공해서 돌아와야 디스크에 있다는 보장이 생긴다</text>
+</svg>

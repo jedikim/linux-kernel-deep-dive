@@ -1,0 +1,50 @@
+<svg viewBox="0 0 760 348" xmlns="http://www.w3.org/2000/svg">
+  <title>struct_ops의 구조: 유저가 함수 포인터 자리에 BPF 프로그램 fd를 적은 맵 값을 넘기면, 커널이 멤버마다 트램펄린을 만들어 ops 구조체를 채우고 서브시스템에 등록한다. 서브시스템은 보통의 함수 포인터로 호출한다.</title>
+
+  <!-- 유저가 채운 값 -->
+  <rect class="box blue" x="20" y="16" width="200" height="150" rx="12"/>
+  <text class="t-b" x="34" y="40">유저가 넘긴 맵 값</text>
+  <text class="t-xs" x="34" y="58">함수 포인터 자리에 fd</text>
+  <text class="t-code" x="34" y="86">.select_cpu = fd 5</text>
+  <text class="t-code" x="34" y="110">.enqueue    = fd 6</text>
+  <text class="t-code" x="34" y="134">.dispatch   = fd 7</text>
+  <text class="t-code" x="34" y="156">.name       = "simple"</text>
+
+  <!-- kdata -->
+  <rect class="box yellow" x="290" y="16" width="220" height="150" rx="12"/>
+  <text class="t-b" x="304" y="40">커널의 ops 구조체</text>
+  <text class="t-xs" x="304" y="58">struct sched_ext_ops (kdata)</text>
+  <text class="t-code" x="304" y="86">.select_cpu = 트램펄린 ①</text>
+  <text class="t-code" x="304" y="110">.enqueue    = 트램펄린 ②</text>
+  <text class="t-code" x="304" y="134">.dispatch   = 트램펄린 ③</text>
+  <text class="t-code" x="304" y="156">.name       = "simple"</text>
+
+  <path class="ln" d="M220 90 H286" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="254" y="80">갱신</text>
+
+  <!-- BPF 프로그램 -->
+  <rect class="box green" x="580" y="64" width="160" height="26" rx="6"/>
+  <text class="t-code mid" x="660" y="82">simple_select_cpu</text>
+  <rect class="box green" x="580" y="98" width="160" height="26" rx="6"/>
+  <text class="t-code mid" x="660" y="116">simple_enqueue</text>
+  <rect class="box green" x="580" y="132" width="160" height="26" rx="6"/>
+  <text class="t-code mid" x="660" y="150">simple_dispatch</text>
+  <text class="t-s t-ink t-b mid" x="660" y="40">BPF 프로그램</text>
+  <text class="t-xs mid" x="660" y="56">검증과 JIT를 마친 코드</text>
+  <path class="ln green" d="M510 82 H576" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M510 106 H576" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M510 130 H545 V145 H576" marker-end="url(#ah-green)"/>
+
+  <!-- 서브시스템 -->
+  <rect class="panel yellow" x="20" y="206" width="720" height="96" rx="14"/>
+  <text class="t-b tc-yellow" x="36" y="230">서브시스템 · 스케줄러 코어</text>
+  <rect class="box code" x="36" y="242" width="330" height="46" rx="8"/>
+  <text class="t-xs" x="48" y="259">태스크가 실행 가능해졌을 때</text>
+  <text class="t-code" x="48" y="278">(sch)-&gt;ops.enqueue(p, enq_flags);</text>
+  <text class="t-s" x="386" y="262">보통의 함수 포인터 호출이다.</text>
+  <text class="t-s" x="386" y="282">누가 채웠는지는 호출부가 모른다</text>
+  <path class="ln" d="M400 166 V202" marker-end="url(#ah)"/>
+  <text class="t-code" x="410" y="190">st_ops-&gt;reg(kdata)</text>
+
+  <text class="t-s mid" x="380" y="330">트램펄린은 C 호출 규약으로 받은 인자를 BPF 프로그램이 받는 형태로 바꿔 넘기는 작은 기계어 조각이다</text>
+</svg>

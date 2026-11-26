@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 252" xmlns="http://www.w3.org/2000/svg">
+  <title>커널 안의 prio 축: −1은 deadline, 0에서 99는 RT 클래스, 100에서 139는 fair 클래스. rt_priority 99가 prio 0이고 nice −20이 prio 100, nice 19가 prio 139다.</title>
+
+  <text class="t-s t-ink t-b" x="20" y="24">task_struct의 prio</text>
+  <text class="t-s tc-warm" x="170" y="24">← 작을수록 높은 우선순위</text>
+
+  <!-- 눈금 -->
+  <text class="t-code mid" x="45" y="52">−1</text>
+  <text class="t-code" x="78" y="52">0</text>
+  <text class="t-code end" x="548" y="52">99</text>
+  <text class="t-code" x="552" y="52">100</text>
+  <text class="t-code mid" x="646" y="52">120</text>
+  <text class="t-code end" x="740" y="52">139</text>
+  <path class="ln thin muted" d="M646 56 V62"/>
+
+  <!-- 축 -->
+  <rect class="box red" x="20" y="62" width="50" height="46" rx="6"/>
+  <text class="t-b mid" x="45" y="90">DL</text>
+  <rect class="box warm" x="78" y="62" width="470" height="46" rx="6"/>
+  <text class="t-b mid" x="313" y="90">RT 클래스 · SCHED_FIFO, SCHED_RR</text>
+  <rect class="box green" x="552" y="62" width="188" height="46" rx="6"/>
+  <text class="t-b mid" x="646" y="90">fair 클래스</text>
+
+  <!-- 유저 공간의 숫자 -->
+  <text class="t-s t-ink t-b" x="20" y="138">유저 공간에서 쓰는 숫자</text>
+  <path class="ln warm" d="M543 156 H84" marker-end="url(#ah-warm)"/>
+  <text class="t-code" x="78" y="178">99</text>
+  <text class="t-code end" x="543" y="178">1</text>
+  <text class="t-s mid" x="313" y="178">rt_priority · 클수록 높다</text>
+
+  <path class="ln green" d="M556 156 H736"/>
+  <path class="ln thin green" d="M646 150 V162"/>
+  <text class="t-code" x="552" y="178">−20</text>
+  <text class="t-code mid" x="646" y="178">0</text>
+  <text class="t-code end" x="740" y="178">19</text>
+  <text class="t-s end" x="740" y="138">nice</text>
+
+  <!-- 계산식 -->
+  <path class="ln thin muted" d="M20 196 H740"/>
+  <text class="t-code mid" x="45" y="220">고정</text>
+  <text class="t-code mid" x="313" y="220">prio = 99 − rt_priority</text>
+  <text class="t-code mid" x="646" y="220">prio = 120 + nice</text>
+  <text class="t-xs mid" x="45" y="238">기한으로 비교</text>
+  <text class="t-xs mid" x="313" y="238">같은 클래스 안에서 prio가 작은 태스크가 먼저</text>
+  <text class="t-xs mid" x="646" y="238">prio 대신 가중치로 비교 (5장)</text>
+</svg>

@@ -1,0 +1,43 @@
+<svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg">
+  <title>가상 인터럽트 주입의 두 방식: exit을 거치는 주입은 대상 CPU를 IPI로 게스트 밖으로 끌어낸 뒤 재진입 때 벡터를 넣고, posted interrupt는 PIR 비트와 통지 벡터로 게스트 모드를 떠나지 않고 전달한다.</title>
+
+  <!-- 위: exit을 거치는 주입 -->
+  <text class="t-b" x="20" y="28">exit을 거치는 주입</text>
+  <text class="t-s t-ink t-b" x="20" y="66">보내는 쪽</text>
+  <rect class="box yellow" x="120" y="44" width="200" height="34" rx="8"/>
+  <text class="t-s t-ink mid" x="220" y="66">① 가상 IRR에 벡터 기록</text>
+  <rect class="box yellow" x="330" y="44" width="200" height="34" rx="8"/>
+  <text class="t-s t-ink mid" x="430" y="66">② kvm_vcpu_kick(): IPI</text>
+
+  <text class="t-s t-ink t-b" x="20" y="120">받는 CPU</text>
+  <rect class="box blue" x="120" y="98" width="310" height="34" rx="8"/>
+  <text class="t-s t-ink mid" x="275" y="120">게스트 실행</text>
+  <rect class="box red" x="430" y="98" width="140" height="34" rx="8"/>
+  <rect x="430" y="98" width="140" height="34" rx="8" fill="url(#hatch-red)"/>
+  <rect class="box blue" x="570" y="98" width="170" height="34" rx="8"/>
+  <text class="t-s t-ink mid" x="655" y="120">게스트 · 핸들러 실행</text>
+  <path class="ln red" d="M430 78 V94" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="434" y="150">③ VM exit → ④ 진입 필드에 벡터 기록 → ⑤ VM 진입</text>
+
+  <path class="ln thin muted dash" d="M20 172 H740"/>
+
+  <!-- 아래: posted interrupt -->
+  <text class="t-b" x="20" y="200">posted interrupt</text>
+  <text class="t-s t-ink t-b" x="20" y="238">보내는 쪽</text>
+  <rect class="box yellow" x="120" y="216" width="200" height="34" rx="8"/>
+  <text class="t-s t-ink mid" x="220" y="238">① PIR에 벡터 비트</text>
+  <rect class="box yellow" x="330" y="216" width="200" height="34" rx="8"/>
+  <text class="t-s t-ink mid" x="430" y="238">② ON 비트 + 통지 IPI</text>
+
+  <text class="t-s t-ink t-b" x="20" y="292">받는 CPU</text>
+  <rect class="box blue" x="120" y="270" width="310" height="34" rx="8"/>
+  <text class="t-s t-ink mid" x="275" y="292">게스트 실행</text>
+  <rect class="box blue" x="430" y="270" width="310" height="34" rx="8"/>
+  <text class="t-s t-ink mid" x="585" y="292">게스트 · 핸들러 실행</text>
+  <path class="ln blue" d="M430 250 V266" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="434" y="322">③ CPU가 PIR을 가상 IRR에 합친다. exit 없음</text>
+
+  <rect class="box red" x="120" y="346" width="26" height="14" rx="3"/>
+  <rect x="120" y="346" width="26" height="14" rx="3" fill="url(#hatch-red)"/>
+  <text class="t-xs" x="154" y="358">게스트가 멈춰 있는 시간. 호스트 모드에서 KVM이 주입을 준비한다</text>
+</svg>

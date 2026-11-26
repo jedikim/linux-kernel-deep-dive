@@ -1,0 +1,43 @@
+<svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg">
+  <title>락 주인 선점: 스핀락을 쥔 태스크 A가 선점당하면 다른 CPU의 태스크 C가 헛돈다. spin_lock()이 선점을 끄면 A는 락을 풀 때까지 끊기지 않는다.</title>
+
+  <!-- 위: 선점을 끄지 않는다면 -->
+  <text class="t-b" x="20" y="26">선점을 끄지 않는다면</text>
+  <text class="t-xs tc-red" x="224" y="44">↓ B가 깨어나 A를 선점</text>
+
+  <text class="t-s t-ink t-b" x="20" y="70">CPU 0</text>
+  <rect class="box blue" x="110" y="50" width="110" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="165" y="70">A · 락 획득</text>
+  <rect class="box gray" x="220" y="50" width="300" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="370" y="70">B 실행 (A는 락을 쥔 채 쫓겨나 있다)</text>
+  <rect class="box blue" x="520" y="50" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="570" y="70">A · 락 해제</text>
+
+  <text class="t-s t-ink t-b" x="20" y="110">CPU 1</text>
+  <rect class="box red" x="250" y="90" width="370" height="30" rx="6"/>
+  <rect x="250" y="90" width="370" height="30" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box green" x="620" y="90" width="120" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="680" y="110">C · 락 획득</text>
+  <text class="t-s tc-red mid" x="435" y="142">C는 A가 다시 실행될 때까지 spin_lock()에서 CPU 1을 태운다</text>
+
+  <path class="ln thin muted dash" d="M20 164 H740"/>
+
+  <!-- 아래: spin_lock()이 선점을 끄면 -->
+  <text class="t-b" x="20" y="194">spin_lock()이 선점을 끄면</text>
+  <text class="t-xs tc-blue" x="204" y="212">↓ B가 깨어남: 플래그만 선다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="240">CPU 0</text>
+  <rect class="box blue" x="110" y="220" width="190" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="240">A · 락 쥔 구간, 선점 꺼짐</text>
+  <rect class="box gray" x="300" y="220" width="220" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="410" y="240">B 실행</text>
+
+  <text class="t-s t-ink t-b" x="20" y="280">CPU 1</text>
+  <rect class="box red" x="250" y="260" width="50" height="30" rx="6"/>
+  <rect x="250" y="260" width="50" height="30" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box green" x="300" y="260" width="160" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="380" y="280">C · 락 획득</text>
+
+  <path class="ln thin blue dash" d="M300 214 V296"/>
+  <text class="t-s mid" x="380" y="316">A가 락을 푸는 순간 C가 락을 얻고, 미뤄 둔 B로의 전환도 그때 일어난다</text>
+</svg>

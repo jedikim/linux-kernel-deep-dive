@@ -1,0 +1,41 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>같은 데이터를 만지는 두 컨텍스트의 조합마다 필요한 최소한의 락: 태스크끼리는 뮤텍스, 태스크와 softirq는 spin_lock_bh, hardirq가 끼면 spin_lock_irq 계열</title>
+
+  <text class="t-b mid" x="237" y="30">태스크</text>
+  <text class="t-xs mid" x="237" y="48">시스템 콜, kworker</text>
+  <text class="t-b mid" x="439" y="30">softirq</text>
+  <text class="t-xs mid" x="439" y="48">타이머, NAPI, BH 워크</text>
+  <text class="t-b mid" x="641" y="30">hardirq</text>
+  <text class="t-xs mid" x="641" y="48">인터럽트 핸들러</text>
+  <text class="t-b" x="20" y="100">태스크</text>
+  <text class="t-b" x="20" y="172">softirq</text>
+  <text class="t-b" x="20" y="244">hardirq</text>
+  <rect class="box blue" x="140" y="62" width="194" height="64" rx="8"/>
+  <text class="t-code t-b mid" x="237" y="88">mutex_lock()</text>
+  <text class="t-xs mid" x="237" y="110">짧고 안 잠들면 spin_lock()</text>
+  <rect class="box purple" x="140" y="134" width="194" height="64" rx="8"/>
+  <text class="t-xs" x="150" y="160">태스크 쪽</text>
+  <text class="t-code" x="214" y="160">spin_lock_bh()</text>
+  <text class="t-xs" x="150" y="182">softirq 쪽</text>
+  <text class="t-code" x="214" y="182">spin_lock()</text>
+  <rect class="box purple" x="342" y="134" width="194" height="64" rx="8"/>
+  <text class="t-code t-b mid" x="439" y="160">spin_lock()</text>
+  <text class="t-xs mid" x="439" y="182">CPU별 데이터면 락 없이</text>
+  <rect class="box warm" x="140" y="206" width="194" height="64" rx="8"/>
+  <text class="t-xs" x="150" y="232">태스크 쪽</text>
+  <text class="t-code" x="214" y="232">spin_lock_irq()</text>
+  <text class="t-xs" x="150" y="254">핸들러 쪽</text>
+  <text class="t-code" x="214" y="254">spin_lock()</text>
+  <rect class="box warm" x="342" y="206" width="194" height="64" rx="8"/>
+  <text class="t-xs" x="352" y="232">softirq 쪽</text>
+  <text class="t-code" x="416" y="232">spin_lock_irq()</text>
+  <text class="t-xs" x="352" y="254">핸들러 쪽</text>
+  <text class="t-code" x="416" y="254">spin_lock()</text>
+  <rect class="box warm" x="544" y="206" width="194" height="64" rx="8"/>
+  <text class="t-code t-b mid" x="641" y="232">spin_lock_irqsave()</text>
+  <text class="t-xs mid" x="641" y="254">서로 다른 핸들러끼리</text>
+  <rect class="ghost dash" x="342" y="62" width="194" height="64" rx="8"/>
+  <rect class="ghost dash" x="544" y="62" width="194" height="64" rx="8"/>
+  <rect class="ghost dash" x="544" y="134" width="194" height="64" rx="8"/>
+  <text class="t-s mid" x="380" y="298">끊길 수 있는 쪽이 끼어드는 쪽을 막아 두고 잡는다. 끼어드는 쪽은 그냥 잡으면 된다.</text>
+</svg>

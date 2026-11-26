@@ -1,0 +1,63 @@
+<svg viewBox="0 0 760 388" xmlns="http://www.w3.org/2000/svg">
+  <title>태스크 A와 B는 nsproxy 하나를 함께 쓰고, 태스크 C는 마운트·PID·네트워크 네임스페이스만 새로 만든 다른 nsproxy를 쓴다. UTS와 IPC 네임스페이스 객체는 두 nsproxy가 함께 가리킨다</title>
+
+  <rect class="box yellow" x="20" y="36" width="130" height="40" rx="8"/>
+  <text class="t-b" x="32" y="61">태스크 A</text>
+  <rect class="box yellow" x="20" y="96" width="130" height="40" rx="8"/>
+  <text class="t-b" x="32" y="121">태스크 B</text>
+  <rect class="box yellow" x="20" y="252" width="130" height="40" rx="8"/>
+  <text class="t-b" x="32" y="277">태스크 C</text>
+  <text class="t-xs" x="20" y="158">fork()만 했다</text>
+  <text class="t-xs" x="20" y="176">→ nsproxy를 공유</text>
+  <text class="t-xs" x="20" y="314">clone(CLONE_NEWNS |</text>
+  <text class="t-xs" x="20" y="332">NEWPID | NEWNET)</text>
+  <text class="t-xs" x="20" y="350">→ nsproxy를 복사</text>
+  <path class="ln" d="M150 56 H196" marker-end="url(#ah)"/>
+  <path class="ln" d="M150 116 H196" marker-end="url(#ah)"/>
+  <path class="ln" d="M150 272 H196" marker-end="url(#ah)"/>
+  <rect class="box" x="200" y="30" width="150" height="134" rx="10"/>
+  <text class="t-mono t-b" x="212" y="52">nsproxy</text>
+  <text class="t-xs end" x="340" y="52">count 2</text>
+  <text class="t-code" x="212" y="80">mnt_ns</text>
+  <text class="t-code" x="212" y="102">pid_ns_for_…</text>
+  <text class="t-code" x="212" y="124">net_ns</text>
+  <text class="t-code" x="212" y="152">uts_ns · ipc_ns</text>
+  <rect class="box" x="200" y="218" width="150" height="134" rx="10"/>
+  <text class="t-mono t-b" x="212" y="240">nsproxy</text>
+  <text class="t-xs end" x="340" y="240">count 1</text>
+  <text class="t-code" x="212" y="264">uts_ns · ipc_ns</text>
+  <text class="t-code" x="212" y="290">mnt_ns</text>
+  <text class="t-code" x="212" y="312">pid_ns_for_…</text>
+  <text class="t-code" x="212" y="334">net_ns</text>
+  <rect class="box blue" x="470" y="30" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="50">마운트 네임스페이스 ①</text>
+  <text class="t-xs end" x="728" y="50">호스트의 트리</text>
+  <rect class="box blue" x="470" y="66" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="86">PID 네임스페이스 ①</text>
+  <text class="t-xs end" x="728" y="86">level 0</text>
+  <rect class="box blue" x="470" y="102" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="122">네트워크 네임스페이스 ①</text>
+  <text class="t-xs end" x="728" y="122">eth0, lo</text>
+  <rect class="box gray" x="470" y="160" width="270" height="56" rx="8"/>
+  <text class="t-b" x="482" y="183">UTS · IPC 네임스페이스</text>
+  <text class="t-xs" x="482" y="203">바꾸지 않았으므로 세 태스크가 함께 쓴다</text>
+  <rect class="box green" x="470" y="244" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="264">마운트 네임스페이스 ②</text>
+  <text class="t-xs end" x="728" y="264">복사한 트리</text>
+  <rect class="box green" x="470" y="280" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="300">PID 네임스페이스 ②</text>
+  <text class="t-xs end" x="728" y="300">level 1</text>
+  <rect class="box green" x="470" y="316" width="270" height="30" rx="8"/>
+  <text class="t-b" x="482" y="336">네트워크 네임스페이스 ②</text>
+  <text class="t-xs end" x="728" y="336">lo뿐</text>
+  <path class="ln thin blue" d="M350 76 H376 V45 H466" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M350 98 H386 V81 H466" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M350 120 H396 V117 H466" marker-end="url(#ah-blue)"/>
+  <path class="ln thin muted" d="M350 148 H376 V176 H466" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M350 260 H412 V198 H466" marker-end="url(#ah-muted)"/>
+  <path class="ln thin green" d="M350 286 H422 V259 H466" marker-end="url(#ah-green)"/>
+  <path class="ln thin green" d="M350 308 H432 V295 H466" marker-end="url(#ah-green)"/>
+  <path class="ln thin green" d="M350 330 H442 V331 H466" marker-end="url(#ah-green)"/>
+
+  <text class="t-s mid" x="380" y="376">네임스페이스 객체의 참조 카운트는 태스크 수가 아니라 가리키는 nsproxy 수다</text>
+</svg>

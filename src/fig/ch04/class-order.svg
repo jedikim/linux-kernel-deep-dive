@@ -1,0 +1,60 @@
+<svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg">
+  <title>링커 스크립트가 스케줄링 클래스 여섯 개를 stop, dl, rt, fair, ext, idle 순서로 메모리에 놓고, 다음 태스크를 고를 때 높은 클래스부터 pick_task를 불러 처음 태스크를 내놓는 클래스에서 멈춘다</title>
+
+  <text class="t-code" x="20" y="26">__sched_class_highest</text>
+  <text class="t-code end" x="732" y="26">__sched_class_lowest</text>
+  <text class="t-s mid" x="360" y="26">주소가 커질수록 낮은 클래스</text>
+  <path class="ln thin muted" d="M20 34 V44"/>
+  <path class="ln thin muted" d="M732 34 V44"/>
+  <path class="ln thin muted" d="M190 22 H262"/>
+  <path class="ln thin muted" d="M458 22 H570" marker-end="url(#ah-muted)"/>
+
+  <rect class="box gray" x="20" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="76" y="71">stop</text>
+  <text class="t-xs mid" x="76" y="92">강제 이동</text>
+
+  <rect class="box warm" x="140" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="196" y="71">dl</text>
+  <text class="t-xs mid" x="196" y="92">기한</text>
+
+  <rect class="box warm" x="260" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="316" y="71">rt</text>
+  <text class="t-xs mid" x="316" y="92">고정 우선순위</text>
+
+  <rect class="box green" x="380" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="436" y="71">fair</text>
+  <text class="t-xs mid" x="436" y="92">일반 태스크</text>
+
+  <rect class="box teal" x="500" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="556" y="71">ext</text>
+  <text class="t-xs mid" x="556" y="92">BPF 스케줄러</text>
+
+  <rect class="box gray" x="620" y="46" width="112" height="60" rx="8"/>
+  <text class="t-mono t-b mid" x="676" y="71">idle</text>
+  <text class="t-xs mid" x="676" y="92">할 일 없을 때</text>
+
+  <!-- pick_task 순회 -->
+  <path class="ln" d="M76 106 V142" marker-end="url(#ah)"/>
+  <text class="t-xs" x="84" y="130">①</text>
+  <path class="ln" d="M196 106 V142" marker-end="url(#ah)"/>
+  <text class="t-xs" x="204" y="130">②</text>
+  <path class="ln" d="M316 106 V142" marker-end="url(#ah)"/>
+  <text class="t-xs" x="324" y="130">③</text>
+  <path class="ln green" d="M436 106 V142" marker-end="url(#ah-green)"/>
+  <text class="t-xs" x="444" y="130">④</text>
+
+  <rect class="ghost dash" x="20" y="146" width="112" height="34" rx="8"/>
+  <text class="t-code mid" x="76" y="168">NULL</text>
+  <rect class="ghost dash" x="140" y="146" width="112" height="34" rx="8"/>
+  <text class="t-code mid" x="196" y="168">NULL</text>
+  <rect class="ghost dash" x="260" y="146" width="112" height="34" rx="8"/>
+  <text class="t-code mid" x="316" y="168">NULL</text>
+  <rect class="solid green" x="380" y="146" width="112" height="34" rx="8"/>
+  <text class="t-s t-b t-on mid" x="436" y="168">태스크 반환</text>
+  <text class="t-xs tc-muted mid" x="556" y="168">묻지 않는다</text>
+  <text class="t-xs tc-muted mid" x="676" y="168">묻지 않는다</text>
+
+  <text class="t-s t-ink mid" x="380" y="214">높은 클래스부터 class->pick_task()를 부르고, 처음으로 태스크를 내놓는 클래스에서 멈춘다</text>
+  <text class="t-s mid" x="380" y="236">끝까지 가더라도 idle 클래스가 반드시 rq->idle을 내놓는다</text>
+  <text class="t-s mid" x="380" y="258">nr_running == cfs.h_nr_queued 이면 순회를 건너뛰고 pick_task_fair()를 바로 부른다</text>
+</svg>

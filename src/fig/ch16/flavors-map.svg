@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg">
+  <title>RCU 변종의 지도: RCU, SRCU, Tasks RCU, Tasks Trace RCU가 읽기 구간을 어떻게 표시하고, 읽는 쪽이 잠들 수 있는지, 유예 기간이 무엇을 기다리는지</title>
+
+  <text class="t-s t-ink t-b" x="150" y="28">읽기 구간의 표시</text>
+  <text class="t-s t-ink t-b mid" x="405" y="28">잠들기</text>
+  <text class="t-s t-ink t-b" x="460" y="28">유예 기간이 기다리는 것 · 쓰임</text>
+
+  <text class="t-b" x="20" y="72">RCU</text>
+  <rect class="box blue" x="150" y="40" width="200" height="56" rx="8"/>
+  <text class="t-code mid" x="250" y="73">rcu_read_lock()</text>
+  <rect class="box red" x="360" y="40" width="90" height="56" rx="8"/>
+  <text class="t-s t-ink mid" x="405" y="73">안 됨</text>
+  <rect class="box" x="460" y="40" width="280" height="56" rx="8"/>
+  <text class="t-s" x="474" y="63">모든 CPU의 정지 상태</text>
+  <text class="t-xs" x="474" y="83">커널 전역. 대부분의 쓰임</text>
+
+  <text class="t-b" x="20" y="140">SRCU</text>
+  <rect class="box blue" x="150" y="108" width="200" height="56" rx="8"/>
+  <text class="t-code mid" x="250" y="141">srcu_read_lock(&amp;ss)</text>
+  <rect class="box green" x="360" y="108" width="90" height="56" rx="8"/>
+  <text class="t-s t-ink mid" x="405" y="141">됨</text>
+  <rect class="box" x="460" y="108" width="280" height="56" rx="8"/>
+  <text class="t-s" x="474" y="131">그 srcu_struct의 읽는 쪽이 모두 나감</text>
+  <text class="t-xs" x="474" y="151">도메인별. KVM 메모리 슬롯, 알림 체인</text>
+
+  <text class="t-b" x="20" y="208">Tasks RCU</text>
+  <rect class="box gray" x="150" y="176" width="200" height="56" rx="8"/>
+  <text class="t-s t-ink mid" x="250" y="209">표시 없음</text>
+  <rect class="box gray" x="360" y="176" width="90" height="56" rx="8"/>
+  <text class="t-s t-ink mid" x="405" y="209">—</text>
+  <rect class="box" x="460" y="176" width="280" height="56" rx="8"/>
+  <text class="t-s" x="474" y="199">모든 태스크의 자발적 컨텍스트 스위치</text>
+  <text class="t-xs" x="474" y="219">ftrace·BPF 트램펄린의 해제</text>
+
+  <text class="t-b" x="20" y="268">Tasks Trace</text>
+  <text class="t-b" x="20" y="286">RCU</text>
+  <rect class="box blue" x="150" y="244" width="200" height="56" rx="8"/>
+  <text class="t-code mid" x="250" y="277">rcu_read_lock_trace()</text>
+  <rect class="box green" x="360" y="244" width="90" height="56" rx="8"/>
+  <text class="t-s t-ink mid" x="405" y="277">됨</text>
+  <rect class="box" x="460" y="244" width="280" height="56" rx="8"/>
+  <text class="t-s" x="474" y="267">v7.3에서는 SRCU 위에 구현</text>
+  <text class="t-xs" x="474" y="287">잠들 수 있는 BPF 프로그램</text>
+
+  <text class="t-xs" x="20" y="320">예전의 RCU-bh와 RCU-sched는 4.20에서 RCU 하나로 합쳐졌다</text>
+</svg>

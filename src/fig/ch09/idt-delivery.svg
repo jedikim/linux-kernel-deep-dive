@@ -1,0 +1,88 @@
+<svg viewBox="0 0 760 412" xmlns="http://www.w3.org/2000/svg">
+  <title>IDT 방식의 인터럽트 전달: CPU가 벡터로 IDT 게이트를 찾고 스택을 골라 프레임을 쌓으면, 벡터별 스텁과 error_entry가 레지스터 저장, swapgs, CR3 전환을 하고 C 함수를 부른다</title>
+
+  <!-- IDT -->
+  <text class="t-b" x="20" y="26">IDT</text>
+  <text class="t-xs" x="54" y="26">벡터로 찾는 표, 256칸</text>
+  <rect class="box" x="20" y="38" width="180" height="28"/>
+  <text class="t-code" x="30" y="57">0x00</text>
+  <text class="t-xs" x="76" y="57">#DE</text>
+  <rect class="box" x="20" y="66" width="180" height="28"/>
+  <text class="t-code" x="30" y="85">0x0e</text>
+  <text class="t-xs" x="76" y="85">#PF 페이지 폴트</text>
+  <text class="t-s mid" x="110" y="113">⋮</text>
+  <rect class="box warm" x="20" y="122" width="180" height="28"/>
+  <text class="t-code" x="30" y="141">0x21</text>
+  <text class="t-xs t-ink t-b" x="76" y="141">장치 인터럽트</text>
+  <text class="t-s mid" x="110" y="169">⋮</text>
+  <rect class="box" x="20" y="178" width="180" height="28"/>
+  <text class="t-code" x="30" y="197">0xec</text>
+  <text class="t-xs" x="76" y="197">APIC 타이머</text>
+  <rect class="box" x="20" y="206" width="180" height="28"/>
+  <text class="t-code" x="30" y="225">0xff</text>
+  <text class="t-xs" x="76" y="225">가짜 인터럽트</text>
+
+  <path class="ln warm" d="M200 136 H213 V324 H205" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="20" y="262" width="180" height="124" rx="10"/>
+  <text class="t-s t-ink t-b" x="32" y="284">게이트 한 칸</text>
+  <text class="t-xs" x="32" y="304">핸들러 주소</text>
+  <text class="t-xs" x="32" y="322">코드 세그먼트</text>
+  <text class="t-xs" x="32" y="340">IST 번호 (0–7)</text>
+  <text class="t-xs" x="32" y="358">DPL (0 또는 3)</text>
+  <text class="t-xs" x="32" y="376">종류: 인터럽트 게이트</text>
+
+  <!-- CPU가 하는 일 -->
+  <text class="t-b tc-blue" x="232" y="26">① CPU가 한다</text>
+  <rect class="box blue" x="232" y="38" width="260" height="104" rx="10"/>
+  <text class="t-s t-ink t-b" x="244" y="60">스택을 고른다</text>
+  <text class="t-xs" x="244" y="82">유저 모드에서 왔으면 TSS의 sp0</text>
+  <text class="t-xs" x="244" y="102">게이트에 IST 번호가 있으면 TSS의 ist[n]</text>
+  <text class="t-xs" x="244" y="122">그 밖에는 쓰던 커널 스택 그대로</text>
+
+  <text class="t-s t-ink t-b" x="232" y="168">고른 스택에 쌓이는 것</text>
+  <rect class="box blue" x="232" y="178" width="140" height="24"/>
+  <text class="t-code mid" x="302" y="195">SS</text>
+  <rect class="box blue" x="232" y="202" width="140" height="24"/>
+  <text class="t-code mid" x="302" y="219">RSP</text>
+  <rect class="box blue" x="232" y="226" width="140" height="24"/>
+  <text class="t-code mid" x="302" y="243">RFLAGS</text>
+  <rect class="box blue" x="232" y="250" width="140" height="24"/>
+  <text class="t-code mid" x="302" y="267">CS</text>
+  <rect class="box blue" x="232" y="274" width="140" height="24"/>
+  <text class="t-code mid" x="302" y="291">RIP</text>
+  <rect class="box yellow" x="232" y="298" width="140" height="24"/>
+  <text class="t-xs t-ink mid" x="302" y="315">오류 코드 / 벡터</text>
+  <rect class="box green" x="232" y="322" width="140" height="40"/>
+  <text class="t-code mid" x="302" y="347">rdi rsi … r15</text>
+
+  <path class="ln thin blue" d="M380 180 V296"/>
+  <text class="t-xs tc-blue" x="388" y="234">CPU가 쌓고</text>
+  <text class="t-xs tc-blue" x="388" y="252">IF를 0으로 한다</text>
+  <text class="t-xs" x="388" y="315">CPU 또는 스텁</text>
+  <text class="t-xs tc-green" x="388" y="347">error_entry</text>
+  <text class="t-xs" x="232" y="386">아래가 낮은 주소. 전체가 struct pt_regs</text>
+
+  <!-- 진입 코드 -->
+  <text class="t-b tc-green" x="520" y="26">② 진입 코드가 한다</text>
+  <rect class="box code" x="520" y="38" width="220" height="70" rx="10"/>
+  <text class="t-xs" x="532" y="58">벡터마다 하나씩 있는 스텁</text>
+  <text class="t-code" x="532" y="78">.byte 0x6a, vector</text>
+  <text class="t-code" x="532" y="96">jmp asm_common_interrupt</text>
+  <path class="ln green" d="M630 108 V121" marker-end="url(#ah-green)"/>
+
+  <rect class="box green" x="520" y="126" width="220" height="140" rx="10"/>
+  <text class="t-mono t-b" x="532" y="148">error_entry</text>
+  <text class="t-xs" x="532" y="170">범용 레지스터를 모두 저장</text>
+  <text class="t-xs t-ink" x="532" y="192">유저 모드에서 왔으면</text>
+  <text class="t-xs" x="542" y="212">swapgs로 GS를 커널 것으로</text>
+  <text class="t-xs" x="542" y="232">CR3를 커널 페이지 테이블로</text>
+  <text class="t-xs" x="542" y="252">스레드 스택으로 옮겨 탄다</text>
+  <path class="ln green" d="M630 266 V279" marker-end="url(#ah-green)"/>
+
+  <rect class="box green" x="520" y="284" width="220" height="56" rx="10"/>
+  <text class="t-mono t-b" x="532" y="306">common_interrupt()</text>
+  <text class="t-xs" x="532" y="326">C 함수. 인자는 pt_regs와 벡터</text>
+
+  <text class="t-xs" x="520" y="366">돌아갈 때는 거꾸로 꺼내고 iretq.</text>
+  <text class="t-xs" x="520" y="386">유저 모드로 가면 다시 swapgs.</text>
+</svg>

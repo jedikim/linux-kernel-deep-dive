@@ -1,0 +1,83 @@
+<svg viewBox="0 0 760 350" xmlns="http://www.w3.org/2000/svg">
+  <title>2소켓, 소켓당 4코어, 코어당 2스레드 머신에서 CPU 0의 스케줄 도메인: SMT 도메인은 CPU 0과 8, MC 도메인은 소켓 0의 여덟 CPU, NUMA 도메인은 전체 열여섯 CPU를 덮고, 각 도메인은 아래 단계의 덩어리를 그룹으로 가진다.</title>
+
+  <!-- 표 -->
+  <text class="t-xs" x="20" y="18">CPU 0의 도메인 (rq->sd에서 parent를 따라 위로)</text>
+  <text class="t-xs" x="270" y="18">범위</text>
+  <text class="t-xs" x="430" y="18">그룹</text>
+
+  <rect class="box purple" x="20" y="26" width="720" height="30" rx="6"/>
+  <text class="t-mono t-b" x="32" y="46">domain2 · NUMA</text>
+  <text class="t-code" x="270" y="46">0-15</text>
+  <text class="t-code" x="430" y="46">{0-3,8-11} {4-7,12-15}</text>
+
+  <rect class="box green" x="20" y="62" width="720" height="30" rx="6"/>
+  <text class="t-mono t-b" x="32" y="82">domain1 · MC</text>
+  <text class="t-code" x="270" y="82">0-3,8-11</text>
+  <text class="t-code" x="430" y="82">{0,8} {1,9} {2,10} {3,11}</text>
+
+  <rect class="box blue" x="20" y="98" width="720" height="30" rx="6"/>
+  <text class="t-mono t-b" x="32" y="118">domain0 · SMT</text>
+  <text class="t-code" x="270" y="118">0,8</text>
+  <text class="t-code" x="430" y="118">{0} {8}</text>
+
+  <!-- 배치 -->
+  <rect class="ghost purple" x="10" y="150" width="740" height="156" rx="12"/>
+  <text class="t-s tc-purple t-b" x="24" y="172">NUMA</text>
+  <text class="t-xs" x="74" y="172">소켓 사이. 메모리가 멀다</text>
+
+  <rect class="panel green" x="18" y="184" width="358" height="112" rx="10"/>
+  <text class="t-s tc-green t-b" x="32" y="206">MC</text>
+  <text class="t-xs" x="60" y="206">소켓 0 · L3를 같이 쓴다</text>
+  <rect class="panel gray" x="388" y="184" width="352" height="112" rx="10"/>
+  <text class="t-xs" x="402" y="206">소켓 1</text>
+
+  <rect class="ghost blue" x="24" y="216" width="84" height="72" rx="8"/>
+  <text class="t-xs tc-blue t-b mid" x="66" y="280">SMT</text>
+
+  <!-- CPU 상자: 소켓 0 -->
+  <rect class="solid blue" x="28" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code t-b t-on mid" x="46" y="246">0</text>
+  <rect class="box blue" x="68" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="86" y="246">8</text>
+
+  <rect class="box" x="116" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="134" y="246">1</text>
+  <rect class="box" x="156" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="174" y="246">9</text>
+
+  <rect class="box" x="204" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="222" y="246">2</text>
+  <rect class="box" x="244" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="262" y="246">10</text>
+
+  <rect class="box" x="292" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="310" y="246">3</text>
+  <rect class="box" x="332" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="350" y="246">11</text>
+
+  <!-- 소켓 1 -->
+  <rect class="box" x="396" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="414" y="246">4</text>
+  <rect class="box" x="436" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="454" y="246">12</text>
+
+  <rect class="box" x="484" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="502" y="246">5</text>
+  <rect class="box" x="524" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="542" y="246">13</text>
+
+  <rect class="box" x="572" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="590" y="246">6</text>
+  <rect class="box" x="612" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="630" y="246">14</text>
+
+  <rect class="box" x="660" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="678" y="246">7</text>
+  <rect class="box" x="700" y="224" width="36" height="34" rx="5"/>
+  <text class="t-code mid" x="718" y="246">15</text>
+
+  <text class="t-xs" x="118" y="280">코어 하나에 CPU 둘</text>
+
+  <text class="t-s mid" x="380" y="332">이 머신은 소켓 하나가 LLC 하나라 PKG 단계가 MC와 범위가 같다. 같은 범위의 단계는 만들어지지 않는다</text>
+</svg>

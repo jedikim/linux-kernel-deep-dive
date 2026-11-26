@@ -1,0 +1,56 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>Tree RCU의 rcu_node 트리: CPU가 정지 상태를 보고하면 잎의 qsmask에서 자기 비트를 지우고, 잎이 0이 되면 부모의 비트를 지우며, 뿌리가 0이 되면 유예 기간이 끝난다</title>
+
+  <rect class="box yellow" x="20" y="24" width="180" height="64" rx="10"/>
+  <text class="t-mono t-b" x="34" y="48">rcu_state</text>
+  <text class="t-code" x="34" y="70">gp_seq, gp_kthread</text>
+
+  <rect class="box purple" x="300" y="24" width="160" height="64" rx="10"/>
+  <text class="t-b mid" x="380" y="48">rcu_node · 뿌리</text>
+  <text class="t-code mid" x="380" y="70">qsmask = 0b10</text>
+
+  <text class="t-s" x="490" y="44">뿌리의 qsmask가 0이 되면</text>
+  <text class="t-s" x="490" y="64">유예 기간이 끝나고</text>
+  <text class="t-s" x="490" y="84">유예 기간 스레드가 깨어난다</text>
+
+  <rect class="box purple" x="110" y="150" width="240" height="64" rx="10"/>
+  <text class="t-b mid" x="230" y="174">rcu_node · CPU 0–15</text>
+  <text class="t-code mid" x="230" y="196">qsmask = 0</text>
+
+  <rect class="box purple" x="410" y="150" width="240" height="64" rx="10"/>
+  <text class="t-b mid" x="530" y="174">rcu_node · CPU 16–31</text>
+  <text class="t-code mid" x="530" y="196">qsmask = 0b100</text>
+
+  <path class="ln yellow" d="M200 56 H296" marker-end="url(#ah-yellow)"/>
+  <path class="ln purple" d="M230 150 V120 H350 V92" marker-end="url(#ah-purple)"/>
+  <path class="ln purple" d="M530 150 V120 H410 V92" marker-end="url(#ah-purple)"/>
+  <text class="t-code tc-purple" x="130" y="124">parent</text>
+  <text class="t-code tc-purple" x="560" y="124">parent</text>
+
+  <rect class="box green" x="110" y="270" width="70" height="44" rx="8"/>
+  <text class="t-s t-ink mid" x="145" y="297">CPU 0</text>
+  <rect class="box green" x="195" y="270" width="70" height="44" rx="8"/>
+  <text class="t-s t-ink mid" x="230" y="297">CPU 1</text>
+  <rect class="box green" x="280" y="270" width="70" height="44" rx="8"/>
+  <text class="t-s t-ink mid" x="315" y="297">⋯ 15</text>
+
+  <rect class="box green" x="410" y="270" width="70" height="44" rx="8"/>
+  <text class="t-s t-ink mid" x="445" y="297">CPU 16</text>
+  <rect class="box green" x="495" y="270" width="70" height="44" rx="8"/>
+  <text class="t-s t-ink mid" x="530" y="297">CPU 17</text>
+  <rect class="box red" x="580" y="270" width="70" height="44" rx="8"/>
+  <text class="t-s t-ink mid" x="615" y="297">CPU 18</text>
+
+  <path class="ln thin muted" d="M145 270 V218" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M230 270 V218" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M315 270 V218" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M445 270 V218" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M530 270 V218" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M615 270 V218" marker-end="url(#ah-muted)"/>
+  <text class="t-code tc-muted" x="20" y="297">rcu_data</text>
+  <text class="t-xs tc-red" x="662" y="290">아직 보고</text>
+  <text class="t-xs tc-red" x="662" y="306">안 함</text>
+
+  <text class="t-s mid" x="380" y="350">CPU는 정지 상태를 지나면 자기 잎의 qsmask에서 자기 비트를 지운다.</text>
+  <text class="t-s mid" x="380" y="370">잎이 0이 되면 부모의 비트를 지운다. 대부분의 보고는 잎의 락만 잡고 끝난다</text>
+</svg>

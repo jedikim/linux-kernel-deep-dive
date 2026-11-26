@@ -1,0 +1,48 @@
+<svg viewBox="0 0 760 262" xmlns="http://www.w3.org/2000/svg">
+  <title>GRO: 한 번의 poll에서 올라온 여섯 개의 TCP 세그먼트가 흐름별로 두 개의 큰 skb로 묶여 프로토콜 스택을 두 번만 오른다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="30">poll 한 번에 올라온 skb</text>
+  <rect class="box blue" x="30" y="46" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="62">A · seq 1000</text>
+  <rect class="box blue" x="30" y="76" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="92">A · seq 2448</text>
+  <rect class="box green" x="30" y="106" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="122">B · seq 500</text>
+  <rect class="box blue" x="30" y="136" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="152">A · seq 3896</text>
+  <rect class="box green" x="30" y="166" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="182">B · seq 1948</text>
+  <rect class="box blue" x="30" y="196" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="212">A · seq 5344</text>
+  <path class="ln" d="M148 133 H256" marker-end="url(#ah)"/>
+
+  <rect class="panel" x="262" y="40" width="268" height="200" rx="12"/>
+  <text class="t-code t-b" x="276" y="62">gro_receive_skb()</text>
+  <text class="t-xs" x="276" y="86">흐름 A: skb 하나, 데이터 5792바이트</text>
+  <rect class="box blue" x="276" y="94" width="44" height="28"/>
+  <text class="t-xs t-ink mid" x="298" y="112">헤더</text>
+  <rect class="box blue" x="320" y="94" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="343" y="112">1448</text>
+  <rect class="box blue" x="366" y="94" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="389" y="112">1448</text>
+  <rect class="box blue" x="412" y="94" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="435" y="112">1448</text>
+  <rect class="box blue" x="458" y="94" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="481" y="112">1448</text>
+  <text class="t-xs" x="276" y="158">흐름 B: skb 하나, 데이터 2896바이트</text>
+  <rect class="box green" x="276" y="166" width="44" height="28"/>
+  <text class="t-xs t-ink mid" x="298" y="184">헤더</text>
+  <rect class="box green" x="320" y="166" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="343" y="184">1448</text>
+  <rect class="box green" x="366" y="166" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="389" y="184">1448</text>
+  <text class="t-xs" x="276" y="224">흐름이 같고 순서가 이어지면 뒤에 붙인다</text>
+
+  <path class="ln blue" d="M504 108 H548 V124 H564" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M412 180 H548 V156 H564" marker-end="url(#ah-green)"/>
+  <rect class="box purple" x="570" y="80" width="170" height="120" rx="12"/>
+  <text class="t-b mid" x="655" y="106">프로토콜 스택</text>
+  <text class="t-s t-ink mid" x="655" y="132">IP · TCP를 2번 오른다</text>
+  <text class="t-xs mid" x="655" y="156">묶지 않으면 6번</text>
+  <text class="t-xs mid" x="655" y="178">소켓 조회, 락, 큐 삽입도 2번</text>
+</svg>

@@ -1,0 +1,55 @@
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+  <title>RT 태스크가 CPU를 독점할 때 deadline 클래스의 엔티티인 fair_server가 뽑히면 pick_task_fair를 불러 일반 태스크를 실행한다. 주기 1초마다 50ms가 일반 태스크에 돌아간다.</title>
+
+  <!-- 클래스 -->
+  <rect class="box gray" x="20" y="28" width="80" height="76" rx="8"/>
+  <text class="t-b mid" x="60" y="70">stop</text>
+
+  <rect class="box warm" x="110" y="28" width="220" height="76" rx="8"/>
+  <text class="t-b" x="124" y="50">deadline</text>
+  <rect class="solid green" x="124" y="60" width="192" height="34" rx="6"/>
+  <text class="t-mono t-b t-on" x="136" y="82">rq->fair_server</text>
+  <text class="t-xs t-on end" x="306" y="82">50ms/1s</text>
+
+  <rect class="box warm" x="340" y="28" width="160" height="76" rx="8"/>
+  <text class="t-b" x="354" y="50">rt</text>
+  <text class="t-xs" x="354" y="72">SCHED_FIFO 태스크가</text>
+  <text class="t-xs" x="354" y="90">무한 반복 중</text>
+
+  <rect class="box green" x="510" y="28" width="150" height="76" rx="8"/>
+  <text class="t-b" x="524" y="50">fair</text>
+  <text class="t-xs" x="524" y="72">일반 태스크들이</text>
+  <text class="t-xs" x="524" y="90">기다린다</text>
+
+  <rect class="box gray" x="670" y="28" width="70" height="76" rx="8"/>
+  <text class="t-b mid" x="705" y="70">idle</text>
+
+  <text class="t-xs" x="20" y="18">높은 클래스</text>
+  <text class="t-xs end" x="740" y="18">낮은 클래스</text>
+
+  <path class="ln green" d="M220 94 V126 H585 V110" marker-end="url(#ah-green)"/>
+  <text class="t-s t-ink mid" x="402" y="146">서버가 뽑히면 server_pick_task()가 pick_task_fair()를 부른다</text>
+
+  <!-- 시간선: 1초 = 320px -->
+  <text class="t-s t-ink t-b" x="20" y="198">CPU</text>
+  <path class="ln thin muted" d="M100 170 V224"/>
+  <path class="ln thin muted" d="M420 170 V224"/>
+  <path class="ln thin muted" d="M740 170 V224"/>
+  <text class="t-xs mid" x="260" y="172">주기 1초</text>
+  <text class="t-xs mid" x="580" y="172">주기 1초</text>
+
+  <rect class="box warm" x="100" y="180" width="304" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="252" y="200">RT 태스크</text>
+  <rect class="solid green" x="404" y="180" width="16" height="30"/>
+  <rect class="box warm" x="420" y="180" width="304" height="30" rx="5"/>
+  <text class="t-s t-ink mid" x="572" y="200">RT 태스크</text>
+  <rect class="solid green" x="724" y="180" width="16" height="30"/>
+
+  <path class="ln thin green" d="M412 214 V230"/>
+  <path class="ln thin green" d="M732 214 V230"/>
+  <text class="t-xs tc-green mid" x="412" y="244">일반 태스크 50ms</text>
+  <text class="t-xs tc-green end" x="740" y="244">일반 태스크 50ms</text>
+
+  <text class="t-s t-ink mid" x="380" y="272">deadline 클래스는 rt보다 높다. 서버가 받은 시간은 fair 클래스의 태스크가 쓴다</text>
+  <text class="t-xs mid" x="380" y="292">일반 태스크가 스스로 50ms를 받은 주기에는 서버가 실행되지 않는다. 주기 안의 위치는 개략이다</text>
+</svg>

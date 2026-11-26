@@ -1,0 +1,133 @@
+<svg viewBox="0 0 760 556" xmlns="http://www.w3.org/2000/svg">
+  <title>커널 지도: 유저 공간과 하드웨어 사이에 시스템 콜, 태스크와 스케줄러, 메모리, 파일과 블록, 네트워크, 격리와 가상화, 동시성, 시간과 인터럽트가 놓인다. 각 상자는 해당 장으로 이어진다.</title>
+
+  <!-- 유저 공간 -->
+  <rect class="panel blue" x="20" y="14" width="720" height="40" rx="10"/>
+  <text class="t-b tc-blue" x="36" y="39">유저 공간</text>
+  <text class="t-s end" x="724" y="39">프로세스 · 스레드 · 컨테이너 · 가상 머신</text>
+
+  <a href="../chapters/ch19.html">
+    <rect class="box teal" x="20" y="62" width="720" height="36" rx="10"/>
+    <text class="t-b mid" x="380" y="85">시스템 콜 인터페이스</text>
+    <text class="t-xs tc-teal end" x="724" y="85">19장</text>
+  </a>
+
+  <!-- 커널 -->
+  <rect class="panel yellow" x="20" y="106" width="720" height="310" rx="12"/>
+
+  <a href="../chapters/ch01.html">
+    <rect class="box blue" x="34" y="120" width="132" height="60" rx="10"/>
+    <text class="t-b mid" x="100" y="146">태스크</text>
+    <text class="t-xs mid" x="100" y="166">1–3장</text>
+  </a>
+  <a href="../chapters/ch04.html">
+    <rect class="box green" x="34" y="188" width="132" height="60" rx="10"/>
+    <text class="t-b mid" x="100" y="214">스케줄러</text>
+    <text class="t-xs mid" x="100" y="234">4–7장</text>
+  </a>
+
+  <a href="../chapters/ch17.html">
+    <rect class="box red" x="174" y="120" width="132" height="60" rx="10"/>
+    <text class="t-b mid" x="240" y="146">가상 주소 공간</text>
+    <text class="t-xs mid" x="240" y="166">17장</text>
+  </a>
+  <a href="../chapters/ch18.html">
+    <rect class="box red" x="174" y="188" width="132" height="60" rx="10"/>
+    <text class="t-b mid" x="240" y="214">물리 메모리</text>
+    <text class="t-xs mid" x="240" y="234">18장</text>
+  </a>
+
+  <a href="../chapters/ch20.html">
+    <rect class="box teal" x="314" y="120" width="132" height="60" rx="10"/>
+    <text class="t-b mid" x="380" y="146">VFS·파일시스템</text>
+    <text class="t-xs mid" x="380" y="166">20장</text>
+  </a>
+  <a href="../chapters/ch21.html">
+    <rect class="box teal" x="314" y="188" width="132" height="60" rx="10"/>
+    <text class="t-b mid" x="380" y="214">블록·io_uring</text>
+    <text class="t-xs mid" x="380" y="234">21장</text>
+  </a>
+
+  <a href="../chapters/ch12.html">
+    <rect class="box warm" x="454" y="120" width="132" height="60" rx="10"/>
+    <text class="t-b mid" x="520" y="146">네트워크 스택</text>
+    <text class="t-xs mid" x="520" y="166">12장</text>
+  </a>
+  <a href="../chapters/ch24.html">
+    <rect class="box yellow" x="454" y="188" width="132" height="60" rx="10"/>
+    <text class="t-b mid" x="520" y="214">eBPF</text>
+    <text class="t-xs mid" x="520" y="234">24장</text>
+  </a>
+
+  <a href="../chapters/ch22.html">
+    <rect class="box yellow" x="594" y="120" width="132" height="60" rx="10"/>
+    <text class="t-b mid" x="660" y="146">격리와 자원 제한</text>
+    <text class="t-xs mid" x="660" y="166">22장</text>
+  </a>
+  <a href="../chapters/ch23.html">
+    <rect class="box yellow" x="594" y="188" width="132" height="60" rx="10"/>
+    <text class="t-b mid" x="660" y="214">가상화 · KVM</text>
+    <text class="t-xs mid" x="660" y="234">23장</text>
+  </a>
+
+  <a href="../chapters/ch13.html">
+    <rect class="box purple" x="34" y="258" width="692" height="46" rx="10"/>
+    <text class="t-b" x="50" y="286">동시성</text>
+    <text class="t-s mid" x="390" y="286">실행 컨텍스트 · 스핀락과 뮤텍스 · 우선순위 상속 · RCU</text>
+    <text class="t-xs tc-purple end" x="712" y="286">13–16장</text>
+  </a>
+
+  <a href="../chapters/ch08.html">
+    <rect class="box warm" x="34" y="314" width="222" height="60" rx="10"/>
+    <text class="t-b mid" x="145" y="340">시간과 타이머</text>
+    <text class="t-xs mid" x="145" y="360">8장</text>
+  </a>
+  <a href="../chapters/ch10.html">
+    <rect class="box warm" x="266" y="314" width="226" height="60" rx="10"/>
+    <text class="t-b mid" x="379" y="340">IRQ 계층</text>
+    <text class="t-xs mid" x="379" y="360">10장</text>
+  </a>
+  <a href="../chapters/ch11.html">
+    <rect class="box warm" x="502" y="314" width="224" height="60" rx="10"/>
+    <text class="t-b mid" x="614" y="340">Top half와 Bottom half</text>
+    <text class="t-xs mid" x="614" y="360">11장</text>
+  </a>
+  <text class="t-b tc-yellow" x="36" y="402">커널</text>
+  <text class="t-s end" x="724" y="402">위에서 아래로: 요청이 내려가는 길 · 아래에서 위로: 인터럽트가 올라오는 길</text>
+
+  <!-- 하드웨어 -->
+  <rect class="panel gray" x="20" y="424" width="720" height="64" rx="12"/>
+  <text class="t-b" x="36" y="461">하드웨어</text>
+  <a href="../chapters/ch09.html">
+    <rect class="box" x="120" y="436" width="280" height="40" rx="10"/>
+    <text class="t-b" x="134" y="461">인터럽트 컨트롤러</text>
+    <text class="t-xs end" x="388" y="461">APIC · MSI · 9장</text>
+  </a>
+  <use href="#i-chip" x="440" y="430" width="30" height="30" class="ic gray"/>
+  <text class="t-xs mid" x="455" y="478">CPU</text>
+  <use href="#i-ram" x="514" y="430" width="30" height="30" class="ic gray"/>
+  <text class="t-xs mid" x="529" y="478">메모리</text>
+  <use href="#i-disk" x="588" y="430" width="30" height="30" class="ic gray"/>
+  <text class="t-xs mid" x="603" y="478">디스크</text>
+  <use href="#i-nic" x="662" y="430" width="30" height="30" class="ic gray"/>
+  <text class="t-xs mid" x="677" y="478">NIC</text>
+
+  <!-- 개발 방법론 -->
+  <text class="t-b" x="20" y="524">개발 방법론</text>
+  <a href="../chapters/ch25.html">
+    <rect class="box" x="124" y="502" width="146" height="36" rx="10"/>
+    <text class="t-s t-ink mid" x="197" y="525">25장 코드 패턴</text>
+  </a>
+  <a href="../chapters/ch26.html">
+    <rect class="box" x="278" y="502" width="146" height="36" rx="10"/>
+    <text class="t-s t-ink mid" x="351" y="525">26장 개발 과정</text>
+  </a>
+  <a href="../chapters/ch27.html">
+    <rect class="box" x="432" y="502" width="146" height="36" rx="10"/>
+    <text class="t-s t-ink mid" x="505" y="525">27장 품질 장치</text>
+  </a>
+  <a href="../chapters/ch28.html">
+    <rect class="box" x="586" y="502" width="154" height="36" rx="10"/>
+    <text class="t-s t-ink mid" x="663" y="525">28장 직접 해 보기</text>
+  </a>
+</svg>

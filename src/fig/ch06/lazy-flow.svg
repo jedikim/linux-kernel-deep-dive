@@ -1,0 +1,37 @@
+<svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg">
+  <title>PREEMPT_LAZY: 일반 태스크가 깨어나면 LAZY 비트만 서고 유저 모드 복귀나 다음 틱에 전환된다. 실시간 태스크가 깨어나면 NEED_RESCHED가 바로 선다.</title>
+
+  <text class="t-xs mid" x="180" y="20">깨어남</text>
+  <text class="t-xs mid" x="520" y="20">틱</text>
+  <path class="ln thin muted dash" d="M180 26 V36 M180 56 V132 M180 152 V228 M180 248 V300"/>
+  <path class="ln thin muted dash" d="M520 26 V196"/>
+
+  <!-- 1: 곧 유저 모드로 -->
+  <text class="t-s t-ink t-b" x="20" y="50">일반 태스크 B가 깨어남 · A가 곧 유저 모드로 돌아가는 경우</text>
+  <rect class="box yellow" x="40" y="58" width="290" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="110" y="78">A · 커널 모드</text>
+  <rect class="box green" x="330" y="58" width="410" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="535" y="78">B 실행</text>
+  <rect class="solid purple" x="180" y="92" width="150" height="6" rx="3"/>
+  <text class="t-xs tc-purple" x="186" y="114">LAZY 비트만 선다 → 유저 모드로 돌아가는 길에 schedule()</text>
+
+  <!-- 2: 커널 안에 오래 -->
+  <text class="t-s t-ink t-b" x="20" y="146">일반 태스크 B가 깨어남 · A가 커널 안에 오래 머무는 경우</text>
+  <rect class="box yellow" x="40" y="154" width="500" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="110" y="174">A · 커널 모드</text>
+  <rect class="box green" x="540" y="154" width="200" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="640" y="174">B 실행</text>
+  <rect class="solid purple" x="180" y="188" width="340" height="6" rx="3"/>
+  <rect class="solid red" x="520" y="188" width="20" height="6" rx="3"/>
+  <text class="t-xs tc-purple" x="186" y="210">LAZY 비트</text>
+  <text class="t-xs tc-red end" x="736" y="210">틱이 NEED_RESCHED로 올린다 → 인터럽트 복귀 길에 선점</text>
+
+  <!-- 3: 실시간 태스크 -->
+  <text class="t-s t-ink t-b" x="20" y="242">실시간 태스크 R이 깨어남</text>
+  <rect class="box yellow" x="40" y="250" width="160" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="110" y="270">A · 커널 모드</text>
+  <rect class="box red" x="200" y="250" width="540" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="470" y="270">R 실행</text>
+  <rect class="solid red" x="180" y="284" width="20" height="6" rx="3"/>
+  <text class="t-xs tc-red" x="186" y="308">RT·deadline 클래스는 resched_curr()를 쓴다 → NEED_RESCHED가 바로 선다</text>
+</svg>

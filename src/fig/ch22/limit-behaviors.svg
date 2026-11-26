@@ -1,0 +1,61 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>두 가지 상한의 동작: cpu.max는 100ms 주기마다 50ms를 쓰면 다음 주기까지 스로틀하고, 메모리는 memory.high를 넘으면 할당이 느려지고 memory.max에 닿으면 cgroup 안에서 회수와 OOM 킬이 일어난다</title>
+
+  <text class="t-code t-b" x="20" y="26">cpu.max = 50000 100000</text>
+  <text class="t-xs" x="200" y="26">100ms 주기마다 50ms까지</text>
+  <rect class="box green" x="40" y="38" width="110" height="30"/>
+  <text class="t-xs t-ink mid" x="95" y="58">실행 50ms</text>
+  <rect class="box red" x="150" y="38" width="110" height="30"/>
+  <rect x="150" y="38" width="110" height="30" fill="url(#hatch-red)"/>
+  <text class="t-xs t-ink t-b mid" x="205" y="58">스로틀</text>
+  <rect class="box green" x="260" y="38" width="110" height="30"/>
+  <text class="t-xs t-ink mid" x="315" y="58">실행 50ms</text>
+  <rect class="box red" x="370" y="38" width="110" height="30"/>
+  <rect x="370" y="38" width="110" height="30" fill="url(#hatch-red)"/>
+  <text class="t-xs t-ink t-b mid" x="425" y="58">스로틀</text>
+  <rect class="box green" x="480" y="38" width="110" height="30"/>
+  <text class="t-xs t-ink mid" x="535" y="58">실행 50ms</text>
+  <rect class="box red" x="590" y="38" width="110" height="30"/>
+  <rect x="590" y="38" width="110" height="30" fill="url(#hatch-red)"/>
+  <text class="t-xs t-ink t-b mid" x="645" y="58">스로틀</text>
+  <path class="ln thin" d="M40 68 V76"/>
+  <text class="t-code" x="40" y="90">0</text>
+  <path class="ln thin" d="M260 68 V76"/>
+  <text class="t-code mid" x="260" y="90">100ms</text>
+  <path class="ln thin" d="M480 68 V76"/>
+  <text class="t-code mid" x="480" y="90">200ms</text>
+  <path class="ln thin" d="M700 68 V76"/>
+  <text class="t-code mid" x="700" y="90">300ms</text>
+  <text class="t-xs mid" x="260" y="108">주기 타이머가 몫을 다시 채운다</text>
+  <text class="t-xs end" x="740" y="108">CPU가 놀고 있어도 스로틀된다</text>
+
+  <path class="ln thin muted dash" d="M20 124 H740"/>
+
+  <text class="t-code t-b" x="20" y="150">memory.high = 400M · memory.max = 500M</text>
+  <rect class="box" x="40" y="162" width="480" height="30"/>
+  <text class="t-xs t-ink mid" x="280" y="182">과금만 한다</text>
+  <rect class="box warm" x="520" y="162" width="120" height="30"/>
+  <text class="t-xs t-ink t-b mid" x="580" y="182">느려진다</text>
+  <rect class="box red" x="640" y="162" width="60" height="30"/>
+  <rect x="640" y="162" width="60" height="30" fill="url(#hatch-red)"/>
+  <path class="ln thin" d="M40 192 V200"/>
+  <text class="t-code" x="40" y="214">0</text>
+  <path class="ln thin" d="M520 192 V200"/>
+  <text class="t-code mid" x="520" y="214">400M</text>
+  <path class="ln thin" d="M640 192 V200"/>
+  <text class="t-code mid" x="640" y="214">500M</text>
+  <text class="t-xs" x="100" y="214">cgroup의 메모리 사용량 →</text>
+
+  <rect class="box" x="20" y="232" width="250" height="68" rx="10"/>
+  <text class="t-b" x="32" y="255">그 아래</text>
+  <text class="t-xs" x="32" y="274">memory.min · low 아래의 메모리는</text>
+  <text class="t-xs" x="32" y="290">회수로부터 보호받는다</text>
+  <rect class="box warm" x="284" y="232" width="250" height="68" rx="10"/>
+  <text class="t-b" x="296" y="255">memory.high를 넘으면</text>
+  <text class="t-xs" x="296" y="274">할당한 태스크가 회수를 떠맡고</text>
+  <text class="t-xs" x="296" y="290">유저 모드 복귀 길에 강제로 잠든다</text>
+  <rect class="box red" x="548" y="232" width="192" height="68" rx="10"/>
+  <text class="t-b" x="560" y="255">memory.max에 닿으면</text>
+  <text class="t-xs" x="560" y="274">cgroup 안에서 회수한다</text>
+  <text class="t-xs" x="560" y="290">안 되면 OOM 킬</text>
+</svg>

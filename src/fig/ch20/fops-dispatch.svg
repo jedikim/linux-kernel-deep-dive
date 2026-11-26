@@ -1,0 +1,69 @@
+<svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg">
+  <title>read()가 vfs_read()까지는 한 길로 오고 f_op의 read_iter에서 ext4, 파이프, procfs의 구현으로 갈린다</title>
+
+  <rect class="box" x="20" y="14" width="150" height="36" rx="8"/>
+  <text class="t-mono mid" x="95" y="37">read(fd, buf, n)</text>
+  <path class="ln" d="M170 32 H196" marker-end="url(#ah)"/>
+  <rect class="box" x="200" y="14" width="130" height="36" rx="8"/>
+  <text class="t-mono mid" x="265" y="37">ksys_read()</text>
+  <path class="ln" d="M330 32 H356" marker-end="url(#ah)"/>
+  <rect class="box" x="360" y="14" width="120" height="36" rx="8"/>
+  <text class="t-mono mid" x="420" y="37">vfs_read()</text>
+  <path class="ln" d="M480 32 H506" marker-end="url(#ah)"/>
+  <rect class="solid" x="510" y="14" width="230" height="36" rx="8"/>
+  <text class="t-mono t-b t-on mid" x="625" y="37">f_op-&gt;read_iter()</text>
+
+  <path class="ln" d="M625 50 V68 H136 V86" marker-end="url(#ah)"/>
+  <path class="ln" d="M380 68 V86" marker-end="url(#ah)"/>
+  <path class="ln" d="M625 68 V86" marker-end="url(#ah)"/>
+
+  <!-- ext4 -->
+  <rect class="panel green" x="20" y="90" width="232" height="244" rx="14"/>
+  <text class="t-b tc-green mid" x="136" y="114">ext4의 일반 파일</text>
+  <rect class="box" x="36" y="126" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="136" y="146">ext4_file_read_iter()</text>
+  <path class="ln green" d="M136 156 V170" marker-end="url(#ah-green)"/>
+  <rect class="box" x="36" y="174" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="136" y="194">generic_file_read_iter()</text>
+  <path class="ln green" d="M136 204 V218" marker-end="url(#ah-green)"/>
+  <rect class="box" x="36" y="222" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="136" y="242">filemap_read()</text>
+  <path class="ln green" d="M136 252 V266" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="36" y="270" width="200" height="50" rx="8"/>
+  <text class="t-b mid" x="136" y="291">페이지 캐시</text>
+  <text class="t-xs mid" x="136" y="309">없으면 디스크에서 읽어 채운다</text>
+
+  <!-- pipe -->
+  <rect class="panel purple" x="264" y="90" width="232" height="244" rx="14"/>
+  <text class="t-b tc-purple mid" x="380" y="114">파이프</text>
+  <rect class="box" x="280" y="126" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="380" y="146">anon_pipe_read()</text>
+  <path class="ln purple" d="M380 156 V170" marker-end="url(#ah-purple)"/>
+  <rect class="box" x="280" y="174" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="380" y="194">mutex_lock(&amp;pipe-&gt;mutex)</text>
+  <path class="ln purple" d="M380 204 V218" marker-end="url(#ah-purple)"/>
+  <rect class="box" x="280" y="222" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="380" y="242">copy_page_to_iter()</text>
+  <path class="ln purple" d="M380 252 V266" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="280" y="270" width="200" height="50" rx="8"/>
+  <text class="t-b mid" x="380" y="291">파이프 버퍼의 링</text>
+  <text class="t-xs mid" x="380" y="309">비어 있으면 쓰는 쪽을 기다린다</text>
+
+  <!-- procfs -->
+  <rect class="panel warm" x="508" y="90" width="232" height="244" rx="14"/>
+  <text class="t-b tc-warm mid" x="624" y="114">/proc/softirqs</text>
+  <rect class="box" x="524" y="126" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="624" y="146">proc_reg_read_iter()</text>
+  <path class="ln warm" d="M624 156 V170" marker-end="url(#ah-warm)"/>
+  <rect class="box" x="524" y="174" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="624" y="194">seq_read_iter()</text>
+  <path class="ln warm" d="M624 204 V218" marker-end="url(#ah-warm)"/>
+  <rect class="box" x="524" y="222" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="624" y="242">show_softirqs()</text>
+  <path class="ln warm" d="M624 252 V266" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="524" y="270" width="200" height="50" rx="8"/>
+  <text class="t-b mid" x="624" y="291">커널의 통계 변수</text>
+  <text class="t-xs mid" x="624" y="309">읽는 순간 글자로 찍어 낸다</text>
+
+  <text class="t-s mid" x="380" y="362">vfs_read()는 대상이 무엇인지 모른다. 아는 것은 f_op 테이블뿐이다</text>
+</svg>

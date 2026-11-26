@@ -1,0 +1,65 @@
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+  <title>티켓 락에서는 기다리는 CPU 전부가 락 워드의 캐시 라인을 되풀이해 가져오지만, qspinlock에서는 대기열 머리 하나만 락 워드를 본다</title>
+
+  <!-- 왼쪽: 티켓 락 -->
+  <rect class="panel gray" x="20" y="14" width="350" height="272" rx="14"/>
+  <text class="t-l" x="36" y="42">티켓 락</text>
+  <text class="t-xs" x="104" y="42">모든 대기자가 같은 워드를 본다</text>
+
+  <rect class="box" x="115" y="64" width="160" height="36" rx="8"/>
+  <text class="t-code mid" x="195" y="87">next=6 · owner=2</text>
+
+  <rect class="box blue" x="32" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="66" y="193">CPU 0</text>
+  <text class="t-xs mid" x="66" y="212">주인</text>
+  <rect class="box red" x="118" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="152" y="193">CPU 1</text>
+  <text class="t-xs mid" x="152" y="212">표 3</text>
+  <rect class="box red" x="204" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="238" y="193">CPU 2</text>
+  <text class="t-xs mid" x="238" y="212">표 4</text>
+  <rect class="box red" x="290" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="324" y="193">CPU 3</text>
+  <text class="t-xs mid" x="324" y="212">표 5</text>
+
+  <path class="ln blue" d="M66 170 V82 H111" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="72" y="74">쓰기</text>
+  <path class="ln red dash" d="M152 170 V104" marker-end="url(#ah-red)"/>
+  <path class="ln red dash" d="M238 170 V104" marker-end="url(#ah-red)"/>
+  <path class="ln red dash" d="M324 170 V138 H262 V104" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="290" y="128">읽기</text>
+
+  <text class="t-s mid" x="195" y="252">unlock이 owner를 올릴 때마다</text>
+  <text class="t-s mid" x="195" y="271">대기자 전부가 캐시 라인을 다시 가져온다</text>
+
+  <!-- 오른쪽: qspinlock -->
+  <rect class="panel gray" x="390" y="14" width="350" height="272" rx="14"/>
+  <text class="t-l" x="406" y="42">qspinlock</text>
+  <text class="t-xs" x="494" y="42">줄 선 대기자는 자기 노드를 본다</text>
+
+  <rect class="box" x="485" y="64" width="160" height="36" rx="8"/>
+  <text class="t-code mid" x="565" y="87">tail=CPU3 · locked=1</text>
+
+  <rect class="box blue" x="402" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="436" y="193">CPU 0</text>
+  <text class="t-xs mid" x="436" y="212">주인</text>
+  <rect class="box purple" x="488" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="522" y="193">CPU 1</text>
+  <text class="t-xs mid" x="522" y="212">머리</text>
+  <rect class="box purple" x="574" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="608" y="193">CPU 2</text>
+  <text class="t-xs mid" x="608" y="212">노드</text>
+  <rect class="box purple" x="660" y="170" width="68" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="694" y="193">CPU 3</text>
+  <text class="t-xs mid" x="694" y="212">노드</text>
+
+  <path class="ln blue" d="M436 170 V82 H481" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="442" y="74">쓰기</text>
+  <path class="ln purple dash" d="M522 170 V104" marker-end="url(#ah-purple)"/>
+  <text class="t-xs tc-purple" x="530" y="140">읽기</text>
+  <path class="ln purple" d="M556 198 H571" marker-end="url(#ah-purple)"/>
+  <path class="ln purple" d="M642 198 H657" marker-end="url(#ah-purple)"/>
+
+  <text class="t-s mid" x="565" y="252">unlock은 locked 바이트만 쓴다</text>
+  <text class="t-s mid" x="565" y="271">다시 가져오는 것은 대기열 머리 하나다</text>
+</svg>

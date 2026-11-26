@@ -1,0 +1,42 @@
+<svg viewBox="0 0 760 286" xmlns="http://www.w3.org/2000/svg">
+  <title>맵을 사이에 둔 유저 공간과 BPF 프로그램: 유저 프로세스는 bpf 시스템 콜로, 훅에서 실행되는 BPF 프로그램은 헬퍼로 커널 안의 같은 맵을 읽고 쓴다.</title>
+
+  <!-- 유저 -->
+  <rect class="box blue" x="20" y="30" width="216" height="170" rx="12"/>
+  <use href="#i-terminal" x="34" y="42" width="30" height="30" class="ic blue"/>
+  <text class="t-b" x="72" y="63">유저 프로세스</text>
+  <text class="t-xs" x="34" y="92">로더, bpftool, 모니터링 에이전트</text>
+  <text class="t-code" x="34" y="124">bpf(BPF_MAP_LOOKUP_ELEM,</text>
+  <text class="t-code" x="34" y="142">    map_fd, &amp;key, &amp;value)</text>
+  <text class="t-xs" x="34" y="176">시스템 콜로 읽고 쓴다</text>
+
+  <!-- 커널: 맵 -->
+  <rect class="panel yellow" x="266" y="16" width="228" height="198" rx="14"/>
+  <text class="t-b tc-yellow" x="282" y="40">커널</text>
+  <rect class="box yellow" x="282" y="50" width="196" height="150" rx="10"/>
+  <text class="t-b" x="296" y="74">맵 counts</text>
+  <text class="t-xs" x="296" y="92">HASH · u32 → u64</text>
+  <rect class="box" x="296" y="102" width="84" height="26"/><text class="t-code mid" x="338" y="120">1203</text>
+  <rect class="box" x="380" y="102" width="84" height="26"/><text class="t-code mid" x="422" y="120">57</text>
+  <rect class="box" x="296" y="128" width="84" height="26"/><text class="t-code mid" x="338" y="146">1377</text>
+  <rect class="box" x="380" y="128" width="84" height="26"/><text class="t-code mid" x="422" y="146">4</text>
+  <rect class="box" x="296" y="154" width="84" height="26"/><text class="t-code mid" x="338" y="172">2210</text>
+  <rect class="box" x="380" y="154" width="84" height="26"/><text class="t-code mid" x="422" y="172">912</text>
+  <text class="t-xs mid" x="338" y="194">pid</text>
+  <text class="t-xs mid" x="422" y="194">횟수</text>
+
+  <!-- BPF 프로그램 -->
+  <rect class="box green" x="524" y="30" width="216" height="170" rx="12"/>
+  <use href="#i-bolt" x="538" y="42" width="30" height="30" class="ic green"/>
+  <text class="t-b" x="576" y="63">BPF 프로그램</text>
+  <text class="t-xs" x="538" y="92">훅에서 사건마다 실행된다</text>
+  <text class="t-code" x="538" y="124">bpf_map_lookup_elem(</text>
+  <text class="t-code" x="538" y="142">    &amp;counts, &amp;pid)</text>
+  <text class="t-xs" x="538" y="176">헬퍼로 값의 포인터를 얻는다</text>
+
+  <path class="ln blue" d="M236 134 H278" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M524 134 H482" marker-end="url(#ah-green)"/>
+
+  <text class="t-s mid" x="380" y="246">맵은 프로그램과 따로 존재하는 커널 객체다. 프로그램이 호출 사이에 남기는 상태가 여기에 있다</text>
+  <text class="t-s mid" x="380" y="268">맵을 가리키는 fd와 프로그램, bpffs의 고정이 모두 사라지면 해제된다</text>
+</svg>

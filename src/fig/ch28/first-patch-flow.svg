@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 278" xmlns="http://www.w3.org/2000/svg">
+  <title>첫 패치의 흐름: 보내기 전에 혼자 하는 다섯 단계와 보낸 뒤 리뷰어와 주고받는 네 단계</title>
+
+  <rect class="panel blue" x="20" y="14" width="372" height="250" rx="14"/>
+  <text class="t-s t-b tc-blue" x="36" y="38">보내기 전: 혼자 하는 일</text>
+  <rect class="panel yellow" x="412" y="14" width="328" height="250" rx="14"/>
+  <text class="t-s t-b tc-yellow" x="428" y="38">보낸 뒤: 주고받는 일</text>
+
+  <rect class="box" x="32" y="48" width="348" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="44" y="70">① 고칠 것을 찾는다</text>
+  <text class="t-xs end" x="368" y="70">자기 기계에서 만난 문제</text>
+  <path class="ln thin" d="M206 82 V88" marker-end="url(#ah)"/>
+  <rect class="box" x="32" y="90" width="348" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="44" y="112">② 커밋한다</text>
+  <text class="t-code end" x="368" y="112">git commit -s</text>
+  <path class="ln thin" d="M206 124 V130" marker-end="url(#ah)"/>
+  <rect class="box" x="32" y="132" width="348" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="44" y="154">③ 검사한다</text>
+  <text class="t-code end" x="368" y="154">checkpatch.pl · make W=1</text>
+  <path class="ln thin" d="M206 166 V172" marker-end="url(#ah)"/>
+  <rect class="box" x="32" y="174" width="348" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="44" y="196">④ 받는 사람을 찾는다</text>
+  <text class="t-code end" x="368" y="196">get_maintainer.pl</text>
+  <path class="ln thin" d="M206 208 V214" marker-end="url(#ah)"/>
+  <rect class="box" x="32" y="216" width="348" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="44" y="238">⑤ 자기에게 먼저 보낸다</text>
+  <text class="t-code end" x="368" y="238">b4 send --reflect</text>
+  <rect class="box" x="436" y="48" width="292" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="448" y="71">⑥ 보낸다</text>
+  <text class="t-code end" x="716" y="71">b4 send</text>
+  <path class="ln thin" d="M582 84 V100" marker-end="url(#ah)"/>
+  <rect class="box" x="436" y="104" width="292" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="448" y="127">⑦ 리뷰에 답한다</text>
+  <text class="t-xs end" x="716" y="127">평문으로, 인용 아래에</text>
+  <path class="ln thin" d="M582 140 V156" marker-end="url(#ah)"/>
+  <rect class="box" x="436" y="160" width="292" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="448" y="183">⑧ v2를 보낸다</text>
+  <text class="t-xs end" x="716" y="183">--- 아래에 변경 내역</text>
+  <path class="ln thin" d="M582 196 V212" marker-end="url(#ah)"/>
+  <rect class="box green" x="436" y="216" width="292" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="448" y="239">⑨ 메인테이너가 적용한다</text>
+
+  <path class="ln" d="M380 233 H402 V66 H432" marker-end="url(#ah)"/>
+  <path class="ln warm" d="M436 178 H424 V122 H432" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm end" x="724" y="38">⑦과 ⑧은 되풀이된다</text>
+</svg>

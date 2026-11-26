@@ -1,0 +1,38 @@
+<svg viewBox="0 0 760 384" xmlns="http://www.w3.org/2000/svg">
+  <title>mutex_lock()의 세 경로: 빠른 경로의 cmpxchg, 주인이 실행 중일 때의 낙관적 스핀, 대기 목록에 서서 잠드는 느린 경로</title>
+
+  <rect class="box blue" x="20" y="16" width="500" height="72" rx="10"/>
+  <text class="t-b" x="34" y="40">① 빠른 경로</text>
+  <text class="t-code" x="34" y="60">__mutex_trylock_fast(): cmpxchg(owner, 0, current)</text>
+  <text class="t-s" x="34" y="79">경합이 없으면 원자 연산 한 번으로 끝난다</text>
+
+  <path class="ln" d="M120 88 V122" marker-end="url(#ah)"/>
+  <text class="t-xs" x="132" y="110">owner가 0이 아니다</text>
+
+  <rect class="box warm" x="20" y="126" width="500" height="72" rx="10"/>
+  <text class="t-b" x="34" y="150">② 낙관적 스핀</text>
+  <text class="t-code" x="34" y="170">mutex_optimistic_spin(): osq_lock() → mutex_spin_on_owner()</text>
+  <text class="t-s" x="34" y="189">주인이 다른 CPU에서 실행 중이면 곧 풀 것으로 보고 돈다</text>
+
+  <path class="ln" d="M120 198 V232" marker-end="url(#ah)"/>
+  <text class="t-xs" x="132" y="220">주인이 CPU에서 내려갔거나 need_resched()</text>
+
+  <rect class="box purple" x="20" y="236" width="500" height="72" rx="10"/>
+  <text class="t-b" x="34" y="260">③ 느린 경로</text>
+  <text class="t-code" x="34" y="280">__mutex_add_waiter() → schedule_preempt_disabled()</text>
+  <text class="t-s" x="34" y="299">대기 목록에 서고 잠든다. unlock이 첫 대기자를 깨운다</text>
+
+  <rect class="box green" x="610" y="16" width="130" height="292" rx="12"/>
+  <text class="t-l mid" x="675" y="156">락 획득</text>
+  <text class="t-code mid" x="675" y="180">owner = current</text>
+
+  <path class="ln green" d="M520 52 H606" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="563" y="44">성공</text>
+  <path class="ln green" d="M520 162 H606" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="563" y="154">풀리면 획득</text>
+  <path class="ln green" d="M520 272 H606" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="563" y="264">깨어나 획득</text>
+
+  <text class="t-s mid" x="380" y="340">깨어난 첫 대기자가 락을 또 놓치면 HANDOFF를 세운다.</text>
+  <text class="t-s mid" x="380" y="360">그러면 다음 unlock은 락을 풀지 않고 그 대기자에게 직접 넘긴다</text>
+</svg>

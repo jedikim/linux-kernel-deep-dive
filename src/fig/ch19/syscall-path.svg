@@ -1,0 +1,49 @@
+<svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg">
+  <title>read() 시스템 콜 한 번의 경로: 유저 모드의 syscall 명령어에서 entry_SYSCALL_64, do_syscall_64의 진입 작업, 디스패치와 본체, 복귀 작업을 거쳐 sysretq나 iretq로 유저 모드에 돌아온다</title>
+
+  <!-- 유저 모드 -->
+  <rect class="panel blue" x="20" y="14" width="720" height="70" rx="12"/>
+  <text class="t-b tc-blue" x="34" y="54">유저</text>
+  <rect class="box" x="120" y="26" width="200" height="46" rx="8"/>
+  <text class="t-mono t-b mid" x="220" y="46">read(fd, buf, n)</text>
+  <text class="t-code mid" x="220" y="64">rax = 0 · syscall</text>
+  <rect class="box" x="500" y="26" width="200" height="46" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="600" y="46">다음 명령어</text>
+  <text class="t-code mid" x="600" y="64">rax = 읽은 바이트 수</text>
+
+  <!-- 커널 모드 -->
+  <rect class="panel yellow" x="20" y="104" width="720" height="302" rx="12"/>
+  <text class="t-b tc-yellow" x="34" y="150">커널</text>
+
+  <path class="ln" d="M220 72 V114" marker-end="url(#ah)"/>
+  <path class="ln" d="M600 118 V76" marker-end="url(#ah)"/>
+
+  <rect class="box" x="120" y="118" width="200" height="56" rx="8"/>
+  <text class="t-mono t-b mid" x="220" y="140">entry_SYSCALL_64</text>
+  <text class="t-xs mid" x="220" y="160">swapgs · 스택 전환 · pt_regs</text>
+
+  <rect class="box" x="500" y="118" width="200" height="56" rx="8"/>
+  <text class="t-mono t-b mid" x="600" y="140">sysretq 또는 iretq</text>
+  <text class="t-xs mid" x="600" y="160">레지스터 복원 · swapgs</text>
+
+  <rect class="ghost dash" x="40" y="192" width="680" height="200" rx="10"/>
+  <text class="t-mono t-b" x="54" y="216">do_syscall_64()</text>
+
+  <path class="ln" d="M220 174 V224" marker-end="url(#ah)"/>
+  <rect class="box" x="120" y="228" width="200" height="64" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="220" y="250">진입 작업</text>
+  <text class="t-xs mid" x="220" y="268">ptrace → seccomp</text>
+  <text class="t-xs mid" x="220" y="284">→ 추적점 → 감사</text>
+
+  <path class="ln" d="M220 292 V347 H256" marker-end="url(#ah)"/>
+  <rect class="box green" x="260" y="318" width="240" height="58" rx="8"/>
+  <text class="t-mono t-b mid" x="380" y="340">x64_sys_call()</text>
+  <text class="t-xs mid" x="380" y="360">switch → __x64_sys_read()</text>
+
+  <path class="ln" d="M500 347 H600 V296" marker-end="url(#ah)"/>
+  <rect class="box" x="500" y="228" width="200" height="64" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="600" y="250">복귀 작업</text>
+  <text class="t-xs mid" x="600" y="268">감사 · 추적점 · ptrace</text>
+  <text class="t-xs mid" x="600" y="284">스케줄 · 시그널 전달</text>
+  <path class="ln" d="M600 228 V178" marker-end="url(#ah)"/>
+</svg>

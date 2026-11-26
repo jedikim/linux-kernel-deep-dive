@@ -1,0 +1,65 @@
+<svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg">
+  <title>CFS의 RB 트리는 vruntime으로 정렬되어 맨 왼쪽 노드가 다음 태스크였다. EEVDF의 트리는 데드라인으로 정렬하고 노드마다 서브트리의 최소 vruntime을 적어, 자격 없는 서브트리를 건너뛰며 자격 있는 것 중 데드라인이 가장 이른 노드를 찾는다.</title>
+
+  <!-- CFS -->
+  <rect class="panel gray" x="20" y="14" width="280" height="312" rx="14"/>
+  <text class="t-b" x="36" y="40">CFS</text>
+  <text class="t-xs" x="36" y="58">vruntime으로 정렬</text>
+
+  <path class="ln thin" d="M180 110 L128 140"/>
+  <path class="ln thin" d="M180 110 L232 140"/>
+  <path class="ln thin" d="M128 170 L76 200"/>
+  <path class="ln thin" d="M232 170 L204 200"/>
+  <rect class="box" x="148" y="80" width="64" height="30" rx="6"/>
+  <text class="t-code mid" x="180" y="100">v 11</text>
+  <rect class="box" x="96" y="140" width="64" height="30" rx="6"/>
+  <text class="t-code mid" x="128" y="160">v 9</text>
+  <rect class="box" x="200" y="140" width="64" height="30" rx="6"/>
+  <text class="t-code mid" x="232" y="160">v 13</text>
+  <rect class="solid green" x="44" y="200" width="64" height="30" rx="6"/>
+  <text class="t-code t-b t-on mid" x="76" y="220">v 6</text>
+  <rect class="box" x="172" y="200" width="64" height="30" rx="6"/>
+  <text class="t-code mid" x="204" y="220">v 12</text>
+
+  <text class="t-s t-ink" x="36" y="272">맨 왼쪽 노드가 답이다</text>
+  <text class="t-xs" x="36" y="292">vruntime이 가장 작은 태스크.</text>
+  <text class="t-xs" x="36" y="310">트리를 내려갈 필요가 없다.</text>
+
+  <!-- EEVDF -->
+  <rect class="panel green" x="320" y="14" width="420" height="312" rx="14"/>
+  <text class="t-b" x="336" y="40">EEVDF</text>
+  <text class="t-xs" x="336" y="58">데드라인(d)으로 정렬 · 노드마다 서브트리의 min_vruntime</text>
+  <text class="t-code t-b tc-purple end" x="724" y="40">V = 10</text>
+
+  <path class="ln thin muted dash" d="M520 124 L404 150"/>
+  <path class="ln thick green" d="M520 124 L628 150"/>
+  <path class="ln thick green" d="M628 194 L572 220"/>
+  <path class="ln thin" d="M628 194 L684 220"/>
+
+  <rect class="box gray" x="468" y="80" width="104" height="44" rx="6"/>
+  <text class="t-code t-b mid" x="520" y="98">d 14</text>
+  <text class="t-code mid" x="520" y="116">v 13 · min 6</text>
+
+  <rect class="box gray" x="352" y="150" width="104" height="44" rx="6"/>
+  <text class="t-code t-b mid" x="404" y="168">d 12</text>
+  <text class="t-code mid" x="404" y="186">v 11 · min 11</text>
+
+  <rect class="box green" x="576" y="150" width="104" height="44" rx="6"/>
+  <text class="t-code t-b mid" x="628" y="168">d 18</text>
+  <text class="t-code mid" x="628" y="186">v 6 · min 6</text>
+
+  <rect class="solid green" x="520" y="220" width="104" height="44" rx="6"/>
+  <text class="t-code t-b t-on mid" x="572" y="238">d 15</text>
+  <text class="t-code t-on mid" x="572" y="256">v 9 · min 9</text>
+
+  <rect class="box gray" x="632" y="220" width="104" height="44" rx="6"/>
+  <text class="t-code t-b mid" x="684" y="238">d 20</text>
+  <text class="t-code mid" x="684" y="256">v 12 · min 12</text>
+
+  <text class="t-xs tc-red" x="336" y="216">min 11 &gt; V</text>
+  <text class="t-xs tc-red" x="336" y="232">서브트리를 통째로</text>
+  <text class="t-xs tc-red" x="336" y="248">건너뛴다</text>
+
+  <text class="t-s t-ink" x="336" y="290">맨 왼쪽(d 12)은 자격이 없다. 위에서부터 내려간다</text>
+  <text class="t-xs" x="336" y="310">자격 있는 v 6과 v 9 가운데 데드라인이 이른 d 15가 답이다</text>
+</svg>

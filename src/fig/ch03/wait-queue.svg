@@ -1,0 +1,66 @@
+<svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg">
+  <title>대기 큐의 구조: wait_queue_head의 리스트에 wait_queue_entry가 매달리고, 각 항목의 private이 잠든 태스크를 가리킨다. 비배타 대기자는 앞쪽에, 배타 대기자는 뒤쪽에 놓인다. wake_up()은 비배타 대기자 전부와 배타 대기자 하나를 깨운다.</title>
+
+  <rect class="box yellow" x="20" y="56" width="128" height="92" rx="10"/>
+  <text class="t-code t-b" x="28" y="78">wait_queue_head</text>
+  <rect class="box" x="30" y="88" width="108" height="22" rx="4"/>
+  <text class="t-code" x="38" y="104">lock</text>
+  <rect class="box" x="30" y="114" width="108" height="22" rx="4"/>
+  <text class="t-code" x="38" y="130">head</text>
+  <text class="t-xs tc-blue t-b mid" x="314" y="26">비배타 대기자: 리스트 앞쪽에 넣는다</text>
+  <path class="ln thin blue" d="M176 36 H452"/>
+  <text class="t-xs tc-purple t-b mid" x="602" y="26">배타 대기자: 뒤쪽에 넣는다</text>
+  <path class="ln thin purple" d="M464 36 H740"/>
+  <rect class="box blue" x="176" y="46" width="132" height="102" rx="10"/>
+  <text class="t-code t-b" x="184" y="66">wait_queue_entry</text>
+  <text class="t-code" x="184" y="86">flags: 0</text>
+  <text class="t-code" x="184" y="104">private, func</text>
+  <rect class="box" x="202" y="114" width="80" height="22" rx="4"/>
+  <text class="t-code mid" x="242" y="130">entry</text>
+  <path class="ln thin muted" d="M242 148 V184" marker-end="url(#ah-muted)"/>
+  <rect class="box green" x="176" y="190" width="132" height="50" rx="10"/>
+  <text class="t-b mid" x="242" y="211">태스크 A</text>
+  <text class="t-xs mid" x="242" y="230">깨어난다</text>
+  <rect class="box blue" x="320" y="46" width="132" height="102" rx="10"/>
+  <text class="t-code t-b" x="328" y="66">wait_queue_entry</text>
+  <text class="t-code" x="328" y="86">flags: 0</text>
+  <text class="t-code" x="328" y="104">private, func</text>
+  <rect class="box" x="346" y="114" width="80" height="22" rx="4"/>
+  <text class="t-code mid" x="386" y="130">entry</text>
+  <path class="ln thin muted" d="M386 148 V184" marker-end="url(#ah-muted)"/>
+  <rect class="box green" x="320" y="190" width="132" height="50" rx="10"/>
+  <text class="t-b mid" x="386" y="211">태스크 B</text>
+  <text class="t-xs mid" x="386" y="230">깨어난다</text>
+  <rect class="box purple" x="464" y="46" width="132" height="102" rx="10"/>
+  <text class="t-code t-b" x="472" y="66">wait_queue_entry</text>
+  <text class="t-code" x="472" y="86">flags: EXCLUSIVE</text>
+  <text class="t-code" x="472" y="104">private, func</text>
+  <rect class="box" x="490" y="114" width="80" height="22" rx="4"/>
+  <text class="t-code mid" x="530" y="130">entry</text>
+  <path class="ln thin muted" d="M530 148 V184" marker-end="url(#ah-muted)"/>
+  <rect class="box green" x="464" y="190" width="132" height="50" rx="10"/>
+  <text class="t-b mid" x="530" y="211">태스크 C</text>
+  <text class="t-xs mid" x="530" y="230">깨어난다</text>
+  <rect class="box purple" x="608" y="46" width="132" height="102" rx="10"/>
+  <text class="t-code t-b" x="616" y="66">wait_queue_entry</text>
+  <text class="t-code" x="616" y="86">flags: EXCLUSIVE</text>
+  <text class="t-code" x="616" y="104">private, func</text>
+  <rect class="box" x="634" y="114" width="80" height="22" rx="4"/>
+  <text class="t-code mid" x="674" y="130">entry</text>
+  <path class="ln thin muted" d="M674 148 V184" marker-end="url(#ah-muted)"/>
+  <rect class="box gray" x="608" y="190" width="132" height="50" rx="10"/>
+  <text class="t-b mid" x="674" y="211">태스크 D</text>
+  <text class="t-xs mid" x="674" y="230">계속 잔다</text>
+  <path class="ln thin" d="M138 125 H197" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M282 125 H341" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M426 125 H485" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M570 125 H629" marker-end="url(#ah)"/>
+  <text class="t-xs" x="20" y="200">private이 잠든</text>
+  <text class="t-xs" x="20" y="216">태스크를 가리킨다</text>
+
+  <rect class="box code" x="20" y="262" width="720" height="62" rx="8"/>
+  <text class="t-mono t-b" x="34" y="285">wake_up(&amp;wq)</text>
+  <text class="t-s" x="190" y="285">앞에서부터 func를 부른다. 배타 대기자를 하나 깨우면 거기서 멈춘다 (A, B, C)</text>
+  <text class="t-mono t-b" x="34" y="309">wake_up_all(&amp;wq)</text>
+  <text class="t-s" x="190" y="309">끝까지 간다 (A, B, C, D)</text>
+</svg>

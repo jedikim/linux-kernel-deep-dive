@@ -1,0 +1,59 @@
+<svg viewBox="0 0 760 388" xmlns="http://www.w3.org/2000/svg">
+  <title>PREEMPT_RT에서 락 타입이 무엇으로 바뀌는지: raw_spinlock_t와 semaphore는 그대로이고 나머지는 rt_mutex 기반 구현으로 바뀐다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="28">락 타입</text>
+  <text class="t-s t-ink t-b mid" x="330" y="28">일반 커널</text>
+  <text class="t-s t-ink t-b mid" x="620" y="28">PREEMPT_RT</text>
+
+  <text class="t-mono" x="20" y="61">raw_spinlock_t</text>
+  <rect class="box red" x="200" y="40" width="260" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="330" y="61">돌며 기다림 · 선점 끔</text>
+  <path class="ln muted" d="M460 56 H496" marker-end="url(#ah-muted)"/>
+  <rect class="box red" x="500" y="40" width="240" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="61">그대로</text>
+
+  <text class="t-mono" x="20" y="105">spinlock_t</text>
+  <rect class="box red" x="200" y="84" width="260" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="330" y="105">돌며 기다림 · 선점 끔</text>
+  <path class="ln muted" d="M460 100 H496" marker-end="url(#ah-muted)"/>
+  <rect class="box purple" x="500" y="84" width="240" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="105">rt_mutex 기반 · 잠듦 · 선점 유지</text>
+
+  <text class="t-mono" x="20" y="149">rwlock_t</text>
+  <rect class="box red" x="200" y="128" width="260" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="330" y="149">돌며 기다림 (qrwlock)</text>
+  <path class="ln muted" d="M460 144 H496" marker-end="url(#ah-muted)"/>
+  <rect class="box purple" x="500" y="128" width="240" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="149">rwbase_rt · 잠듦</text>
+
+  <text class="t-mono" x="20" y="193">local_lock_t</text>
+  <rect class="box yellow" x="200" y="172" width="260" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="330" y="193">선점이나 인터럽트를 끌 뿐</text>
+  <path class="ln muted" d="M460 188 H496" marker-end="url(#ah-muted)"/>
+  <rect class="box purple" x="500" y="172" width="240" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="193">CPU별 spinlock_t</text>
+
+  <text class="t-mono" x="20" y="237">mutex</text>
+  <rect class="box blue" x="200" y="216" width="260" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="330" y="237">잠듦 · 낙관적 스핀</text>
+  <path class="ln muted" d="M460 232 H496" marker-end="url(#ah-muted)"/>
+  <rect class="box purple" x="500" y="216" width="240" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="237">rt_mutex 기반 · 잠듦</text>
+
+  <text class="t-mono" x="20" y="281">rw_semaphore</text>
+  <rect class="box blue" x="200" y="260" width="260" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="330" y="281">잠듦 · 낙관적 스핀</text>
+  <path class="ln muted" d="M460 276 H496" marker-end="url(#ah-muted)"/>
+  <rect class="box purple" x="500" y="260" width="240" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="281">rwbase_rt · 잠듦</text>
+
+  <text class="t-mono" x="20" y="325">semaphore</text>
+  <rect class="box blue" x="200" y="304" width="260" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="330" y="325">잠듦 · 주인 개념 없음</text>
+  <path class="ln muted" d="M460 320 H496" marker-end="url(#ah-muted)"/>
+  <rect class="box blue" x="500" y="304" width="240" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="325">그대로</text>
+
+  <rect class="box purple" x="20" y="358" width="14" height="14" rx="3"/>
+  <text class="t-s" x="44" y="370">rt_mutex 위에 구현된 락. 주인이 있으므로 우선순위 상속이 적용된다</text>
+</svg>

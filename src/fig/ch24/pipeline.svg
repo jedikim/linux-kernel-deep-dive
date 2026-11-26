@@ -1,0 +1,44 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>BPF 프로그램의 경로: 유저 공간에서 C 소스를 clang으로 컴파일해 ELF 오브젝트를 만들고 로더가 bpf 시스템 콜로 넘기면, 커널이 권한 확인, 검증, JIT를 거쳐 훅에 붙이고 사건마다 실행한다.</title>
+
+  <!-- 유저 공간 -->
+  <rect class="panel blue" x="20" y="16" width="720" height="100" rx="14"/>
+  <text class="t-b tc-blue" x="36" y="40">유저 공간</text>
+  <rect class="box blue" x="36" y="50" width="150" height="54" rx="10"/>
+  <text class="t-b" x="48" y="73">C 소스</text>
+  <text class="t-code" x="48" y="93">count.bpf.c</text>
+  <rect class="box blue" x="210" y="50" width="226" height="54" rx="10"/>
+  <text class="t-b" x="222" y="73">clang → ELF 오브젝트</text>
+  <text class="t-xs" x="222" y="93">바이트코드 · BTF · 맵 정의 · 재배치</text>
+  <rect class="box blue" x="460" y="50" width="264" height="54" rx="10"/>
+  <text class="t-b" x="472" y="73">로더 (libbpf)</text>
+  <text class="t-xs" x="472" y="93">맵을 만들고 재배치를 적용한다</text>
+  <path class="ln blue" d="M186 77 H206" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M436 77 H456" marker-end="url(#ah-blue)"/>
+
+  <!-- 커널 -->
+  <rect class="panel yellow" x="20" y="150" width="720" height="124" rx="14"/>
+  <text class="t-b tc-yellow" x="36" y="174">커널</text>
+  <rect class="box yellow" x="36" y="184" width="150" height="54" rx="10"/>
+  <text class="t-b" x="48" y="207">권한 확인</text>
+  <text class="t-code" x="48" y="227">bpf_prog_load()</text>
+  <rect class="box yellow" x="210" y="184" width="150" height="54" rx="10"/>
+  <text class="t-b" x="222" y="207">검증기</text>
+  <text class="t-code" x="222" y="227">bpf_check()</text>
+  <rect class="box yellow" x="384" y="184" width="126" height="54" rx="10"/>
+  <text class="t-b" x="396" y="207">JIT</text>
+  <text class="t-xs" x="396" y="227">기계어로 번역</text>
+  <rect class="box green" x="534" y="184" width="190" height="54" rx="10"/>
+  <text class="t-b" x="546" y="207">훅에 부착 → 실행</text>
+  <text class="t-xs" x="546" y="227">사건이 날 때마다 호출된다</text>
+  <path class="ln" d="M186 211 H206" marker-end="url(#ah)"/>
+  <path class="ln" d="M360 211 H380" marker-end="url(#ah)"/>
+  <path class="ln green" d="M510 211 H530" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-red" x="222" y="260">통과하지 못하면 오류와 검증기 로그가 유저 공간으로 돌아간다</text>
+
+  <!-- 시스템 콜 -->
+  <path class="ln blue" d="M592 104 V138 H111 V180" marker-end="url(#ah-blue)"/>
+  <text class="t-code tc-blue mid" x="350" y="132">bpf(BPF_PROG_LOAD, ...)</text>
+
+  <text class="t-s mid" x="380" y="302">시스템 콜 한 번 안에서 권한 확인, 검증, JIT가 끝난다. 부착은 그다음의 별도 호출이다</text>
+</svg>

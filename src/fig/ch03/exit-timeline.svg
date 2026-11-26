@@ -1,0 +1,51 @@
+<svg viewBox="0 0 760 388" xmlns="http://www.w3.org/2000/svg">
+  <title>태스크가 죽어서 사라지기까지: do_exit()가 주소 공간과 파일을 놓고, exit_notify()가 태스크를 좀비로 만들어 부모에게 SIGCHLD를 보낸다. 마지막 스위치에서 커널 스택을 놓고, 부모가 wait4()를 부르면 release_task()가 PID를 놓으며, task_struct 메모리는 RCU 유예 기간이 지난 뒤에 풀린다.</title>
+
+  <!-- 시점 안내선 -->
+  <path class="ln thin muted dash" d="M210 30 V292"/>
+  <path class="ln thin muted dash" d="M350 30 V292"/>
+  <path class="ln thin muted dash" d="M410 30 V292"/>
+  <path class="ln thin muted dash" d="M560 30 V292"/>
+  <path class="ln thin muted dash" d="M670 30 V292"/>
+  <text class="t-xs t-ink t-b mid" x="210" y="22">①</text>
+  <text class="t-xs t-ink t-b mid" x="350" y="22">②</text>
+  <text class="t-xs t-ink t-b mid" x="410" y="22">③</text>
+  <text class="t-xs t-ink t-b mid" x="560" y="22">④</text>
+  <text class="t-xs t-ink t-b mid" x="670" y="22">⑤</text>
+
+  <!-- 죽는 태스크 -->
+  <text class="t-s t-ink t-b" x="20" y="60">죽는 태스크</text>
+  <rect class="box green" x="120" y="40" width="90" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="165" y="60">유저 코드</text>
+  <rect class="box yellow" x="210" y="40" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="310" y="60">do_exit()</text>
+  <rect class="box gray" x="410" y="40" width="150" height="30" rx="6"/>
+  <rect x="410" y="40" width="150" height="30" rx="6" fill="url(#hatch)"/>
+  <text class="t-xs" x="416" y="88">좀비. 다시는 실행되지 않는다</text>
+
+  <!-- 부모 -->
+  <text class="t-s t-ink t-b" x="20" y="130">부모</text>
+  <rect class="box blue" x="120" y="110" width="440" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="240" y="130">다른 일을 하는 중</text>
+  <rect class="box yellow" x="560" y="110" width="70" height="30" rx="6"/>
+  <text class="t-code mid" x="595" y="130">wait4()</text>
+  <rect class="box blue" x="630" y="110" width="110" height="30" rx="6"/>
+  <path class="ln thin warm" d="M350 70 V106" marker-end="url(#ah-warm)"/>
+  <text class="t-code tc-warm end" x="342" y="94">SIGCHLD</text>
+
+  <!-- 자원의 수명 -->
+  <text class="t-s t-ink t-b" x="20" y="178">mm, 파일</text>
+  <rect class="solid purple" x="120" y="166" width="170" height="16" rx="4"/>
+  <text class="t-s t-ink t-b" x="20" y="210">커널 스택</text>
+  <rect class="solid purple" x="120" y="198" width="290" height="16" rx="4"/>
+  <text class="t-s t-ink t-b" x="20" y="242">PID, 종료 코드</text>
+  <rect class="solid purple" x="120" y="230" width="440" height="16" rx="4"/>
+  <text class="t-s t-ink t-b" x="20" y="274">task_struct</text>
+  <rect class="solid purple" x="120" y="262" width="550" height="16" rx="4"/>
+
+  <!-- 시점 설명 -->
+  <text class="t-xs" x="20" y="316">① exit()를 부르거나 치명적 시그널을 받는다. do_exit() 안에서 mm, 파일, fs를 차례로 놓는다.</text>
+  <text class="t-xs" x="20" y="334">② exit_notify(): exit_state를 EXIT_ZOMBIE로 바꾸고 부모에게 SIGCHLD를 보낸다.</text>
+  <text class="t-xs" x="20" y="352">③ 마지막 schedule(). 스위치를 넘겨받은 다음 태스크가 죽은 태스크의 커널 스택을 놓는다.</text>
+  <text class="t-xs" x="20" y="370">④ 부모의 wait4()가 release_task()를 불러 PID를 놓는다.   ⑤ RCU 유예 기간 뒤 task_struct 메모리가 풀린다.</text>
+</svg>

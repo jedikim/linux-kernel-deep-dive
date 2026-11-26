@@ -1,0 +1,63 @@
+<svg viewBox="0 0 760 428" xmlns="http://www.w3.org/2000/svg">
+  <title>/home/kim/notes.txt의 경로 탐색: 마운트 A의 루트 dentry에서 home을 찾고, 마운트 해시를 조회해 마운트 B의 루트로 건너간 뒤 kim, notes.txt를 차례로 찾는다</title>
+
+  <text class="t-mono t-b" x="20" y="30">/home/kim/notes.txt</text>
+  <text class="t-s" x="186" y="30">성분 하나에 dcache 조회 한 번</text>
+
+  <!-- 마운트 A -->
+  <rect class="panel blue" x="20" y="44" width="720" height="96" rx="14"/>
+  <text class="t-b tc-blue end" x="724" y="68">마운트 A · 루트 파일시스템</text>
+  <rect class="box blue" x="36" y="84" width="80" height="36" rx="8"/>
+  <text class="t-mono t-b mid" x="76" y="107">/</text>
+  <path class="ln blue" d="M116 102 H172" marker-end="url(#ah-blue)"/>
+  <text class="t-xs mid" x="144" y="94">①</text>
+  <rect class="box blue" x="176" y="84" width="100" height="36" rx="8"/>
+  <text class="t-mono t-b mid" x="226" y="107">home</text>
+  <text class="t-code" x="290" y="100">DCACHE_MOUNTED</text>
+  <text class="t-xs" x="290" y="118">이 dentry 위에 다른 파일시스템이 걸려 있다는 표시</text>
+
+  <!-- 건너기 -->
+  <text class="t-code tc-warm" x="240" y="158">② __lookup_mnt(마운트 A, home)</text>
+  <text class="t-s tc-warm" x="240" y="177">마운트 해시 조회 → 마운트 B의 루트 dentry로 건넌다</text>
+
+  <!-- 마운트 B -->
+  <rect class="panel green" x="20" y="188" width="720" height="150" rx="14"/>
+  <text class="t-b tc-green end" x="724" y="212">마운트 B · /home에 붙은 파일시스템</text>
+  <path class="ln warm thick" d="M226 120 V224" marker-end="url(#ah-warm)"/>
+  <rect class="box green" x="176" y="228" width="100" height="36" rx="8"/>
+  <text class="t-mono t-b mid" x="226" y="251">/</text>
+  <path class="ln green" d="M276 246 H322" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="299" y="238">③</text>
+  <rect class="box green" x="326" y="228" width="90" height="36" rx="8"/>
+  <text class="t-mono t-b mid" x="371" y="251">kim</text>
+  <path class="ln green" d="M416 246 H452" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="434" y="238">④</text>
+  <rect class="box green" x="456" y="228" width="120" height="36" rx="8"/>
+  <text class="t-mono t-b mid" x="516" y="251">notes.txt</text>
+  <path class="ln" d="M576 246 H636" marker-end="url(#ah)"/>
+  <text class="t-code mid" x="606" y="238">d_inode</text>
+  <rect class="box gray" x="640" y="228" width="84" height="36" rx="8"/>
+  <text class="t-mono t-b mid" x="682" y="251">inode</text>
+
+  <!-- 음성 dentry -->
+  <path class="ln thin red dash" d="M371 264 V284"/>
+  <rect class="ghost red dash" x="311" y="288" width="120" height="34" rx="8"/>
+  <text class="t-mono mid" x="371" y="310">todo.txt</text>
+  <text class="t-xs tc-red" x="442" y="310">음성 dentry · d_inode = NULL</text>
+
+  <!-- 현재 위치 -->
+  <text class="t-s t-ink t-b" x="20" y="388">현재 위치</text>
+  <text class="t-code" x="20" y="406">nd-&gt;path</text>
+  <text class="t-xs mid" x="184" y="366">시작 (fs-&gt;root)</text>
+  <rect class="box blue" x="110" y="374" width="148" height="36" rx="8"/>
+  <text class="t-code mid" x="184" y="397">(A, "/")</text>
+  <text class="t-xs mid" x="342" y="366">①② home을 찾고 건넌 뒤</text>
+  <rect class="box green" x="268" y="374" width="148" height="36" rx="8"/>
+  <text class="t-code mid" x="342" y="397">(B, "/")</text>
+  <text class="t-xs mid" x="500" y="366">③ 뒤</text>
+  <rect class="box green" x="426" y="374" width="148" height="36" rx="8"/>
+  <text class="t-code mid" x="500" y="397">(B, "kim")</text>
+  <text class="t-xs mid" x="658" y="366">④ 뒤</text>
+  <rect class="box green" x="584" y="374" width="148" height="36" rx="8"/>
+  <text class="t-code mid" x="658" y="397">(B, "notes.txt")</text>
+</svg>

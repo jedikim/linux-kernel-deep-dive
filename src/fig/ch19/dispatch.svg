@@ -1,0 +1,51 @@
+<svg viewBox="0 0 760 352" xmlns="http://www.w3.org/2000/svg">
+  <title>시스템 콜 표에서 디스패치까지: syscall_64.tbl의 한 줄이 생성된 헤더의 __SYSCALL() 한 줄이 되고, 그 헤더가 함수 선언, 추적용 배열, switch의 case로 세 번 포함된다</title>
+
+  <text class="t-mono t-b" x="20" y="28">syscall_64.tbl</text>
+  <rect class="box code" x="20" y="38" width="200" height="150" rx="8"/>
+  <text class="t-code" x="32" y="64">0 common read sys_read</text>
+  <text class="t-code" x="32" y="82">1 common write sys_write</text>
+  <text class="t-code" x="32" y="100">2 common open sys_open</text>
+  <text class="t-code" x="32" y="118">⋮</text>
+  <text class="t-code" x="32" y="136">472 common fchroot …</text>
+  <text class="t-xs" x="32" y="170">번호 · ABI · 이름 · 함수</text>
+
+  <path class="ln" d="M220 113 H296" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="258" y="103">빌드할 때</text>
+
+  <text class="t-mono t-b" x="300" y="28">asm/syscalls_64.h</text>
+  <rect class="box code" x="300" y="38" width="200" height="150" rx="8"/>
+  <text class="t-code" x="312" y="64">__SYSCALL(0, sys_read)</text>
+  <text class="t-code" x="312" y="82">__SYSCALL(1, sys_write)</text>
+  <text class="t-code" x="312" y="100">__SYSCALL(2, sys_open)</text>
+  <text class="t-code" x="312" y="118">⋮</text>
+  <text class="t-xs" x="312" y="152">scripts/syscalltbl.sh가</text>
+  <text class="t-xs" x="312" y="170">만들어 내는 헤더</text>
+
+  <text class="t-s" x="540" y="78">0번이 오면</text>
+  <text class="t-code t-ink" x="540" y="100">__x64_sys_read(regs)</text>
+  <text class="t-s" x="540" y="122">를 직접 호출한다</text>
+
+  <path class="ln" d="M400 188 V212 H134 V230" marker-end="url(#ah)"/>
+  <path class="ln" d="M400 212 V230" marker-end="url(#ah)"/>
+  <path class="ln" d="M400 212 H626 V230" marker-end="url(#ah)"/>
+  <text class="t-xs" x="412" y="206">__SYSCALL의 정의를 바꿔 가며 세 번 포함한다</text>
+
+  <rect class="box" x="20" y="234" width="228" height="104" rx="10"/>
+  <text class="t-s t-ink t-b" x="32" y="256">① 함수 선언</text>
+  <text class="t-code" x="32" y="278">extern long</text>
+  <text class="t-code" x="32" y="296">__x64_##sym(…);</text>
+  <text class="t-xs" x="32" y="322">컴파일러에 이름을 알린다</text>
+
+  <rect class="box" x="266" y="234" width="228" height="104" rx="10"/>
+  <text class="t-s t-ink t-b" x="278" y="256">② sys_call_table[]</text>
+  <text class="t-code" x="278" y="278">__x64_##sym,</text>
+  <text class="t-xs" x="278" y="304">추적 코드가 함수 주소를</text>
+  <text class="t-xs" x="278" y="322">찾는 데만 쓴다</text>
+
+  <rect class="box green" x="512" y="234" width="228" height="104" rx="10"/>
+  <text class="t-s t-ink t-b" x="524" y="256">③ x64_sys_call()의 switch</text>
+  <text class="t-code" x="524" y="278">case nr:</text>
+  <text class="t-code" x="524" y="296">return __x64_##sym(regs);</text>
+  <text class="t-xs" x="524" y="322">실제 디스패치</text>
+</svg>

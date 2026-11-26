@@ -1,0 +1,52 @@
+<svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg">
+  <title>copy_from_user 도중의 페이지 폴트 처리: 주소가 VMA 안이면 페이지를 채우고 같은 명령어를 다시 실행하고, 아니면 예외 테이블이 가리키는 곳으로 건너뛰어 남은 바이트 수를 돌려준다</title>
+
+  <rect class="box yellow" x="20" y="20" width="160" height="50" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="100" y="41">주소 누르기</text>
+  <text class="t-code mid" x="100" y="59">mask_user_address()</text>
+  <path class="ln" d="M180 45 H196" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="200" y="20" width="160" height="50" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="280" y="41">SMAP 잠깐 풀기</text>
+  <text class="t-code mid" x="280" y="59">stac()</text>
+  <path class="ln" d="M360 45 H376" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="380" y="20" width="160" height="50" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="460" y="41">복사</text>
+  <text class="t-code mid" x="460" y="59">1: rep movsb</text>
+  <path class="ln" d="M540 45 H556" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="560" y="20" width="160" height="50" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="640" y="41">SMAP 다시 걸기</text>
+  <text class="t-code mid" x="640" y="59">2: clac()</text>
+
+  <path class="ln red" d="M480 70 V100" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="488" y="90">매핑이 없다</text>
+  <rect class="solid" x="360" y="104" width="200" height="34" rx="17"/>
+  <text class="t-b t-on mid" x="460" y="126">페이지 폴트</text>
+  <path class="ln" d="M460 138 V156" marker-end="url(#ah)"/>
+  <rect class="solid" x="340" y="160" width="240" height="34" rx="17"/>
+  <text class="t-b t-on mid" x="460" y="182">주소가 VMA 안인가</text>
+
+  <!-- 예 -->
+  <path class="ln green" d="M340 177 H180 V212" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="40" y="216" width="280" height="64" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="180" y="238">예 · 평소의 폴트</text>
+  <text class="t-xs mid" x="180" y="256">페이지를 채우고 같은 명령어를 다시 실행</text>
+  <text class="t-xs mid" x="180" y="272">복사 코드는 폴트가 났는지도 모른다</text>
+  <path class="ln green dash" d="M60 216 V86 H440 V74" marker-end="url(#ah-green)"/>
+
+  <!-- 아니오 -->
+  <path class="ln red" d="M580 177 H600 V212" marker-end="url(#ah-red)"/>
+  <rect class="box red" x="440" y="216" width="300" height="64" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="590" y="238">아니오 · fixup_exception()</text>
+  <text class="t-xs mid" x="590" y="256">예외 테이블에서 1:의 짝 2:를 찾아</text>
+  <text class="t-xs mid" x="590" y="272">regs-&gt;ip를 그 주소로 바꾼다</text>
+  <path class="ln red dash" d="M710 216 V74" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red end" x="702" y="150">2:에서 이어진다</text>
+
+  <path class="ln" d="M590 280 V302" marker-end="url(#ah)"/>
+  <rect class="box" x="440" y="306" width="300" height="52" rx="10"/>
+  <text class="t-s t-ink t-b mid" x="590" y="328">반환값 = 못 복사한 바이트 수</text>
+  <text class="t-xs mid" x="590" y="346">0이 아니면 호출한 쪽이 −EFAULT를 돌려준다</text>
+</svg>

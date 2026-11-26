@@ -1,0 +1,56 @@
+<svg viewBox="0 0 760 338" xmlns="http://www.w3.org/2000/svg">
+  <title>bottom half 메커니즘의 변천: 옛 BH와 태스크 큐가 사라지고 softirq, 태스크릿, 워크큐, 스레드 IRQ, BH 워크큐가 차례로 들어온 버전별 도표</title>
+
+  <text class="t-code mid" x="150" y="20">2.2까지</text>
+  <path class="ln thin muted dash" d="M150 44 V288"/>
+  <text class="t-code mid" x="250" y="20">2.3.43</text>
+  <text class="t-xs mid" x="250" y="37">2000</text>
+  <path class="ln thin muted dash" d="M250 44 V288"/>
+  <text class="t-code mid" x="350" y="20">2.5.40–41</text>
+  <text class="t-xs mid" x="350" y="37">2002</text>
+  <path class="ln thin muted dash" d="M350 44 V288"/>
+  <text class="t-code mid" x="450" y="20">2.6.30</text>
+  <text class="t-xs mid" x="450" y="37">2009</text>
+  <path class="ln thin muted dash" d="M450 44 V288"/>
+  <text class="t-code mid" x="540" y="20">2.6.36</text>
+  <text class="t-xs mid" x="540" y="37">2010</text>
+  <path class="ln thin muted dash" d="M540 44 V288"/>
+  <text class="t-code mid" x="630" y="20">6.9</text>
+  <text class="t-xs mid" x="630" y="37">2024</text>
+  <path class="ln thin muted dash" d="M630 44 V288"/>
+  <text class="t-code end" x="740" y="20">7.3</text>
+  <text class="t-xs end" x="740" y="37">2026</text>
+  <text class="t-s t-ink t-b" x="20" y="73">옛 BH</text>
+  <rect class="box gray" x="150" y="56" width="200" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="250" y="72">정적 32개 · 전역에서 하나씩</text>
+  <text class="t-s t-ink t-b" x="20" y="107">태스크 큐</text>
+  <rect class="box gray" x="150" y="90" width="200" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="250" y="106">나중에 부를 함수의 목록</text>
+  <text class="t-s t-ink t-b" x="20" y="141">softirq</text>
+  <rect class="box purple" x="250" y="124" width="490" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="495" y="140">CPU별 pending 비트맵 + 정적 핸들러 배열</text>
+  <text class="t-s t-ink t-b" x="20" y="175">태스크릿</text>
+  <rect class="box purple" x="250" y="158" width="380" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="440" y="174">softirq 위에 얹은 동적 등록 방식</text>
+  <rect class="box purple" x="630" y="158" width="110" height="24" rx="5"/>
+  <rect x="630" y="158" width="110" height="24" rx="5" fill="url(#hatch)"/>
+  <text class="t-s t-ink t-b" x="20" y="209">워크큐</text>
+  <rect class="box blue" x="350" y="192" width="190" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="445" y="208">워크큐마다 전용 스레드</text>
+  <rect class="box blue" x="540" y="192" width="200" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="640" y="208">CMWQ: 공유 워커 풀</text>
+  <text class="t-s t-ink t-b" x="20" y="243">스레드 IRQ</text>
+  <rect class="box blue" x="450" y="226" width="290" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="595" y="242">1차 핸들러 + 전용 커널 스레드</text>
+  <text class="t-s t-ink t-b" x="20" y="277">BH 워크큐</text>
+  <rect class="box purple" x="630" y="260" width="110" height="24" rx="5"/>
+  <text class="t-code t-ink mid" x="685" y="276">WQ_BH</text>
+
+  <rect class="box purple" x="150" y="306" width="22" height="14" rx="3"/>
+  <text class="t-xs" x="180" y="318">softirq 컨텍스트 (잠들 수 없음)</text>
+  <rect class="box blue" x="372" y="306" width="22" height="14" rx="3"/>
+  <text class="t-xs" x="402" y="318">프로세스 컨텍스트 (잠들 수 있음)</text>
+  <rect class="box purple" x="604" y="306" width="22" height="14" rx="3"/>
+  <rect x="604" y="306" width="22" height="14" rx="3" fill="url(#hatch)"/>
+  <text class="t-xs" x="634" y="318">폐기 진행 중</text>
+</svg>

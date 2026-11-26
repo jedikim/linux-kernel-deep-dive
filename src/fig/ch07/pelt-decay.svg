@@ -1,0 +1,47 @@
+<svg viewBox="0 0 760 310" xmlns="http://www.w3.org/2000/svg">
+  <title>PELT의 util_avg: 태스크가 계속 실행되는 동안 1024를 향해 차오르고, 잠들면 32ms마다 절반으로 줄어든다. util_est는 잠들기 직전의 값을 기억한다.</title>
+
+  <!-- 활동: 1ms = 3px, t=0은 x=100 -->
+  <text class="t-s t-ink t-b" x="20" y="48">태스크</text>
+  <rect class="box green" x="100" y="30" width="288" height="26" rx="5"/>
+  <text class="t-s t-ink mid" x="244" y="48">실행</text>
+  <rect class="ghost dash" x="388" y="30" width="192" height="26" rx="5"/>
+  <text class="t-s mid" x="484" y="48">잠듦</text>
+  <rect class="box green" x="580" y="30" width="96" height="26" rx="5"/>
+  <text class="t-s t-ink mid" x="628" y="48">실행</text>
+
+  <!-- 축: util 0은 y=250, 1024는 y=90 -->
+  <path class="ln thin muted" d="M100 250 H700"/>
+  <path class="ln thin muted" d="M100 250 V80"/>
+  <path class="ln thin muted dash" d="M100 90 H700"/>
+  <path class="ln thin muted dash" d="M100 170 H700"/>
+  <text class="t-code end" x="92" y="254">0</text>
+  <text class="t-code end" x="92" y="174">512</text>
+  <text class="t-code end" x="92" y="94">1024</text>
+  <text class="t-s t-ink t-b" x="20" y="134">util_avg</text>
+
+  <path class="ln thin muted dash" d="M388 60 V250"/>
+  <path class="ln thin muted dash" d="M580 60 V250"/>
+
+  <!-- 곡선 -->
+  <path class="ln thick blue" d="M100 250 L148 203 L196 170 L244 147 L292 130 L340 118 L388 110 L436 151 L484 180 L532 200 L580 215 L628 178 L676 152"/>
+
+  <!-- util_est -->
+  <path class="ln purple dash" d="M388 110 H676"/>
+  <text class="t-xs tc-purple end" x="572" y="104">util_est: 잠들기 직전의 값</text>
+
+  <!-- 반감기 -->
+  <path class="ln thin warm" d="M484 110 V180"/>
+  <text class="t-xs tc-warm" x="490" y="140">32ms 뒤</text>
+  <text class="t-xs tc-warm" x="490" y="156">절반</text>
+
+  <text class="t-code mid" x="100" y="270">0</text>
+  <text class="t-code mid" x="196" y="270">32</text>
+  <text class="t-code mid" x="292" y="270">64</text>
+  <text class="t-code mid" x="388" y="270">96</text>
+  <text class="t-code mid" x="484" y="270">128</text>
+  <text class="t-code mid" x="580" y="270">160</text>
+  <text class="t-code mid" x="676" y="270">192ms</text>
+
+  <text class="t-xs mid" x="400" y="296">1024는 가장 큰 CPU를 최고 주파수로 꽉 채운 양이다. 64ms를 자면 4분의 1만 남는다</text>
+</svg>

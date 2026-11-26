@@ -1,0 +1,57 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>copy_thread()가 꾸민 자식의 커널 스택(x86-64): 맨 위에 ax를 0으로 고친 pt_regs, 그 아래에 ret_addr가 ret_from_fork_asm인 inactive_task_frame이 놓인다. 자식은 처음 스케줄될 때 이 틀을 따라 ret_from_fork_asm, ret_from_fork를 거쳐 유저 모드로 나간다.</title>
+
+  <!-- 왼쪽: 스택 -->
+  <text class="t-b" x="20" y="24">자식의 커널 스택</text>
+  <text class="t-xs end" x="330" y="24">높은 주소 ↑</text>
+
+  <rect class="box blue" x="20" y="36" width="310" height="112" rx="10"/>
+  <text class="t-mono t-b" x="34" y="59">struct pt_regs</text>
+  <text class="t-xs end" x="318" y="59">유저 레지스터 저장 영역</text>
+  <rect class="box" x="34" y="70" width="282" height="30" rx="6"/>
+  <text class="t-code" x="46" y="90">ip, sp, flags, …</text>
+  <text class="t-xs end" x="306" y="90">부모 것을 그대로 복사</text>
+  <rect class="box green" x="34" y="106" width="282" height="30" rx="6"/>
+  <text class="t-mono t-b" x="46" y="126">ax = 0</text>
+  <text class="t-xs end" x="306" y="126">자식이 받을 반환값</text>
+
+  <rect class="box yellow" x="20" y="156" width="310" height="148" rx="10"/>
+  <text class="t-mono t-b" x="34" y="179">struct inactive_task_frame</text>
+  <rect class="box warm" x="34" y="190" width="282" height="30" rx="6"/>
+  <text class="t-code t-b" x="46" y="210">ret_addr = ret_from_fork_asm</text>
+  <rect class="box" x="34" y="226" width="282" height="30" rx="6"/>
+  <text class="t-code" x="46" y="246">bp</text>
+  <text class="t-xs end" x="306" y="246">프레임 포인터</text>
+  <rect class="box" x="34" y="262" width="282" height="30" rx="6"/>
+  <text class="t-code" x="46" y="282">bx = 0, r12 … r15</text>
+  <text class="t-xs end" x="306" y="282">커널 스레드면 bx = 함수</text>
+
+  <path class="ln thin" d="M175 332 V310" marker-end="url(#ah)"/>
+  <text class="t-code" x="186" y="328">thread.sp가 가리키는 곳</text>
+  <rect class="ghost dash" x="20" y="340" width="310" height="36" rx="10"/>
+  <text class="t-s mid" x="175" y="363">빈 스택. 아래로 자란다</text>
+
+  <!-- 오른쪽: 첫 실행 -->
+  <text class="t-b" x="380" y="24">자식이 처음 CPU를 받을 때</text>
+
+  <rect class="box" x="380" y="36" width="360" height="62" rx="10"/>
+  <text class="t-b" x="394" y="60">① 스케줄러가 자식으로 스위치</text>
+  <text class="t-code" x="394" y="82">__switch_to_asm: rsp ← thread.sp, pop × 6</text>
+  <path class="ln" d="M560 98 V112" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="380" y="116" width="360" height="62" rx="10"/>
+  <text class="t-b" x="394" y="140">② ret이 ret_addr를 꺼낸다</text>
+  <text class="t-code" x="394" y="162">ret_from_fork_asm → call ret_from_fork</text>
+  <path class="ln" d="M560 178 V192" marker-end="url(#ah)"/>
+
+  <rect class="box" x="380" y="196" width="360" height="62" rx="10"/>
+  <text class="t-b" x="394" y="220">③ 스위치 뒷정리를 하고 출구로</text>
+  <text class="t-code" x="394" y="242">schedule_tail() → syscall_exit_to_user_mode()</text>
+  <path class="ln" d="M560 258 V272" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="380" y="276" width="360" height="62" rx="10"/>
+  <text class="t-b" x="394" y="300">④ pt_regs를 레지스터에 싣고 유저 모드로</text>
+  <text class="t-s" x="394" y="322">rax = 0인 채로 syscall 다음 명령어에서 실행을 잇는다</text>
+
+  <text class="t-s" x="380" y="363">두 구조체를 묶은 것이 struct fork_frame이다.</text>
+</svg>

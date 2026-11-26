@@ -1,0 +1,56 @@
+<svg viewBox="0 0 760 364" xmlns="http://www.w3.org/2000/svg">
+  <title>핀 인터럽트와 MSI의 전달 경로 비교: 핀 인터럽트는 선과 IO-APIC을 거치고, MSI는 장치가 정해진 주소에 벡터를 직접 써서 Local APIC에 닿는다</title>
+
+  <!-- 핀 인터럽트 -->
+  <text class="t-l" x="20" y="28">핀 인터럽트</text>
+  <text class="t-s" x="116" y="28">선의 전압으로 알린다</text>
+
+  <rect class="box gray" x="20" y="44" width="150" height="52" rx="8"/>
+  <text class="t-b mid" x="95" y="66">장치 A · 장치 B</text>
+  <text class="t-xs mid" x="95" y="86">선 하나를 나눠 쓴다</text>
+  <path class="ln warm" d="M170 70 H245" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm mid" x="208" y="62">인터럽트 선</text>
+
+  <rect class="box warm" x="250" y="44" width="170" height="52" rx="8"/>
+  <text class="t-b mid" x="335" y="66">IO-APIC</text>
+  <text class="t-xs mid" x="335" y="86">핀 → 벡터·목적지 조회</text>
+  <path class="ln warm" d="M420 70 H485" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm mid" x="453" y="62">메시지</text>
+
+  <rect class="box warm" x="490" y="44" width="130" height="52" rx="8"/>
+  <text class="t-b mid" x="555" y="75">Local APIC</text>
+  <path class="ln" d="M620 70 H655" marker-end="url(#ah)"/>
+  <rect class="box blue" x="660" y="44" width="80" height="52" rx="8"/>
+  <text class="t-b mid" x="700" y="75">CPU</text>
+
+  <text class="t-s" x="20" y="124">· 누가 올렸는지는 선만 봐서는 모른다. 그 선에 등록된 핸들러를 모두 불러 묻는다.</text>
+  <text class="t-s" x="20" y="146">· 레벨 트리거에서는 장치가 요청을 거둘 때까지 선이 올라가 있다.</text>
+
+  <path class="ln thin muted dash" d="M20 168 H740"/>
+
+  <!-- MSI -->
+  <text class="t-l" x="20" y="200">MSI · MSI-X</text>
+  <text class="t-s" x="126" y="200">메모리 쓰기 한 번으로 알린다</text>
+
+  <rect class="box gray" x="20" y="216" width="210" height="82" rx="8"/>
+  <text class="t-b" x="32" y="238">NVMe SSD</text>
+  <text class="t-xs end" x="220" y="238">큐마다 한 줄</text>
+  <text class="t-code" x="32" y="262">addr 0xfee01000  data 0x41</text>
+  <text class="t-code" x="32" y="282">addr 0xfee03000  data 0x52</text>
+  <path class="ln green" d="M230 257 H295" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-green mid" x="263" y="249">쓰기</text>
+
+  <rect class="ghost dash" x="300" y="231" width="150" height="52" rx="8"/>
+  <text class="t-s t-ink mid" x="375" y="253">인터럽트 리매핑</text>
+  <text class="t-xs mid" x="375" y="272">IOMMU가 있으면</text>
+  <path class="ln green" d="M450 257 H485" marker-end="url(#ah-green)"/>
+
+  <rect class="box warm" x="490" y="231" width="130" height="52" rx="8"/>
+  <text class="t-b mid" x="555" y="262">Local APIC</text>
+  <path class="ln" d="M620 257 H655" marker-end="url(#ah)"/>
+  <rect class="box blue" x="660" y="231" width="80" height="52" rx="8"/>
+  <text class="t-b mid" x="700" y="262">CPU</text>
+
+  <text class="t-s" x="20" y="326">· 주소에 목적지 APIC ID가, 데이터에 벡터 번호가 들어 있다. 커널이 장치에 써 넣은 값이다.</text>
+  <text class="t-s" x="20" y="348">· 벡터를 다른 장치와 나누지 않는다. 장치 하나가 MSI는 32개, MSI-X는 2048개까지 가진다.</text>
+</svg>

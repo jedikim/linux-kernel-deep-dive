@@ -1,0 +1,49 @@
+<svg viewBox="0 0 760 326" xmlns="http://www.w3.org/2000/svg">
+  <title>32비트 jiffies가 넘칠 때 단순 비교는 틀리고 time_after()의 부호 있는 뺄셈은 맞는다</title>
+
+  <text class="t-b" x="20" y="24">32비트 jiffies</text>
+  <text class="t-xs mid" x="380" y="24">0xffffffff → 0x00000000</text>
+
+  <!-- 타임아웃 길이 -->
+  <path class="ln thin warm" d="M120 54 H540" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm mid" x="240" y="47">+500틱 (HZ=250에서 2초)</text>
+
+  <!-- 수직선 -->
+  <path class="ln" d="M40 96 H720" marker-end="url(#ah)"/>
+  <path class="ln thin muted dash" d="M380 32 V116"/>
+  <path class="ln" d="M120 89 V103 M280 89 V103 M540 89 V103 M640 89 V103"/>
+  <text class="t-code mid" x="120" y="80">0xffffff00</text>
+  <text class="t-code mid" x="280" y="80">0xffffffa0</text>
+  <text class="t-code mid" x="540" y="80">0x000000f4</text>
+  <text class="t-code mid" x="640" y="80">0x00000100</text>
+  <text class="t-xs mid" x="120" y="122">타임아웃을 건 시각</text>
+  <text class="t-xs t-ink t-b mid" x="280" y="122">지금 ①</text>
+  <text class="t-xs tc-warm mid" x="540" y="122">timeout</text>
+  <text class="t-xs t-ink t-b mid" x="640" y="122">지금 ②</text>
+
+  <!-- 표 머리 -->
+  <text class="t-s t-ink t-b" x="180" y="156">단순 비교  jiffies &gt; timeout</text>
+  <text class="t-s t-ink t-b" x="460" y="156">time_after(jiffies, timeout)</text>
+
+  <!-- ① -->
+  <text class="t-b" x="20" y="186">① 넘치기 전</text>
+  <text class="t-code" x="20" y="206">0xffffffa0</text>
+  <rect class="box red" x="180" y="166" width="270" height="52" rx="8"/>
+  <text class="t-code" x="194" y="187">0xffffffa0 &gt; 0x000000f4</text>
+  <text class="t-xs tc-red" x="194" y="207">참 → 340틱이 남았는데 만료로 본다</text>
+  <rect class="box green" x="460" y="166" width="280" height="52" rx="8"/>
+  <text class="t-code" x="474" y="187">(long)(0xf4 - 0xffffffa0) = 340</text>
+  <text class="t-xs tc-green" x="474" y="207">음수가 아니다 → 아직 만료 전 (맞음)</text>
+
+  <!-- ② -->
+  <text class="t-b" x="20" y="248">② 넘친 뒤</text>
+  <text class="t-code" x="20" y="268">0x00000100</text>
+  <rect class="box green" x="180" y="228" width="270" height="52" rx="8"/>
+  <text class="t-code" x="194" y="249">0x00000100 &gt; 0x000000f4</text>
+  <text class="t-xs tc-green" x="194" y="269">참 → 만료 (맞음)</text>
+  <rect class="box green" x="460" y="228" width="280" height="52" rx="8"/>
+  <text class="t-code" x="474" y="249">(long)(0xf4 - 0x00000100) = -12</text>
+  <text class="t-xs tc-green" x="474" y="269">음수다 → 만료 (맞음)</text>
+
+  <text class="t-s mid" x="380" y="308">두 시각의 간격이 표현 범위의 절반보다 작으면, 부호 있는 뺄셈은 넘침과 상관없이 앞뒤를 맞게 가린다</text>
+</svg>

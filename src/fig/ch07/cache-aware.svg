@@ -1,0 +1,78 @@
+<svg viewBox="0 0 760 296" xmlns="http://www.w3.org/2000/svg">
+  <title>LLC가 둘인 머신에서 프로세스 P의 스레드 넷과 프로세스 Q의 스레드 둘. 부하만 보면 두 LLC에 셋씩 나뉘지만, 캐시 인지 스케줄링은 P의 스레드 넷을 한 LLC에 모으고 불균형을 받아들인다.</title>
+
+  <!-- 왼쪽: 부하만 -->
+  <text class="t-b" x="20" y="28">부하만 볼 때</text>
+  <text class="t-xs end" x="370" y="28">3 대 3으로 고르다</text>
+
+  <rect class="panel gray" x="20" y="40" width="165" height="118" rx="12"/>
+  <text class="t-s t-ink t-b" x="34" y="62">LLC 0</text>
+  <rect class="solid blue" x="30" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="46" y="94">P</text>
+  <rect class="solid blue" x="68" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="84" y="94">P</text>
+  <rect class="solid warm" x="106" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="122" y="94">Q</text>
+  <rect class="ghost dash" x="144" y="74" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="30" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="68" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="106" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="144" y="112" width="32" height="30" rx="5"/>
+
+  <rect class="panel gray" x="205" y="40" width="165" height="118" rx="12"/>
+  <text class="t-s t-ink t-b" x="219" y="62">LLC 1</text>
+  <rect class="solid blue" x="215" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="231" y="94">P</text>
+  <rect class="solid blue" x="253" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="269" y="94">P</text>
+  <rect class="solid warm" x="291" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="307" y="94">Q</text>
+  <rect class="ghost dash" x="329" y="74" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="215" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="253" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="291" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="329" y="112" width="32" height="30" rx="5"/>
+
+  <path class="ln red" d="M65 162 V180 H250 V164" marker-start="url(#ah-red)" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red mid" x="158" y="200">P의 데이터가 두 캐시 사이를 오간다</text>
+
+  <!-- 오른쪽: 캐시 인지 -->
+  <text class="t-b" x="390" y="28">캐시 인지 스케줄링</text>
+  <text class="t-xs end" x="740" y="28">4 대 2를 받아들인다</text>
+
+  <rect class="panel green" x="390" y="40" width="165" height="118" rx="12"/>
+  <text class="t-s t-ink t-b" x="404" y="62">LLC 0</text>
+  <text class="t-xs tc-green end" x="545" y="62">P의 선호 LLC</text>
+  <rect class="solid blue" x="400" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="416" y="94">P</text>
+  <rect class="solid blue" x="438" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="454" y="94">P</text>
+  <rect class="solid blue" x="476" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="492" y="94">P</text>
+  <rect class="solid blue" x="514" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="530" y="94">P</text>
+  <rect class="ghost dash" x="400" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="438" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="476" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="514" y="112" width="32" height="30" rx="5"/>
+
+  <rect class="panel gray" x="575" y="40" width="165" height="118" rx="12"/>
+  <text class="t-s t-ink t-b" x="589" y="62">LLC 1</text>
+  <rect class="solid warm" x="585" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="601" y="94">Q</text>
+  <rect class="solid warm" x="623" y="74" width="32" height="30" rx="5"/>
+  <text class="t-s t-b t-on mid" x="639" y="94">Q</text>
+  <rect class="ghost dash" x="661" y="74" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="699" y="74" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="585" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="623" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="661" y="112" width="32" height="30" rx="5"/>
+  <rect class="ghost dash" x="699" y="112" width="32" height="30" rx="5"/>
+
+  <text class="t-xs tc-green mid" x="565" y="184">P의 스레드가 같은 캐시를 쓴다</text>
+  <text class="t-xs mid" x="565" y="200">선호 LLC에서 나가는 이동을 막는다</text>
+
+  <path class="ln thin muted" d="M20 222 H740"/>
+  <text class="t-s t-ink mid" x="380" y="250">선호 LLC의 이용률이 문턱(기본 50%)을 넘으면 다시 보통의 부하 분산에 맡긴다</text>
+  <text class="t-xs mid" x="380" y="274">스레드가 LLC의 코어 수에 견주어 너무 많거나 쓰는 메모리가 LLC보다 크면 처음부터 모으지 않는다</text>
+</svg>

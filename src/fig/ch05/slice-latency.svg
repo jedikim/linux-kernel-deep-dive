@@ -1,0 +1,28 @@
+<svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg">
+  <title>CPU를 계속 쓰는 태스크 L이 도는 중에 태스크 S가 깨어난다. S의 slice가 L과 같으면 L의 보호 구간이 끝날 때까지 기다리고, slice가 짧으면 깨어나자마자 실행된다. S가 받는 CPU 시간은 같다.</title>
+
+  <text class="t-xs mid" x="250" y="18">S가 깨어난다</text>
+  <path class="ln thin muted dash" d="M250 24 V200"/>
+
+  <text class="t-s t-ink t-b" x="20" y="46">S의 slice가 L과 같을 때</text>
+  <rect class="box blue" x="100" y="56" width="320" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="175" y="76">L 실행</text>
+  <rect class="box warm" x="420" y="56" width="40" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="440" y="76">S</text>
+  <rect class="box blue" x="460" y="56" width="280" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="600" y="76">L 실행</text>
+  <rect class="solid red" x="250" y="90" width="170" height="6" rx="3"/>
+  <text class="t-xs tc-red" x="256" y="112">S가 기다린다. L은 보호 구간이 끝날 때까지 끊기지 않는다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="146">S의 slice가 더 짧을 때</text>
+  <rect class="box blue" x="100" y="156" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="175" y="176">L 실행</text>
+  <rect class="box warm" x="250" y="156" width="40" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="270" y="176">S</text>
+  <rect class="box blue" x="290" y="156" width="450" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="515" y="176">L 실행</text>
+  <text class="t-xs tc-green" x="256" y="208">S의 데드라인이 더 이르다. PREEMPT_SHORT가 L의 보호를 풀고 바로 바꾼다</text>
+
+  <text class="t-s t-ink mid" x="380" y="240">두 경우에 S가 받는 CPU 시간은 같다. 달라지는 것은 기다리는 시간이다</text>
+  <text class="t-xs mid" x="380" y="260">가중치가 받는 총량을 정하고, slice가 받는 시점을 정한다</text>
+</svg>

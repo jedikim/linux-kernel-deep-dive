@@ -1,0 +1,55 @@
+<svg viewBox="0 0 760 306" xmlns="http://www.w3.org/2000/svg">
+  <title>소켓에서 softirq와 프로세스 컨텍스트가 만나는 방식: 태스크가 소켓을 쥐고 있지 않으면 softirq가 수신 큐에 바로 넣고, 쥐고 있으면 backlog에 넣어 두었다가 태스크가 release_sock()에서 처리한다</title>
+
+  <!-- softirq -->
+  <rect class="panel purple" x="20" y="16" width="236" height="250" rx="14"/>
+  <text class="t-b tc-purple" x="34" y="42">softirq</text>
+  <rect class="box" x="34" y="54" width="208" height="32" rx="8"/>
+  <text class="t-code mid" x="138" y="75">tcp_v4_rcv()</text>
+  <path class="ln" d="M138 86 V100" marker-end="url(#ah)"/>
+  <rect class="box" x="34" y="104" width="208" height="44"/>
+  <text class="t-s t-ink t-b mid" x="138" y="123">태스크가 소켓을 쥐고 있나</text>
+  <text class="t-code mid" x="138" y="140">sock_owned_by_user()</text>
+  <rect class="box" x="34" y="148" width="208" height="28"/>
+  <text class="t-s t-ink t-b" x="44" y="167">아니오</text>
+  <text class="t-code" x="96" y="167">tcp_v4_do_rcv()</text>
+  <rect class="box" x="34" y="176" width="208" height="28"/>
+  <text class="t-s t-ink t-b" x="44" y="195">예</text>
+  <text class="t-code" x="96" y="195">tcp_add_backlog()</text>
+  <text class="t-xs" x="34" y="228">큐에 넣은 뒤 sk_data_ready()로</text>
+  <text class="t-xs" x="34" y="246">잠든 읽는 쪽을 깨운다</text>
+
+  <!-- sock -->
+  <rect class="box gray" x="300" y="54" width="170" height="162" rx="12"/>
+  <text class="t-mono t-b" x="314" y="78">struct sock</text>
+  <rect class="box" x="314" y="92" width="142" height="34" rx="6"/>
+  <text class="t-code mid" x="385" y="114">sk_receive_queue</text>
+  <rect class="box" x="314" y="162" width="142" height="34" rx="6"/>
+  <text class="t-code mid" x="385" y="184">sk_backlog</text>
+  <path class="ln thin blue" d="M420 162 V132" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue end" x="412" y="150">나중에 옮긴다</text>
+
+  <path class="ln purple" d="M242 162 H276 V109 H308" marker-end="url(#ah-purple)"/>
+  <path class="ln purple" d="M242 190 H288 V179 H308" marker-end="url(#ah-purple)"/>
+
+  <!-- 프로세스 컨텍스트 -->
+  <rect class="panel blue" x="510" y="16" width="230" height="250" rx="14"/>
+  <text class="t-b tc-blue" x="524" y="42">프로세스 컨텍스트</text>
+  <text class="t-code" x="524" y="62">tcp_recvmsg()</text>
+  <rect class="box" x="524" y="74" width="202" height="30" rx="8"/>
+  <text class="t-code" x="536" y="94">lock_sock()</text>
+  <text class="t-xs end" x="716" y="94">소켓을 쥔다</text>
+  <rect class="box" x="524" y="112" width="202" height="30" rx="8"/>
+  <text class="t-code" x="536" y="132">tcp_recvmsg_locked()</text>
+  <text class="t-xs end" x="716" y="132">복사</text>
+  <rect class="box" x="524" y="150" width="202" height="48" rx="8"/>
+  <text class="t-code" x="536" y="170">release_sock()</text>
+  <text class="t-xs" x="536" y="188">backlog를 처리하고 놓는다</text>
+  <text class="t-xs" x="524" y="228">읽을 것이 없으면 sk_wait_data()로</text>
+  <text class="t-xs" x="524" y="246">잠들고, softirq가 깨운다</text>
+
+  <path class="ln blue" d="M456 109 H490 V127 H518" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M524 179 H462" marker-end="url(#ah-blue)"/>
+
+  <text class="t-s mid" x="380" y="290">태스크가 소켓을 쥔 동안 도착한 세그먼트는 backlog에서 기다린다. 두 컨텍스트가 소켓을 동시에 고치지 않는다.</text>
+</svg>

@@ -1,0 +1,73 @@
+<svg viewBox="0 0 760 414" xmlns="http://www.w3.org/2000/svg">
+  <title>v7.3 SLUB의 네 층: CPU별 main·spare sheaf, NUMA 노드별 barn의 가득 찬 sheaf와 빈 sheaf, 노드별 partial 슬랩 목록, 버디 할당자</title>
+
+  <!-- 1층: CPU별 -->
+  <rect class="panel blue" x="20" y="14" width="350" height="104" rx="12"/>
+  <text class="t-b tc-blue" x="34" y="38">CPU 0</text>
+  <text class="t-code" x="90" y="38">slub_percpu_sheaves</text>
+  <text class="t-code" x="34" y="66">main</text>
+  <text class="t-code" x="34" y="98">spare</text>
+  <g>
+    <rect class="solid blue" x="90" y="50" width="22" height="22"/><rect class="solid blue" x="112" y="50" width="22" height="22"/><rect class="solid blue" x="134" y="50" width="22" height="22"/><rect class="solid blue" x="156" y="50" width="22" height="22"/><rect class="solid blue" x="178" y="50" width="22" height="22"/><rect class="ghost" x="200" y="50" width="22" height="22"/><rect class="ghost" x="222" y="50" width="22" height="22"/><rect class="ghost" x="244" y="50" width="22" height="22"/>
+    <rect class="solid blue" x="90" y="82" width="22" height="22"/><rect class="solid blue" x="112" y="82" width="22" height="22"/><rect class="solid blue" x="134" y="82" width="22" height="22"/><rect class="solid blue" x="156" y="82" width="22" height="22"/><rect class="solid blue" x="178" y="82" width="22" height="22"/><rect class="solid blue" x="200" y="82" width="22" height="22"/><rect class="solid blue" x="222" y="82" width="22" height="22"/><rect class="solid blue" x="244" y="82" width="22" height="22"/>
+  </g>
+  <text class="t-xs" x="276" y="66">← 넣고 빼는 곳</text>
+  <text class="t-xs" x="276" y="98">예비</text>
+
+  <rect class="panel blue" x="390" y="14" width="350" height="104" rx="12"/>
+  <text class="t-b tc-blue" x="404" y="38">CPU 1</text>
+  <text class="t-code" x="460" y="38">slub_percpu_sheaves</text>
+  <text class="t-code" x="404" y="66">main</text>
+  <text class="t-code" x="404" y="98">spare</text>
+  <g>
+    <rect class="solid blue" x="460" y="50" width="22" height="22"/><rect class="solid blue" x="482" y="50" width="22" height="22"/><rect class="ghost" x="504" y="50" width="22" height="22"/><rect class="ghost" x="526" y="50" width="22" height="22"/><rect class="ghost" x="548" y="50" width="22" height="22"/><rect class="ghost" x="570" y="50" width="22" height="22"/><rect class="ghost" x="592" y="50" width="22" height="22"/><rect class="ghost" x="614" y="50" width="22" height="22"/>
+    <rect class="ghost" x="460" y="82" width="22" height="22"/><rect class="ghost" x="482" y="82" width="22" height="22"/><rect class="ghost" x="504" y="82" width="22" height="22"/><rect class="ghost" x="526" y="82" width="22" height="22"/><rect class="ghost" x="548" y="82" width="22" height="22"/><rect class="ghost" x="570" y="82" width="22" height="22"/><rect class="ghost" x="592" y="82" width="22" height="22"/><rect class="ghost" x="614" y="82" width="22" height="22"/>
+  </g>
+
+  <!-- 1↔2 -->
+  <path class="ln" d="M185 152 V124" marker-end="url(#ah)"/>
+  <path class="ln" d="M205 122 V150" marker-end="url(#ah)"/>
+  <path class="ln" d="M555 152 V124" marker-end="url(#ah)"/>
+  <path class="ln" d="M575 122 V150" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="380" y="142">둘 다 비면 가득 찬 sheaf를 받고, 둘 다 차면 넘긴다</text>
+
+  <!-- 2층: barn -->
+  <rect class="panel yellow" x="20" y="156" width="720" height="74" rx="12"/>
+  <text class="t-b tc-yellow" x="34" y="180">barn</text>
+  <text class="t-xs" x="76" y="180">NUMA 노드마다 하나 · node_barn</text>
+  <text class="t-code" x="34" y="212">sheaves_full</text>
+  <g>
+    <rect class="solid blue" x="136" y="198" width="60" height="18"/>
+    <rect class="solid blue" x="206" y="198" width="60" height="18"/>
+    <rect class="solid blue" x="276" y="198" width="60" height="18"/>
+  </g>
+  <text class="t-code" x="400" y="212">sheaves_empty</text>
+  <g>
+    <rect class="ghost" x="510" y="198" width="60" height="18"/>
+    <rect class="ghost" x="580" y="198" width="60" height="18"/>
+  </g>
+
+  <!-- 2↔3 -->
+  <path class="ln" d="M370 264 V236" marker-end="url(#ah)"/>
+  <path class="ln" d="M390 234 V262" marker-end="url(#ah)"/>
+  <text class="t-xs" x="404" y="254">barn에도 없으면 슬랩에서 객체를 꺼내 sheaf를 채운다</text>
+
+  <!-- 3층: partial -->
+  <rect class="panel" x="20" y="268" width="720" height="74" rx="12"/>
+  <text class="t-b" x="34" y="292">partial 목록</text>
+  <text class="t-xs" x="122" y="292">빈 객체가 남은 슬랩들 · kmem_cache_node</text>
+  <g>
+    <rect class="box gray" x="34" y="304" width="22" height="24"/><rect class="box gray" x="56" y="304" width="22" height="24"/><rect class="box green" x="78" y="304" width="22" height="24"/><rect class="box gray" x="100" y="304" width="22" height="24"/><rect class="box green" x="122" y="304" width="22" height="24"/><rect class="box green" x="144" y="304" width="22" height="24"/><rect class="box gray" x="166" y="304" width="22" height="24"/><rect class="box gray" x="188" y="304" width="22" height="24"/><rect class="box green" x="210" y="304" width="22" height="24"/><rect class="box gray" x="232" y="304" width="22" height="24"/>
+    <rect class="box green" x="270" y="304" width="22" height="24"/><rect class="box green" x="292" y="304" width="22" height="24"/><rect class="box gray" x="314" y="304" width="22" height="24"/><rect class="box gray" x="336" y="304" width="22" height="24"/><rect class="box gray" x="358" y="304" width="22" height="24"/><rect class="box green" x="380" y="304" width="22" height="24"/><rect class="box gray" x="402" y="304" width="22" height="24"/><rect class="box green" x="424" y="304" width="22" height="24"/><rect class="box green" x="446" y="304" width="22" height="24"/><rect class="box green" x="468" y="304" width="22" height="24"/>
+    <rect class="box gray" x="506" y="304" width="22" height="24"/><rect class="box green" x="528" y="304" width="22" height="24"/><rect class="box green" x="550" y="304" width="22" height="24"/><rect class="box green" x="572" y="304" width="22" height="24"/><rect class="box green" x="594" y="304" width="22" height="24"/><rect class="box green" x="616" y="304" width="22" height="24"/><rect class="box green" x="638" y="304" width="22" height="24"/><rect class="box gray" x="660" y="304" width="22" height="24"/><rect class="box green" x="682" y="304" width="22" height="24"/><rect class="box green" x="704" y="304" width="22" height="24"/>
+  </g>
+
+  <!-- 3↔4 -->
+  <path class="ln" d="M370 374 V348" marker-end="url(#ah)"/>
+  <path class="ln" d="M390 346 V372" marker-end="url(#ah)"/>
+  <text class="t-xs" x="404" y="364">슬랩이 없으면 새 페이지를 받아 객체로 자른다</text>
+
+  <!-- 4층 -->
+  <rect class="box green" x="20" y="378" width="720" height="30" rx="8"/>
+  <text class="t-b mid" x="380" y="398">버디 할당자</text>
+</svg>

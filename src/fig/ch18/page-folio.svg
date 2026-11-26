@@ -1,0 +1,70 @@
+<svg viewBox="0 0 760 352" xmlns="http://www.w3.org/2000/svg">
+  <title>struct page 배열 위의 폴리오: 연속한 네 프레임 가운데 첫 프레임이 head이고 나머지 tail의 compound_info가 head를 가리킨다. struct folio는 head의 struct page와 같은 메모리를 다른 타입으로 읽는다.</title>
+
+  <text class="t-s t-ink t-b" x="60" y="22">vmemmap의 struct page 배열 · 프레임마다 하나</text>
+
+  <text class="t-code mid tc-muted" x="100" y="46">PFN 40</text>
+  <text class="t-code mid tc-muted" x="180" y="46">41</text>
+  <text class="t-code mid tc-muted" x="260" y="46">42</text>
+  <text class="t-code mid tc-muted" x="340" y="46">43</text>
+  <text class="t-code mid tc-muted" x="420" y="46">44</text>
+  <text class="t-code mid tc-muted" x="500" y="46">45</text>
+  <text class="t-code mid tc-muted" x="580" y="46">46</text>
+  <text class="t-code mid tc-muted" x="660" y="46">47</text>
+
+  <rect class="box" x="60" y="54" width="80" height="54"/>
+  <text class="t-s mid" x="100" y="86">홑 페이지</text>
+  <rect class="box" x="140" y="54" width="80" height="54"/>
+  <text class="t-s mid" x="180" y="86">홑 페이지</text>
+  <rect class="box blue" x="220" y="54" width="80" height="54"/>
+  <text class="t-b mid" x="260" y="78">head</text>
+  <text class="t-xs mid" x="260" y="97">플래그·참조</text>
+  <rect class="box gray" x="300" y="54" width="80" height="54"/>
+  <text class="t-s t-ink mid" x="340" y="86">tail</text>
+  <rect class="box gray" x="380" y="54" width="80" height="54"/>
+  <text class="t-s t-ink mid" x="420" y="86">tail</text>
+  <rect class="box gray" x="460" y="54" width="80" height="54"/>
+  <text class="t-s t-ink mid" x="500" y="86">tail</text>
+  <rect class="box" x="540" y="54" width="80" height="54"/>
+  <text class="t-s mid" x="580" y="86">홑 페이지</text>
+  <rect class="box" x="620" y="54" width="80" height="54"/>
+  <text class="t-s mid" x="660" y="86">홑 페이지</text>
+
+  <rect class="ghost warm" x="216" y="50" width="328" height="62" rx="6"/>
+
+  <path class="ln thin" d="M340 112 V128 M420 112 V128 M500 112 V128 H260 V116" marker-end="url(#ah)"/>
+  <text class="t-code" x="512" y="132">compound_info → head</text>
+  <text class="t-s tc-warm mid" x="380" y="152">폴리오 하나 · order 2 · 네 프레임</text>
+
+  <!-- 같은 메모리, 두 타입 -->
+  <rect class="panel" x="60" y="172" width="310" height="166" rx="12"/>
+  <text class="t-mono t-b" x="74" y="196">struct page</text>
+  <text class="t-xs" x="170" y="196">head 프레임의 것</text>
+  <rect class="box" x="74" y="206" width="282" height="22"/>
+  <text class="t-code" x="84" y="222">flags</text>
+  <rect class="box" x="74" y="228" width="282" height="22"/>
+  <text class="t-code" x="84" y="244">lru / buddy_list / pcp_list …</text>
+  <rect class="box" x="74" y="250" width="282" height="22"/>
+  <text class="t-code" x="84" y="266">mapping</text>
+  <rect class="box" x="74" y="272" width="282" height="22"/>
+  <text class="t-code" x="84" y="288">__folio_index</text>
+  <rect class="box" x="74" y="294" width="282" height="22"/>
+  <text class="t-code" x="84" y="310">_mapcount · _refcount</text>
+
+  <text class="t-h mid" x="380" y="266">=</text>
+
+  <rect class="panel blue" x="390" y="172" width="310" height="166" rx="12"/>
+  <text class="t-mono t-b" x="404" y="196">struct folio</text>
+  <text class="t-xs" x="508" y="196">같은 주소, 다른 타입</text>
+  <rect class="box" x="404" y="206" width="282" height="22"/>
+  <text class="t-code" x="414" y="222">flags</text>
+  <rect class="box" x="404" y="228" width="282" height="22"/>
+  <text class="t-code" x="414" y="244">lru</text>
+  <rect class="box" x="404" y="250" width="282" height="22"/>
+  <text class="t-code" x="414" y="266">mapping</text>
+  <rect class="box" x="404" y="272" width="282" height="22"/>
+  <text class="t-code" x="414" y="288">index</text>
+  <rect class="box" x="404" y="294" width="282" height="22"/>
+  <text class="t-code" x="414" y="310">_mapcount · _refcount</text>
+  <text class="t-xs" x="404" y="331">tail 자리에는 _nr_pages, _large_mapcount 등</text>
+</svg>

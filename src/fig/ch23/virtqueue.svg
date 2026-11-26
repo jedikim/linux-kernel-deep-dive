@@ -1,0 +1,70 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>분할 virtqueue의 세 영역: 디스크립터 테이블에 버퍼 사슬을 적고, 드라이버가 avail 링에 사슬의 머리 번호를 넣으면 장치가 처리한 뒤 used 링에 돌려준다. 킥과 인터럽트는 필요할 때만 보낸다.</title>
+
+  <!-- 드라이버 -->
+  <rect class="box blue" x="20" y="44" width="160" height="250" rx="12"/>
+  <text class="t-b" x="32" y="68">virtio 드라이버</text>
+  <text class="t-xs" x="32" y="86">게스트 커널</text>
+  <text class="t-xs t-ink" x="32" y="116">① 버퍼 주소와 길이를</text>
+  <text class="t-xs t-ink" x="32" y="132">디스크립터에 적는다</text>
+  <text class="t-xs t-ink" x="32" y="176">② 사슬의 머리 번호를</text>
+  <text class="t-xs t-ink" x="32" y="192">avail 링에 넣는다</text>
+  <text class="t-xs t-ink" x="32" y="252">⑤ used 링에서</text>
+  <text class="t-xs t-ink" x="32" y="268">끝난 사슬을 거둔다</text>
+
+  <!-- 장치 -->
+  <rect class="box yellow" x="580" y="44" width="160" height="250" rx="12"/>
+  <text class="t-b" x="592" y="68">장치</text>
+  <text class="t-xs" x="592" y="86">VMM 또는 호스트 커널</text>
+  <text class="t-xs t-ink" x="592" y="176">③ avail 링을 읽고</text>
+  <text class="t-xs t-ink" x="592" y="192">버퍼를 처리한다</text>
+  <text class="t-xs t-ink" x="592" y="252">④ 끝난 사슬의 번호를</text>
+  <text class="t-xs t-ink" x="592" y="268">used 링에 넣는다</text>
+
+  <!-- 공유 영역 -->
+  <rect class="panel gray" x="196" y="16" width="368" height="278" rx="14"/>
+  <text class="t-xs mid" x="380" y="36">게스트 메모리 안의 공유 영역</text>
+
+  <text class="t-s t-ink t-b" x="212" y="60">디스크립터 테이블</text>
+  <rect class="box" x="212" y="70" width="42" height="32"/><text class="t-code mid" x="233" y="91">0</text>
+  <rect class="box" x="254" y="70" width="42" height="32"/><text class="t-code mid" x="275" y="91">1</text>
+  <rect class="box blue" x="296" y="70" width="42" height="32"/><text class="t-code mid" x="317" y="91">2</text>
+  <rect class="box blue" x="338" y="70" width="42" height="32"/><text class="t-code mid" x="359" y="91">3</text>
+  <rect class="box" x="380" y="70" width="42" height="32"/><text class="t-code mid" x="401" y="91">4</text>
+  <rect class="box" x="422" y="70" width="42" height="32"/><text class="t-code mid" x="443" y="91">5</text>
+  <rect class="box" x="464" y="70" width="42" height="32"/><text class="t-code mid" x="485" y="91">6</text>
+  <rect class="box" x="506" y="70" width="42" height="32"/><text class="t-code mid" x="527" y="91">7</text>
+  <text class="t-xs" x="212" y="120">2 → 3이 사슬 하나. flags의 NEXT 비트와 next로 잇는다</text>
+
+  <text class="t-s t-ink t-b" x="212" y="156">avail 링</text>
+  <text class="t-xs" x="274" y="156">드라이버만 쓴다</text>
+  <rect class="box" x="212" y="164" width="64" height="32"/><text class="t-code mid" x="244" y="185">flags</text>
+  <rect class="box" x="276" y="164" width="64" height="32"/><text class="t-code mid" x="308" y="185">idx=1</text>
+  <rect class="box blue" x="340" y="164" width="42" height="32"/><text class="t-code mid" x="361" y="185">2</text>
+  <rect class="box" x="382" y="164" width="42" height="32"/>
+  <rect class="box" x="424" y="164" width="42" height="32"/>
+  <rect class="box" x="466" y="164" width="42" height="32"/>
+  <rect class="box" x="508" y="164" width="42" height="32"/>
+
+  <text class="t-s t-ink t-b" x="212" y="232">used 링</text>
+  <text class="t-xs" x="274" y="232">장치만 쓴다</text>
+  <rect class="box" x="212" y="240" width="64" height="32"/><text class="t-code mid" x="244" y="261">flags</text>
+  <rect class="box" x="276" y="240" width="64" height="32"/><text class="t-code mid" x="308" y="261">idx=1</text>
+  <rect class="box yellow" x="340" y="240" width="105" height="32"/><text class="t-code mid" x="392" y="261">id=2, len</text>
+  <rect class="box" x="445" y="240" width="105" height="32"/>
+
+  <!-- 화살표 -->
+  <path class="ln blue" d="M180 86 H208" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M180 180 H208" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M550 180 H576" marker-end="url(#ah-blue)"/>
+  <path class="ln yellow" d="M580 256 H554" marker-end="url(#ah-yellow)"/>
+  <path class="ln yellow" d="M212 256 H184" marker-end="url(#ah-yellow)"/>
+
+  <!-- 통지 -->
+  <path class="ln blue" d="M70 294 V326 H690 V298" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue mid" x="380" y="320">킥: 큐에 새 버퍼가 있다 — VM exit, 장치가 원할 때만</text>
+  <path class="ln yellow" d="M650 294 V356 H110 V298" marker-end="url(#ah-yellow)"/>
+  <text class="t-xs tc-yellow mid" x="380" y="350">인터럽트: 끝난 버퍼가 있다 — 드라이버가 원할 때만</text>
+
+  <text class="t-s mid" x="380" y="380">버퍼의 내용은 디스크립터가 가리키는 게스트 메모리에 있다. 양쪽이 exit 없이 읽고 쓴다</text>
+</svg>

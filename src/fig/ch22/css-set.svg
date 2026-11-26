@@ -1,0 +1,65 @@
+<svg viewBox="0 0 760 330" xmlns="http://www.w3.org/2000/svg">
+  <title>태스크, css_set, css, cgroup의 연결: 같은 cgroup에 있는 태스크 둘은 css_set 하나를 함께 가리키고, css_set은 컨트롤러별 css를, css는 cgroup을 가리킨다</title>
+
+  <text class="t-xs" x="20" y="24">task_struct의 cgroups →</text>
+  <text class="t-xs" x="190" y="24">css_set</text>
+  <text class="t-xs" x="400" y="24">css (컨트롤러별 상태)</text>
+  <text class="t-xs" x="630" y="24">cgroup</text>
+
+  <!-- web -->
+  <rect class="box yellow" x="20" y="36" width="120" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="59">nginx</text>
+  <rect class="box yellow" x="20" y="84" width="120" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="107">nginx worker</text>
+  <path class="ln" d="M140 54 H186" marker-end="url(#ah)"/>
+  <path class="ln" d="M140 102 H186" marker-end="url(#ah)"/>
+
+  <rect class="box" x="190" y="36" width="160" height="96" rx="10"/>
+  <text class="t-mono t-b" x="202" y="58">css_set</text>
+  <text class="t-xs end" x="340" y="58">참조 2</text>
+  <text class="t-code" x="202" y="84">subsys[cpu]</text>
+  <text class="t-code" x="202" y="114">subsys[memory]</text>
+  <path class="ln blue" d="M350 80 H396" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M350 110 H372 V118 H396" marker-end="url(#ah-blue)"/>
+
+  <rect class="box blue" x="400" y="36" width="180" height="52" rx="8"/>
+  <text class="t-code t-b" x="412" y="58">task_group</text>
+  <text class="t-xs" x="412" y="76">cpu.weight · cpu.max</text>
+  <rect class="box blue" x="400" y="96" width="180" height="52" rx="8"/>
+  <text class="t-code t-b" x="412" y="118">mem_cgroup</text>
+  <text class="t-xs" x="412" y="136">memory.max · 사용량</text>
+  <path class="ln green" d="M580 62 H604 V84 H626" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M580 122 H604 V100 H626" marker-end="url(#ah-green)"/>
+
+  <rect class="box green" x="630" y="66" width="110" height="52" rx="8"/>
+  <text class="t-mono t-b mid" x="685" y="97">web</text>
+
+  <path class="ln thin muted dash" d="M20 166 H740"/>
+
+  <!-- db -->
+  <rect class="box yellow" x="20" y="196" width="120" height="36" rx="8"/>
+  <text class="t-s t-ink t-b" x="32" y="219">postgres</text>
+  <path class="ln" d="M140 214 H186" marker-end="url(#ah)"/>
+
+  <rect class="box" x="190" y="180" width="160" height="96" rx="10"/>
+  <text class="t-mono t-b" x="202" y="202">css_set</text>
+  <text class="t-xs end" x="340" y="202">참조 1</text>
+  <text class="t-code" x="202" y="228">subsys[cpu]</text>
+  <text class="t-code" x="202" y="258">subsys[memory]</text>
+  <path class="ln blue" d="M350 224 H396" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M350 254 H372 V262 H396" marker-end="url(#ah-blue)"/>
+
+  <rect class="box blue" x="400" y="180" width="180" height="52" rx="8"/>
+  <text class="t-code t-b" x="412" y="202">task_group</text>
+  <text class="t-xs" x="412" y="220">cpu.weight · cpu.max</text>
+  <rect class="box blue" x="400" y="240" width="180" height="52" rx="8"/>
+  <text class="t-code t-b" x="412" y="262">mem_cgroup</text>
+  <text class="t-xs" x="412" y="280">memory.max · 사용량</text>
+  <path class="ln green" d="M580 206 H604 V228 H626" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M580 266 H604 V244 H626" marker-end="url(#ah-green)"/>
+
+  <rect class="box green" x="630" y="210" width="110" height="52" rx="8"/>
+  <text class="t-mono t-b mid" x="685" y="241">db</text>
+
+  <text class="t-s mid" x="380" y="316">fork()한 자식은 부모의 css_set을 가리키고 참조 카운트만 올린다</text>
+</svg>

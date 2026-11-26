@@ -1,0 +1,63 @@
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+  <title>시스템 콜 진입 작업의 순서와 seccomp의 처분: ptrace 보고, seccomp 필터, 추적점과 감사를 거쳐 본체로 가며, 필터의 반환값에 따라 통과, 오류 반환, SIGSYS, 감독 프로세스 통지, 프로세스 종료로 갈린다</title>
+
+  <rect class="box" x="20" y="24" width="120" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="80" y="48">진입</text>
+  <text class="t-xs mid" x="80" y="66">syscall_work 확인</text>
+  <path class="ln" d="M140 52 H156" marker-end="url(#ah)"/>
+
+  <rect class="box" x="160" y="24" width="130" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="225" y="48">ptrace</text>
+  <text class="t-xs mid" x="225" y="66">추적자에게 보고</text>
+  <path class="ln" d="M290 52 H306" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="225" y="98">번호와 인자를 바꿀 수 있다</text>
+
+  <rect class="box warm" x="310" y="24" width="150" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="385" y="48">seccomp</text>
+  <text class="t-xs mid" x="385" y="66">BPF 필터 실행</text>
+  <path class="ln" d="M460 52 H476" marker-end="url(#ah)"/>
+
+  <rect class="box" x="480" y="24" width="120" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="540" y="48">추적점 · 감사</text>
+  <text class="t-xs mid" x="540" y="66">기록만 한다</text>
+  <path class="ln" d="M600 52 H616" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="620" y="24" width="120" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="680" y="48">시스템 콜 본체</text>
+  <text class="t-code mid" x="680" y="66">x64_sys_call()</text>
+
+  <!-- 필터 입력 -->
+  <text class="t-code t-ink" x="400" y="118">입력 · struct seccomp_data</text>
+  <text class="t-code" x="400" y="136">nr · arch · instruction_pointer · args[6]</text>
+  <text class="t-xs" x="400" y="156">포인터 인자는 값만 본다. 가리키는 내용은 읽지 못한다</text>
+
+  <!-- 처분 -->
+  <path class="ln warm" d="M385 80 V186 H88 V200" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M234 186 V200" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M380 186 V200" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M385 186 H526 V200" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M526 186 H672 V200" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm end" x="377" y="176">필터의 반환값</text>
+
+  <rect class="box green" x="20" y="204" width="136" height="54" rx="8"/>
+  <text class="t-code t-b mid" x="88" y="226">RET_ALLOW</text>
+  <text class="t-xs mid" x="88" y="246">통과</text>
+
+  <rect class="box yellow" x="166" y="204" width="136" height="54" rx="8"/>
+  <text class="t-code t-b mid" x="234" y="226">RET_ERRNO</text>
+  <text class="t-xs mid" x="234" y="246">실행 없이 오류 반환</text>
+
+  <rect class="box yellow" x="312" y="204" width="136" height="54" rx="8"/>
+  <text class="t-code t-b mid" x="380" y="226">RET_TRAP</text>
+  <text class="t-xs mid" x="380" y="246">SIGSYS를 보낸다</text>
+
+  <rect class="box blue" x="458" y="204" width="136" height="54" rx="8"/>
+  <text class="t-code t-b mid" x="526" y="226">RET_USER_NOTIF</text>
+  <text class="t-xs mid" x="526" y="246">감독 프로세스가 결정</text>
+
+  <rect class="box red" x="604" y="204" width="136" height="54" rx="8"/>
+  <text class="t-code t-b mid" x="672" y="226">RET_KILL_PROCESS</text>
+  <text class="t-xs mid" x="672" y="246">프로세스 종료</text>
+
+  <text class="t-s mid" x="380" y="284">ALLOW가 아니면 본체는 실행되지 않는다. ptrace 다음에 검사하므로 추적자가 바꾼 값도 걸러진다</text>
+</svg>

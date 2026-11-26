@@ -1,0 +1,62 @@
+<svg viewBox="0 0 760 300" xmlns="http://www.w3.org/2000/svg">
+  <title>버전 문자열 7.3.2-arch1-1의 구성과, 메인라인 7.3에서 안정 버전 7.3.1, 7.3.2가 갈라져 나오는 모습</title>
+
+  <!-- 버전 문자열 -->
+  <text class="t-code" x="20" y="52">$ uname -r</text>
+  <rect class="box blue" x="130" y="22" width="56" height="48" rx="8"/>
+  <text class="t-h t-mono mid" x="158" y="53">7</text>
+  <text class="t-h mid" x="197" y="53">.</text>
+  <rect class="box blue" x="208" y="22" width="56" height="48" rx="8"/>
+  <text class="t-h t-mono mid" x="236" y="53">3</text>
+  <text class="t-h mid" x="275" y="53">.</text>
+  <rect class="box green" x="286" y="22" width="56" height="48" rx="8"/>
+  <text class="t-h t-mono mid" x="314" y="53">2</text>
+  <rect class="box gray" x="354" y="22" width="130" height="48" rx="8"/>
+  <text class="t-h t-mono mid" x="419" y="53">-arch1-1</text>
+
+  <path class="ln thin blue" d="M134 78 V86 H260 V78"/>
+  <text class="t-s t-ink t-b tc-blue mid" x="197" y="104">메인라인 릴리스</text>
+  <text class="t-code mid tc-muted" x="197" y="121">VERSION.PATCHLEVEL</text>
+
+  <path class="ln thin green" d="M314 78 V92"/>
+  <text class="t-s t-ink t-b tc-green mid" x="314" y="108">안정 버전</text>
+  <text class="t-code mid tc-muted" x="314" y="125">SUBLEVEL</text>
+
+  <path class="ln thin muted" d="M419 78 V92"/>
+  <text class="t-s t-ink t-b mid" x="419" y="108">배포판 꼬리</text>
+
+  <text class="t-s" x="520" y="42">앞의 두 숫자가 릴리스를 가리킨다.</text>
+  <text class="t-s" x="520" y="60">숫자의 크기에 뜻은 없다.</text>
+
+  <path class="ln thin muted dash" d="M20 146 H740"/>
+
+  <!-- 메인라인 -->
+  <text class="t-s t-ink t-b" x="20" y="194">메인라인</text>
+  <path class="ln blue" d="M100 190 H716" marker-end="url(#ah-blue)"/>
+  <circle class="f-blue" cx="130" cy="190" r="7"/>
+  <text class="t-code mid" x="130" y="174">7.2</text>
+  <circle class="s-surface" cx="250" cy="190" r="5"/>
+  <circle class="ghost blue" cx="250" cy="190" r="5"/>
+  <text class="t-code mid" x="250" y="174">7.3-rc1</text>
+  <circle class="s-surface" cx="370" cy="190" r="5"/>
+  <circle class="ghost blue" cx="370" cy="190" r="5"/>
+  <text class="t-code mid" x="370" y="174">7.3-rc7</text>
+  <circle class="f-blue" cx="450" cy="190" r="7"/>
+  <text class="t-code t-b mid" x="450" y="174">7.3</text>
+  <circle class="s-surface" cx="570" cy="190" r="5"/>
+  <circle class="ghost blue" cx="570" cy="190" r="5"/>
+  <text class="t-code mid" x="570" y="174">7.4-rc1</text>
+
+  <text class="t-xs mid" x="190" y="212">머지 윈도 2주</text>
+  <text class="t-xs mid" x="310" y="212">매주 rc, 수정만</text>
+  <text class="t-xs mid" x="510" y="212">머지 윈도 2주</text>
+
+  <!-- 안정 브랜치 -->
+  <text class="t-s t-ink t-b" x="20" y="262">안정 7.3.y</text>
+  <path class="ln green" d="M450 197 V258 H716" marker-end="url(#ah-green)"/>
+  <circle class="f-green" cx="530" cy="258" r="6"/>
+  <text class="t-code mid" x="530" y="282">7.3.1</text>
+  <circle class="f-green" cx="620" cy="258" r="6"/>
+  <text class="t-code mid" x="620" y="282">7.3.2</text>
+  <text class="t-xs tc-green" x="140" y="262">메인라인에 먼저 들어간 버그 수정만 옮겨 온다</text>
+</svg>

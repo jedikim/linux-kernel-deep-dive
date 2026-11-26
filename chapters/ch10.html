@@ -1,0 +1,1151 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>커널의 IRQ 계층 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="irq_desc에서 핸들러까지, 여러 CPU가 같은 IRQ를 만날 때">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="커널의 IRQ 계층 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="irq_desc에서 핸들러까지, 여러 CPU가 같은 IRQ를 만날 때">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch10" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html" aria-current="page"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">3부 시간과 인터럽트 › <b>10장 커널의 IRQ 계층</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-warm">
+<div class="ch-kicker"><span class="ch-no">10</span><span class="part">3부 · 시간과 인터럽트</span></div>
+<h1>커널의 IRQ 계층</h1>
+<p class="ch-sub">irq_desc에서 핸들러까지, 여러 CPU가 같은 IRQ를 만날 때</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 55분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/irqdesc.h" target="_blank" rel="noopener">include/linux/irqdesc.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/irqdesc.c" target="_blank" rel="noopener">kernel/irq/irqdesc.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/irq.h" target="_blank" rel="noopener">include/linux/irq.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/chip.c" target="_blank" rel="noopener">kernel/irq/chip.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/internals.h" target="_blank" rel="noopener">kernel/irq/internals.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/idtentry.h" target="_blank" rel="noopener">arch/x86/include/asm/idtentry.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kernel/irq.c" target="_blank" rel="noopener">arch/x86/kernel/irq.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/handle.c" target="_blank" rel="noopener">kernel/irq/handle.c</a></div>
+</header><div class="lead">
+<p>CPU가 커널에 건네주는 것은 벡터 번호 하나입니다. 그 숫자에서 "이 NVMe 장치의 3번 큐가 일을 마쳤다"까지 가려면 여러 질문에 답해야 합니다. 어느 장치인가. 그 장치의 드라이버가 등록한 함수는 무엇인가. 컨트롤러에는 언제 어떤 응답을 보내야 하는가. 처리하는 도중에 같은 인터럽트가 다른 CPU에 또 오면 어떻게 하는가. 그리고 이 답은 APIC을 쓰는 PC에서도, GIC을 쓰는 ARM 보드에서도 같은 드라이버 코드로 통해야 합니다. 이 장은 그 사이를 메우는 커널의 IRQ 계층을 읽습니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>하드웨어 IRQ 번호, 리눅스 IRQ 번호, 벡터는 각각 무엇이고 누가 이어 주는가?</li>
+<li><code>irq_desc</code> 안의 <code>irq_chip</code>, 플로 핸들러, <code>irqaction</code>은 각각 무엇을 책임지는가?</li>
+<li>벡터 번호에서 드라이버의 핸들러까지 v7.3은 어떤 함수를 거치는가?</li>
+<li>같은 IRQ가 두 CPU에 잇달아 오면 핸들러는 어떻게 한 번에 하나만 실행되는가?</li>
+<li>여러 장치가 IRQ 하나를 나눠 쓸 때 커널은 누구의 인터럽트인지 어떻게 아는가?</li>
+<li>인터럽트가 어느 CPU로 갈지는 누가, 무엇을 근거로 정하는가?</li>
+</ul>
+</div>
+<section class="level2" id="numbers">
+<h2><span class="sec-n">10.1</span>번호가 셋이다<a aria-label="이 절의 링크" class="anchor" href="#numbers">#</a></h2>
+<p>인터럽트 하나에는 번호가 셋 붙습니다. 이 셋을 섞으면 그 뒤의 코드가 읽히지 않습니다.</p>
+<ul>
+<li><strong>하드웨어 IRQ 번호</strong>(hwirq): 인터럽트 컨트롤러 안에서의 번호입니다. IO-APIC이라면 핀 번호, MSI-X라면 장치의 표에서 몇 번째 항목인지, GIC이라면 INTID입니다. 컨트롤러마다 0부터 따로 셉니다.</li>
+<li><strong>리눅스 IRQ 번호</strong>: 커널이 인터럽트마다 붙이는 시스템 전체에서 유일한 번호입니다. 드라이버가 <code>request_irq()</code>에 넘기는 값이고 <code>/proc/interrupts</code>의 첫 열입니다. 하드웨어와는 아무 관계가 없는, <code>irq_desc</code>를 찾는 열쇠일 뿐입니다.</li>
+<li><strong>벡터</strong>: x86 CPU가 인터럽트를 구분하는 번호입니다(<a href="ch09.html">9장</a>). CPU마다 따로 배정합니다.</li>
+</ul>
+<p>hwirq와 리눅스 IRQ 번호를 이어 주는 것이 <strong><code>irq_domain</code></strong>입니다. 컨트롤러 하나가 도메인 하나를 만들고, 그 안에서 hwirq를 리눅스 IRQ 번호로 바꾸는 표를 가집니다.</p>
+<figure class="fig" id="fig-irq-numbers-domain"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 396" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>인터럽트의 세 가지 번호: 리눅스 IRQ 번호 하나에 도메인마다 hwirq를 가진 irq_data가 사슬로 달리고, 맨 끝 벡터 도메인이 CPU와 벡터 번호를 정한다</title>
+
+  <!-- 예 1: MSI-X -->
+  <rect class="box blue" x="20" y="16" width="720" height="40" rx="10"/>
+  <text class="t-b" x="34" y="41">리눅스 IRQ 142</text>
+  <text class="t-s" x="160" y="41">드라이버가 request_irq()에 넘기는 번호. irq_desc 하나에 대응한다</text>
+
+  <rect class="box green" x="20" y="72" width="220" height="92" rx="10"/>
+  <text class="t-s t-ink t-b" x="34" y="94">PCI-MSIX 도메인</text>
+  <text class="t-code" x="34" y="116">hwirq = 1</text>
+  <text class="t-xs" x="34" y="136">장치 MSI-X 표의 1번 항목</text>
+  <text class="t-xs" x="34" y="154">irq_chip: PCI-MSIX</text>
+
+  <rect class="box yellow" x="270" y="72" width="220" height="92" rx="10"/>
+  <text class="t-s t-ink t-b" x="284" y="94">인터럽트 리매핑 도메인</text>
+  <text class="t-code" x="284" y="116">hwirq = 표 인덱스</text>
+  <text class="t-xs" x="284" y="136">IOMMU의 리매핑 표 항목</text>
+  <text class="t-xs" x="284" y="154">IOMMU가 있을 때만 낀다</text>
+
+  <rect class="box warm" x="520" y="72" width="220" height="92" rx="10"/>
+  <text class="t-s t-ink t-b" x="534" y="94">벡터 도메인</text>
+  <text class="t-code" x="534" y="116">CPU 3, 벡터 0x41</text>
+  <text class="t-xs" x="534" y="136">그 CPU의 벡터 공간에서 한 칸</text>
+  <text class="t-xs" x="534" y="154">irq_chip: APIC</text>
+
+  <path class="ln" d="M240 118 H265" marker-end="url(#ah)"/>
+  <path class="ln" d="M490 118 H515" marker-end="url(#ah)"/>
+  <text class="t-xs" x="20" y="186">상자 하나가 struct irq_data 하나다. 화살표는 parent_data 포인터이고, CPU에 가까운 쪽이 부모다.</text>
+
+  <!-- 예 2: 핀 -->
+  <rect class="box blue" x="20" y="210" width="720" height="40" rx="10"/>
+  <text class="t-b" x="34" y="235">리눅스 IRQ 1</text>
+  <text class="t-s" x="160" y="235">키보드 컨트롤러(i8042)</text>
+
+  <rect class="box green" x="20" y="266" width="220" height="72" rx="10"/>
+  <text class="t-s t-ink t-b" x="34" y="288">IO-APIC 도메인</text>
+  <text class="t-code" x="34" y="310">hwirq = 1</text>
+  <text class="t-xs" x="34" y="328">IO-APIC의 1번 핀</text>
+
+  <rect class="box yellow" x="270" y="266" width="220" height="72" rx="10"/>
+  <text class="t-s t-ink t-b" x="284" y="288">인터럽트 리매핑 도메인</text>
+  <text class="t-code" x="284" y="310">hwirq = 표 인덱스</text>
+
+  <rect class="box warm" x="520" y="266" width="220" height="72" rx="10"/>
+  <text class="t-s t-ink t-b" x="534" y="288">벡터 도메인</text>
+  <text class="t-code" x="534" y="310">CPU 0, 벡터 0x31</text>
+
+  <path class="ln" d="M240 302 H265" marker-end="url(#ah)"/>
+  <path class="ln" d="M490 302 H515" marker-end="url(#ah)"/>
+
+  <text class="t-s mid" x="380" y="372">인터럽트가 오면 거꾸로 찾는다: CPU가 받은 벡터 → 그 CPU의 vector_irq[벡터] → irq_desc</text>
+</svg></div><figcaption><b>그림 10-1</b>인터럽트 두 개의 번호들. 리눅스 IRQ 번호 하나에 도메인마다 <code>irq_data</code>가 하나씩 달립니다.</figcaption></figure>
+<p>요즘 하드웨어에서는 인터럽트 하나가 컨트롤러를 여럿 거칩니다. x86에서 MSI-X 인터럽트는 장치의 MSI-X 표, IOMMU의 리매핑 표, CPU의 벡터를 차례로 지납니다. 커널은 이 경로를 <strong>도메인 계층</strong>으로 그대로 본뜹니다. 장치에 가까운 쪽이 자식이고 CPU에 가까운 쪽이 부모입니다. 인터럽트를 하나 할당하면 계층의 각 도메인이 자기 몫의 자원(표의 한 칸, 벡터 하나)을 잡고 자기 <code>irq_data</code>를 채웁니다. 친화성을 바꾸는 것 같은 요청은 자식에서 부모로 차례로 내려갑니다.</p>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"IRQ 번호는 하드웨어의 인터럽트 선 번호다." PIC 하나가 전부이던 시절에는 맞았습니다. IRQ 1은 PIC의 1번 선이고 벡터는 거기에 상수를 더한 값이었습니다. 지금 <code>/proc/interrupts</code>에 보이는 <code>142</code>는 커널이 할당한 순서에 가까운 숫자이고, 재부팅하면 달라질 수 있습니다. 하드웨어 쪽 번호는 같은 줄의 컨트롤러 이름 뒤에 따로 나옵니다. x86에서 0–15번만은 호환성 때문에 옛 ISA IRQ 번호와 같게 맞춰 둡니다.</p>
+</div>
+</section>
+<section class="level2" id="irq-desc">
+<h2><span class="sec-n">10.2</span>irq_desc<a aria-label="이 절의 링크" class="anchor" href="#irq-desc">#</a></h2>
+<p>리눅스 IRQ 번호 하나에 <strong><code>struct irq_desc</code></strong> 하나가 대응합니다. 이 인터럽트에 대해 커널이 아는 모든 것이 여기에 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/irqdesc.h#L81" rel="noopener" target="_blank">include/linux/irqdesc.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/irqdesc.h" data-line="81" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="kw">struct</span> irq_desc <span class="op">{</span></span>
+<span id="cb1-2">    <span class="kw">struct</span> irq_common_data  irq_common_data<span class="op">;</span></span>
+<span id="cb1-3">    <span class="kw">struct</span> irq_data     irq_data<span class="op">;</span></span>
+<span id="cb1-4">    <span class="kw">struct</span> irqstat __percpu <span class="op">*</span>kstat_irqs<span class="op">;</span></span>
+<span id="cb1-5">    irq_flow_handler_t  handle_irq<span class="op">;</span></span>
+<span id="cb1-6">    <span class="kw">struct</span> irqaction    <span class="op">*</span>action<span class="op">;</span>    <span class="co">/* IRQ action list */</span></span>
+<span id="cb1-7">    <span class="dt">unsigned</span> <span class="dt">int</span>        status_use_accessors<span class="op">;</span></span>
+<span id="cb1-8">    <span class="dt">unsigned</span> <span class="dt">int</span>        core_internal_state__do_not_mess_with_it<span class="op">;</span></span>
+<span id="cb1-9">    <span class="dt">unsigned</span> <span class="dt">int</span>        depth<span class="op">;</span>      <span class="co">/* nested irq disables */</span></span>
+<span id="cb1-10">    <span class="dt">unsigned</span> <span class="dt">int</span>        wake_depth<span class="op">;</span> <span class="co">/* nested wake enables */</span></span>
+<span id="cb1-11">    <span class="co">/* ... */</span></span>
+<span id="cb1-12">    <span class="dt">unsigned</span> <span class="dt">int</span>        irq_count<span class="op">;</span>  <span class="co">/* For detecting broken IRQs */</span></span>
+<span id="cb1-13">    <span class="dt">unsigned</span> <span class="dt">int</span>        irqs_unhandled<span class="op">;</span></span>
+<span id="cb1-14">    <span class="co">/* ... */</span></span>
+<span id="cb1-15">    raw_spinlock_t      lock<span class="op">;</span></span>
+<span id="cb1-16">    <span class="co">/* ... */</span></span>
+<span id="cb1-17">    <span class="kw">struct</span> mutex        request_mutex<span class="op">;</span></span>
+<span id="cb1-18">    <span class="co">/* ... */</span></span>
+<span id="cb1-19">    <span class="dt">const</span> <span class="dt">char</span>      <span class="op">*</span>name<span class="op">;</span></span>
+<span id="cb1-20">    <span class="co">/* ... */</span></span>
+<span id="cb1-21"><span class="op">}</span> ____cacheline_internodealigned_in_smp<span class="op">;</span></span></code></pre></div></div>
+<figure class="fig" id="fig-irq-desc-map"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 476" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>irq_desc 구조 지도: irq_data가 irq_chip을, handle_irq가 플로 핸들러를, action이 irqaction 사슬을, kstat_irqs가 CPU별 횟수를 가리키고, lock과 depth와 내부 상태가 함께 들어 있다</title>
+
+  <!-- irq_desc -->
+  <rect class="panel blue" x="20" y="16" width="250" height="444" rx="12"/>
+  <text class="t-mono t-b" x="34" y="40">struct irq_desc</text>
+  <text class="t-xs" x="34" y="58">리눅스 IRQ 번호 하나에 하나</text>
+
+  <rect class="box" x="34" y="70" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="87">irq_common_data</text>
+  <text class="t-xs" x="44" y="103">상태(IRQD_*), 친화성 마스크</text>
+  <rect class="box" x="34" y="116" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="133">irq_data</text>
+  <text class="t-xs" x="44" y="149">irq, hwirq, chip, domain</text>
+  <rect class="box" x="34" y="162" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="179">handle_irq</text>
+  <text class="t-xs" x="44" y="195">플로 핸들러 포인터</text>
+  <rect class="box" x="34" y="208" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="225">action</text>
+  <text class="t-xs" x="44" y="241">핸들러 사슬의 머리</text>
+  <rect class="box" x="34" y="254" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="271">kstat_irqs</text>
+  <text class="t-xs" x="44" y="287">CPU별 발생 횟수</text>
+  <rect class="box red" x="34" y="300" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="317">lock</text>
+  <text class="t-xs" x="44" y="333">이 구조체를 지키는 raw 스핀락</text>
+  <rect class="box red" x="34" y="346" width="222" height="40" rx="6"/>
+  <text class="t-code" x="44" y="363">depth</text>
+  <text class="t-xs" x="44" y="379">disable_irq() 중첩 횟수</text>
+  <rect class="box red" x="34" y="392" width="222" height="54" rx="6"/>
+  <text class="t-code" x="44" y="409">core_internal_state__</text>
+  <text class="t-code" x="44" y="424">do_not_mess_with_it</text>
+  <text class="t-xs" x="44" y="440">코어만 쓰는 상태(IRQS_*)</text>
+
+  <!-- irq_chip -->
+  <path class="ln warm" d="M256 136 H325" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="330" y="96" width="410" height="84" rx="10"/>
+  <text class="t-mono t-b" x="344" y="120">struct irq_chip</text>
+  <text class="t-xs tc-warm end" x="728" y="120">하드웨어를 아는 쪽</text>
+  <text class="t-code" x="344" y="144">.irq_mask() .irq_unmask() .irq_ack() .irq_eoi()</text>
+  <text class="t-code" x="344" y="164">.irq_set_affinity() .irq_set_type()</text>
+
+  <!-- 플로 핸들러 -->
+  <path class="ln green" d="M256 182 H310 V226 H325" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="330" y="196" width="410" height="62" rx="10"/>
+  <text class="t-mono t-b" x="344" y="220">handle_fasteoi_irq()</text>
+  <text class="t-xs tc-green end" x="728" y="220">순서를 아는 쪽</text>
+  <text class="t-xs" x="344" y="242">칩 콜백과 action 사슬을 어떤 순서로 부를지 정한 함수</text>
+
+  <!-- irqaction 사슬 -->
+  <path class="ln purple" d="M256 228 H298 V314 H325" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="330" y="274" width="190" height="84" rx="10"/>
+  <text class="t-mono t-b" x="342" y="296">struct irqaction</text>
+  <text class="t-code" x="342" y="316">.handler  .dev_id</text>
+  <text class="t-code" x="342" y="334">.thread_fn  .name</text>
+  <text class="t-xs" x="342" y="350">드라이버 A가 등록</text>
+  <path class="ln purple" d="M520 314 H545" marker-end="url(#ah-purple)"/>
+  <text class="t-code mid" x="533" y="306">next</text>
+  <rect class="box purple" x="550" y="274" width="190" height="84" rx="10"/>
+  <text class="t-mono t-b" x="562" y="296">struct irqaction</text>
+  <text class="t-code" x="562" y="316">.handler  .dev_id</text>
+  <text class="t-code" x="562" y="334">.thread_fn  .name</text>
+  <text class="t-xs" x="562" y="350">드라이버 B (선을 나눠 쓸 때)</text>
+
+  <!-- CPU별 횟수 -->
+  <path class="ln" d="M256 274 H286 V394 H325" marker-end="url(#ah)"/>
+  <rect class="box" x="330" y="376" width="100" height="36"/>
+  <text class="t-code mid" x="380" y="399">CPU0  921</text>
+  <rect class="box" x="430" y="376" width="100" height="36"/>
+  <text class="t-code mid" x="480" y="399">CPU1  0</text>
+  <rect class="box" x="530" y="376" width="100" height="36"/>
+  <text class="t-code mid" x="580" y="399">CPU2  14</text>
+  <rect class="box" x="630" y="376" width="110" height="36"/>
+  <text class="t-code mid" x="685" y="399">CPU3  0</text>
+
+  <text class="t-xs tc-red" x="330" y="440">빨간 칸은 한 IRQ를 여러 CPU와 여러 호출자가 동시에 건드릴 때를 위한 것이다</text>
+
+  <text class="t-xs" x="330" y="40">irq_data 안의 chip 포인터</text>
+  <text class="t-xs" x="330" y="58">도메인이 여러 겹이면 겹마다 irq_data와 irq_chip이 따로 있다</text>
+</svg></div><figcaption><b>그림 10-2</b><code>irq_desc</code>에서 뻗어 나가는 포인터들. 색은 그 부분을 누가 쓰는지를 나타냅니다. 주황은 칩 드라이버, 초록은 IRQ 코어, 보라는 장치 드라이버입니다.</figcaption></figure>
+<p>필드는 네 무리로 읽으면 됩니다.</p>
+<ul>
+<li><strong>하드웨어 쪽</strong>: <code>irq_data</code>에는 리눅스 IRQ 번호(<code>irq</code>), hwirq, 그리고 이 인터럽트를 맡은 컨트롤러의 조작 함수 묶음인 <code>irq_chip</code> 포인터가 있습니다. <code>irq_common_data</code>에는 도메인 계층의 모든 <code>irq_data</code>가 함께 보는 값, 곧 상태 비트와 친화성 마스크가 있습니다.</li>
+<li><strong>처리 방법</strong>: <code>handle_irq</code>는 이 인터럽트가 왔을 때 부를 함수입니다. <strong>플로 핸들러</strong>(flow handler)라고 합니다.</li>
+<li><strong>드라이버 쪽</strong>: <code>action</code>은 드라이버가 등록한 핸들러들의 연결 리스트입니다.</li>
+<li><strong>동시성</strong>: <code>lock</code>은 이 구조체를 지키는 스핀락, <code>depth</code>는 <code>disable_irq()</code>가 중첩된 횟수, 이름이 긴 <code>core_internal_state__do_not_mess_with_it</code>은 코어만 쓰는 상태 비트입니다. <code>request_mutex</code>는 등록과 해제를 직렬화합니다.</li>
+</ul>
+<p><code>kstat_irqs</code>는 CPU별 횟수입니다. <code>/proc/interrupts</code>의 숫자가 여기서 나옵니다.</p>
+<p><code>irq_desc</code>는 배열이 아니라 트리에 들어 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/irqdesc.c#L169" rel="noopener" target="_blank">kernel/irq/irqdesc.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/irq/irqdesc.c" data-line="169" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><span class="dt">static</span> <span class="kw">struct</span> maple_tree sparse_irqs <span class="op">=</span> MTREE_INIT_EXT<span class="op">(</span>sparse_irqs<span class="op">,</span></span>
+<span id="cb2-2">                    MT_FLAGS_ALLOC_RANGE <span class="op">|</span></span>
+<span id="cb2-3">                    MT_FLAGS_LOCK_EXTERN <span class="op">|</span></span>
+<span id="cb2-4">                    MT_FLAGS_USE_RCU<span class="op">,</span></span>
+<span id="cb2-5">                    sparse_irq_lock<span class="op">);</span></span>
+<span id="cb2-6"><span class="co">/* ... */</span></span>
+<span id="cb2-7"><span class="kw">struct</span> irq_desc <span class="op">*</span>irq_to_desc<span class="op">(</span><span class="dt">unsigned</span> <span class="dt">int</span> irq<span class="op">)</span></span>
+<span id="cb2-8"><span class="op">{</span></span>
+<span id="cb2-9">    <span class="cf">return</span> mtree_load<span class="op">(&amp;</span>sparse_irqs<span class="op">,</span> irq<span class="op">);</span></span>
+<span id="cb2-10"><span class="op">}</span></span></code></pre></div></div>
+<p>리눅스 IRQ 번호는 드문드문 쓰입니다. CPU가 수백 개이고 장치마다 큐가 수백 개인 서버에서는 번호가 수만까지 가지만 실제로 쓰이는 것은 일부입니다. 그래서 필요할 때 할당해서 메이플 트리(<a href="ch17.html">17장</a>)에 번호를 키로 넣습니다. <code>MT_FLAGS_USE_RCU</code>가 있으므로 찾는 쪽은 락 없이 읽습니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료는 <code>irq_desc[NR_IRQS]</code>라는 전역 배열을 그리고, IRQ 번호를 인덱스로 씁니다. v7.3에서 x86과 arm64는 <code>CONFIG_SPARSE_IRQ</code>를 쓰므로 배열이 없습니다. 디스크립터를 담는 자료구조는 래딕스 트리를 거쳐 6.5에서 메이플 트리가 되었고, 번호의 상한도 빌드 때 정한 값에서 <code>INT_MAX</code>로 풀렸습니다. 구조체 안도 달라졌습니다. 옛 판에 있던 <code>status</code> 한 워드는 <a href="#state">뒤에서 볼</a> 두 곳으로 갈라졌고, <code>kstat_irqs</code>는 정수 배열에서 <code>struct irqstat</code>로 바뀌었습니다.</p>
+</div>
+</section>
+<section class="level2" id="chip-flow">
+<h2><span class="sec-n">10.3</span>칩과 플로<a aria-label="이 절의 링크" class="anchor" href="#chip-flow">#</a></h2>
+<p>인터럽트 하나를 처리하려면 컨트롤러와 몇 가지를 주고받아야 합니다. 받았다고 알리고(ack), 필요하면 막고(mask), 다시 열고(unmask), 끝났다고 알립니다(eoi). <strong>무엇을</strong> 하는지는 컨트롤러마다 다릅니다. IO-APIC의 마스크는 리다이렉션 항목의 비트 하나를 쓰는 일이고, PIC의 마스크는 포트 <code>0x21</code>에 쓰는 일입니다. 이 부분이 <code>struct irq_chip</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/irq.h#L499" rel="noopener" target="_blank">include/linux/irq.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/irq.h" data-line="499" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><span class="kw">struct</span> irq_chip <span class="op">{</span></span>
+<span id="cb3-2">    <span class="dt">const</span> <span class="dt">char</span>  <span class="op">*</span>name<span class="op">;</span></span>
+<span id="cb3-3">    <span class="dt">unsigned</span> <span class="dt">int</span>    <span class="op">(*</span>irq_startup<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">);</span></span>
+<span id="cb3-4">    <span class="dt">void</span>        <span class="op">(*</span>irq_shutdown<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">);</span></span>
+<span id="cb3-5">    <span class="dt">void</span>        <span class="op">(*</span>irq_enable<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">);</span></span>
+<span id="cb3-6">    <span class="dt">void</span>        <span class="op">(*</span>irq_disable<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">);</span></span>
+<span id="cb3-7"></span>
+<span id="cb3-8">    <span class="dt">void</span>        <span class="op">(*</span>irq_ack<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">);</span></span>
+<span id="cb3-9">    <span class="dt">void</span>        <span class="op">(*</span>irq_mask<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">);</span></span>
+<span id="cb3-10">    <span class="dt">void</span>        <span class="op">(*</span>irq_mask_ack<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">);</span></span>
+<span id="cb3-11">    <span class="dt">void</span>        <span class="op">(*</span>irq_unmask<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">);</span></span>
+<span id="cb3-12">    <span class="dt">void</span>        <span class="op">(*</span>irq_eoi<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">);</span></span>
+<span id="cb3-13"></span>
+<span id="cb3-14">    <span class="dt">int</span>     <span class="op">(*</span>irq_set_affinity<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">,</span> <span class="dt">const</span> <span class="kw">struct</span> cpumask <span class="op">*</span>dest<span class="op">,</span> <span class="dt">bool</span> force<span class="op">);</span></span>
+<span id="cb3-15">    <span class="co">/* ... */</span></span>
+<span id="cb3-16">    <span class="dt">int</span>     <span class="op">(*</span>irq_set_type<span class="op">)(</span><span class="kw">struct</span> irq_data <span class="op">*</span>data<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span> flow_type<span class="op">);</span></span>
+<span id="cb3-17">    <span class="co">/* ... */</span></span>
+<span id="cb3-18"><span class="op">};</span></span></code></pre></div></div>
+<p><strong>어떤 순서로</strong> 하는지는 컨트롤러가 아니라 신호의 방식이 정합니다. 에지 트리거와 레벨 트리거는 순서가 달라야 합니다.</p>
+<figure class="fig" id="fig-edge-vs-level-flow"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 384" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>에지 트리거와 레벨 트리거의 플로 차이: 에지는 먼저 ack하고 처리 중에 온 에지를 이어서 처리하며, 레벨은 먼저 마스크하고 핸들러가 장치를 달랜 뒤 마스크를 푼다</title>
+
+  <!-- 에지 -->
+  <text class="t-b" x="20" y="26">에지 트리거</text>
+  <text class="t-mono" x="112" y="26">handle_edge_irq()</text>
+  <text class="t-xs" x="20" y="74">신호</text>
+  <path class="ln" d="M130 80 H180 V58 H200 V80 H380 V58 H400 V80 H730"/>
+  <path class="ln thin red dash" d="M390 58 V96"/>
+  <text class="t-xs tc-red mid" x="390" y="46">처리 중에 온 두 번째 에지</text>
+  <text class="t-xs" x="20" y="115">커널</text>
+  <rect class="box warm" x="204" y="96" width="44" height="28" rx="5"/>
+  <text class="t-xs t-ink mid" x="226" y="115">ack</text>
+  <rect class="box blue" x="250" y="96" width="250" height="28" rx="5"/>
+  <text class="t-xs t-ink mid" x="320" y="115">핸들러 실행</text>
+  <rect class="box blue" x="502" y="96" width="180" height="28" rx="5"/>
+  <text class="t-xs t-ink mid" x="592" y="115">한 번 더 실행</text>
+  <text class="t-xs" x="130" y="146">ack를 먼저 해서 컨트롤러가 다음 에지를 받을 수 있게 한다. 처리 중에 온 것은 표시해 두었다가 이어서 처리한다.</text>
+
+  <path class="ln thin muted dash" d="M20 164 H740"/>
+
+  <!-- 레벨 -->
+  <text class="t-b" x="20" y="192">레벨 트리거</text>
+  <text class="t-mono" x="112" y="192">handle_level_irq()</text>
+  <text class="t-xs" x="20" y="240">신호</text>
+  <path class="ln" d="M130 246 H180 V224 H430 V246 H730"/>
+  <path class="ln thin green dash" d="M430 224 V262"/>
+  <text class="t-xs tc-green mid" x="430" y="212">드라이버가 장치의 원인을 지우면 선이 내려간다</text>
+  <text class="t-xs" x="20" y="281">커널</text>
+  <rect class="box warm" x="184" y="262" width="76" height="28" rx="5"/>
+  <text class="t-xs t-ink mid" x="222" y="281">mask·ack</text>
+  <rect class="box blue" x="262" y="262" width="230" height="28" rx="5"/>
+  <text class="t-xs t-ink mid" x="340" y="281">핸들러 실행</text>
+  <rect class="box warm" x="494" y="262" width="70" height="28" rx="5"/>
+  <text class="t-xs t-ink mid" x="529" y="281">unmask</text>
+  <text class="t-xs" x="130" y="312">선이 올라가 있는 동안은 요청이 계속 살아 있다. 먼저 막아 두지 않으면 핸들러가 장치를 달래기도 전에 다시 걸린다.</text>
+
+  <path class="ln thin muted dash" d="M20 330 H740"/>
+
+  <text class="t-b" x="20" y="356">fasteoi</text>
+  <text class="t-mono" x="80" y="356">handle_fasteoi_irq()</text>
+  <text class="t-xs" x="250" y="356">컨트롤러가 EOI를 받을 때까지 같은 인터럽트를 다시 올리지 않는다(IO-APIC, GIC).</text>
+  <text class="t-xs" x="250" y="374">마스크할 필요 없이 핸들러 뒤에 eoi 한 번이면 된다.</text>
+</svg></div><figcaption><b>그림 10-3</b>에지와 레벨에서 ack·mask·unmask의 순서가 다른 이유. 이 순서를 담은 함수가 플로 핸들러입니다.</figcaption></figure>
+<p>레벨 트리거의 플로 핸들러는 그림 그대로입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/chip.c#L689" rel="noopener" target="_blank">kernel/irq/chip.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/irq/chip.c" data-line="689" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="dt">void</span> handle_level_irq<span class="op">(</span><span class="kw">struct</span> irq_desc <span class="op">*</span>desc<span class="op">)</span></span>
+<span id="cb4-2"><span class="op">{</span></span>
+<span id="cb4-3">    guard<span class="op">(</span>raw_spinlock<span class="op">)(&amp;</span>desc<span class="op">-&gt;</span>lock<span class="op">);</span></span>
+<span id="cb4-4">    mask_ack_irq<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb4-5"></span>
+<span id="cb4-6">    <span class="cf">if</span> <span class="op">(!</span>irq_can_handle<span class="op">(</span>desc<span class="op">))</span></span>
+<span id="cb4-7">        <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb4-8"></span>
+<span id="cb4-9">    kstat_incr_irqs_this_cpu<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb4-10">    handle_irq_event<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb4-11"></span>
+<span id="cb4-12">    cond_unmask_irq<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb4-13"><span class="op">}</span></span></code></pre></div></div>
+<p>막고, 드라이버의 핸들러들을 부르고(<code>handle_irq_event()</code>), 엽니다. <code>mask_ack_irq()</code>와 <code>cond_unmask_irq()</code>는 안에서 <code>desc-&gt;irq_data.chip</code>의 콜백을 부릅니다. 이 함수에는 IO-APIC이나 GIC이라는 말이 없습니다. <code>guard(raw_spinlock)</code>은 함수를 빠져나갈 때 락을 자동으로 푸는 표기입니다(<a href="ch14.html">14장</a>).</p>
+<p>코어가 제공하는 플로 핸들러는 몇 개뿐입니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>플로 핸들러</th>
+<th>순서</th>
+<th>v7.3의 x86에서 쓰는 곳</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>handle_edge_irq()</code></td>
+<td>ack → 핸들러 → (그사이 또 왔으면 반복)</td>
+<td>MSI, MSI-X, IO-APIC의 에지 핀</td>
+</tr>
+<tr>
+<td><code>handle_level_irq()</code></td>
+<td>mask·ack → 핸들러 → unmask</td>
+<td>8259 PIC</td>
+</tr>
+<tr>
+<td><code>handle_fasteoi_irq()</code></td>
+<td>핸들러 → eoi</td>
+<td>IO-APIC의 레벨 핀</td>
+</tr>
+<tr>
+<td><code>handle_percpu_irq()</code></td>
+<td>ack → 핸들러 → eoi, 락 없음</td>
+<td>CPU마다 따로 오는 인터럽트</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>/proc/interrupts</code>에서 hwirq 뒤에 붙는 <code>-edge</code>, <code>-fasteoi</code>가 이 이름입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p><code>Documentation/core-api/genericirq.rst</code>는 이 구조가 나온 까닭을 적어 두었습니다. 처음의 리눅스는 <code>__do_IRQ()</code>라는 함수 하나가 모든 종류의 인터럽트를 처리했고, 칩마다 다른 동작은 <code>-&gt;ack</code>, <code>-&gt;end</code> 같은 콜백으로 갈랐습니다. 그러자 "언제 무엇을 부르는가"라는 흐름의 논리와 "레지스터에 무엇을 쓰는가"라는 하드웨어의 논리가 콜백 안에서 뒤섞였습니다. i386에는 같은 IO-APIC을 두고 에지용 타입과 레벨용 타입이 따로 있었습니다. 해법은 축을 둘로 나누는 것이었습니다. 흐름은 플로 핸들러 몇 개로, 하드웨어는 <code>irq_chip</code>으로 나누면, 칩 M개와 흐름 N개를 M+N개의 코드로 덮습니다. 변하는 이유가 다른 것을 한 함수에 두지 않는다는 원칙의 사례입니다.</p>
+</div>
+</section>
+<section class="level2" id="state">
+<h2><span class="sec-n">10.4</span>상태 비트<a aria-label="이 절의 링크" class="anchor" href="#state">#</a></h2>
+<p>IRQ마다 상태가 있습니다. 꺼져 있는가, 마스크되어 있는가, 지금 어느 CPU에서 처리 중인가, 처리 중에 또 왔는가. v7.3은 이 비트들을 두 곳에 나눠 둡니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/irq.h#L228" rel="noopener" target="_blank">include/linux/irq.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/irq.h" data-line="228" id="cb5"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb5-1"><span class="kw">enum</span> <span class="op">{</span></span>
+<span id="cb5-2">    IRQD_TRIGGER_MASK       <span class="op">=</span> <span class="bn">0xf</span><span class="op">,</span></span>
+<span id="cb5-3">    IRQD_SETAFFINITY_PENDING    <span class="op">=</span> BIT<span class="op">(</span><span class="dv">8</span><span class="op">),</span></span>
+<span id="cb5-4">    <span class="co">/* ... */</span></span>
+<span id="cb5-5">    IRQD_LEVEL          <span class="op">=</span> BIT<span class="op">(</span><span class="dv">13</span><span class="op">),</span></span>
+<span id="cb5-6">    IRQD_WAKEUP_STATE       <span class="op">=</span> BIT<span class="op">(</span><span class="dv">14</span><span class="op">),</span></span>
+<span id="cb5-7">    IRQD_IRQ_DISABLED       <span class="op">=</span> BIT<span class="op">(</span><span class="dv">16</span><span class="op">),</span></span>
+<span id="cb5-8">    IRQD_IRQ_MASKED         <span class="op">=</span> BIT<span class="op">(</span><span class="dv">17</span><span class="op">),</span></span>
+<span id="cb5-9">    IRQD_IRQ_INPROGRESS     <span class="op">=</span> BIT<span class="op">(</span><span class="dv">18</span><span class="op">),</span></span>
+<span id="cb5-10">    <span class="co">/* ... */</span></span>
+<span id="cb5-11">    IRQD_AFFINITY_MANAGED       <span class="op">=</span> BIT<span class="op">(</span><span class="dv">21</span><span class="op">),</span></span>
+<span id="cb5-12">    <span class="co">/* ... */</span></span>
+<span id="cb5-13"><span class="op">};</span></span></code></pre></div></div>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/internals.h#L66" rel="noopener" target="_blank">kernel/irq/internals.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/irq/internals.h" data-line="66" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="kw">enum</span> <span class="op">{</span></span>
+<span id="cb6-2">    IRQS_AUTODETECT     <span class="op">=</span> <span class="bn">0x00000001</span><span class="op">,</span></span>
+<span id="cb6-3">    IRQS_SPURIOUS_DISABLED  <span class="op">=</span> <span class="bn">0x00000002</span><span class="op">,</span></span>
+<span id="cb6-4">    IRQS_POLL_INPROGRESS    <span class="op">=</span> <span class="bn">0x00000008</span><span class="op">,</span></span>
+<span id="cb6-5">    IRQS_ONESHOT        <span class="op">=</span> <span class="bn">0x00000020</span><span class="op">,</span></span>
+<span id="cb6-6">    IRQS_REPLAY     <span class="op">=</span> <span class="bn">0x00000040</span><span class="op">,</span></span>
+<span id="cb6-7">    IRQS_WAITING        <span class="op">=</span> <span class="bn">0x00000080</span><span class="op">,</span></span>
+<span id="cb6-8">    IRQS_PENDING        <span class="op">=</span> <span class="bn">0x00000200</span><span class="op">,</span></span>
+<span id="cb6-9">    <span class="co">/* ... */</span></span>
+<span id="cb6-10"><span class="op">};</span></span></code></pre></div></div>
+<p>두 열거형은 정의된 파일부터 다릅니다. <code>IRQD_*</code>는 공개 헤더 <code>include/linux/irq.h</code>에 있고 <code>irq_common_data.state_use_accessors</code>에 저장됩니다. 칩 드라이버가 알아야 하는 상태입니다. <code>IRQS_*</code>는 <code>kernel/irq/</code> 디렉터리 안의 <code>internals.h</code>에 있고 <code>desc-&gt;core_internal_state__do_not_mess_with_it</code>에 저장됩니다. 플로 핸들러와 코어만 쓰는 상태입니다.</p>
+<figure class="fig" id="fig-state-bits-old-new"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>IRQ 상태 비트의 분할: 예전에 desc-&gt;status 한 워드에 있던 IRQ_DISABLED, IRQ_INPROGRESS는 칩 드라이버도 읽는 IRQD_* 로, IRQ_PENDING, IRQ_WAITING은 코어 전용 IRQS_* 로 갈라졌다</title>
+
+  <!-- 예전 -->
+  <text class="t-b" x="20" y="26">예전</text>
+  <text class="t-mono" x="60" y="26">desc-&gt;status</text>
+  <text class="t-xs" x="20" y="46">모든 상태가 한 워드에. 누구나 읽고 썼다</text>
+  <rect class="box gray" x="20" y="70" width="230" height="34"/>
+  <text class="t-code" x="32" y="92">IRQ_DISABLED</text>
+  <rect class="box gray" x="20" y="104" width="230" height="34"/>
+  <text class="t-code" x="32" y="126">IRQ_INPROGRESS</text>
+  <rect class="box gray" x="20" y="244" width="230" height="34"/>
+  <text class="t-code" x="32" y="266">IRQ_PENDING</text>
+  <rect class="box gray" x="20" y="278" width="230" height="34"/>
+  <text class="t-code" x="32" y="300">IRQ_WAITING</text>
+  <rect class="ghost dash" x="20" y="162" width="230" height="58"/>
+  <text class="t-code" x="32" y="186">IRQ_LEVEL  IRQ_MASKED</text>
+  <text class="t-xs" x="32" y="206">그 밖의 설정 비트들</text>
+
+  <!-- IRQD -->
+  <rect class="panel warm" x="400" y="16" width="340" height="162" rx="12"/>
+  <text class="t-b tc-warm" x="414" y="40">IRQD_*</text>
+  <text class="t-xs end" x="728" y="40">칩 드라이버도 읽을 수 있다</text>
+  <text class="t-code" x="414" y="60">irq_common_data.state_use_accessors</text>
+  <rect class="box" x="414" y="70" width="312" height="30"/>
+  <text class="t-code" x="426" y="90">IRQD_IRQ_DISABLED</text>
+  <rect class="box" x="414" y="104" width="312" height="30"/>
+  <text class="t-code" x="426" y="124">IRQD_IRQ_INPROGRESS</text>
+  <rect class="box" x="414" y="138" width="312" height="30"/>
+  <text class="t-code" x="426" y="158">IRQD_IRQ_MASKED  IRQD_LEVEL  …</text>
+
+  <!-- IRQS -->
+  <rect class="panel red" x="400" y="194" width="340" height="162" rx="12"/>
+  <text class="t-b tc-red" x="414" y="218">IRQS_*</text>
+  <text class="t-xs end" x="728" y="218">kernel/irq/ 안에서만 쓴다</text>
+  <text class="t-code" x="414" y="238">core_internal_state__do_not_mess_with_it</text>
+  <rect class="box" x="414" y="248" width="312" height="30"/>
+  <text class="t-code" x="426" y="268">IRQS_PENDING</text>
+  <rect class="box" x="414" y="282" width="312" height="30"/>
+  <text class="t-code" x="426" y="302">IRQS_WAITING</text>
+  <rect class="box" x="414" y="316" width="312" height="30"/>
+  <text class="t-code" x="426" y="336">IRQS_REPLAY  IRQS_ONESHOT  …</text>
+
+  <path class="ln warm" d="M250 86 H409" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M250 120 H409" marker-end="url(#ah-warm)"/>
+  <path class="ln red" d="M250 262 H409" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M250 296 H409" marker-end="url(#ah-red)"/>
+</svg></div><figcaption><b>그림 10-4</b>한 워드에 있던 상태가 쓰는 사람에 따라 둘로 갈렸습니다.</figcaption></figure>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료는 <code>irq_desc[irq].status</code>에 <code>IRQ_DISABLED</code>, <code>IRQ_PENDING</code>, <code>IRQ_INPROGRESS</code>, <code>IRQ_WAITING</code>이 함께 있다고 설명하고, 드라이버나 아키텍처 코드가 이 필드를 직접 읽고 고치는 예를 보여 줍니다. v7.3에는 이 이름들이 없습니다. 대응은 이렇습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>옛 비트</th>
+<th>v7.3</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IRQ_DISABLED</code></td>
+<td><code>IRQD_IRQ_DISABLED</code></td>
+<td><code>disable_irq()</code>로 꺼 둔 상태</td>
+</tr>
+<tr>
+<td><code>IRQ_INPROGRESS</code></td>
+<td><code>IRQD_IRQ_INPROGRESS</code></td>
+<td>어느 CPU가 핸들러를 실행 중</td>
+</tr>
+<tr>
+<td><code>IRQ_PENDING</code></td>
+<td><code>IRQS_PENDING</code></td>
+<td>처리하지 못한 요청이 남아 있음</td>
+</tr>
+<tr>
+<td><code>IRQ_WAITING</code></td>
+<td><code>IRQS_WAITING</code></td>
+<td>아직 한 번도 오지 않음(자동 탐지용)</td>
+</tr>
+</tbody>
+</table></div>
+<p>코어 밖의 코드가 상태 워드를 직접 고치지 못하게 하려는 것이 나눈 이유입니다.</p>
+</div>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>C에는 <code>private</code>이 없습니다. 커널은 세 겹으로 같은 효과를 냅니다. 첫째는 <strong>이름</strong>입니다. <code>state_use_accessors</code>와 <code>core_internal_state__do_not_mess_with_it</code>은 필드 이름이 곧 경고문입니다. 이 필드를 직접 건드리는 패치는 리뷰에서 눈에 띌 수밖에 없습니다. 코어 안에서는 <code>#define istate core_internal_state__do_not_mess_with_it</code>으로 짧게 줄여 씁니다. 둘째는 <strong>접근자의 위치</strong>입니다. 읽는 함수 <code>irqd_irq_inprogress()</code>는 공개 헤더에 있고, 쓰는 함수 <code>irqd_set()</code>은 <code>kernel/irq/internals.h</code>에만 있습니다. 그 파일의 첫 주석은 "<code>kernel/irq/</code> 밖에서는 이 파일을 포함하지 말라"입니다. 셋째는 <strong>정적 검사</strong>입니다. <code>state_use_accessors</code>에 붙은 <code>__private</code> 표시는 <code>ACCESS_PRIVATE()</code> 매크로를 거치지 않은 접근을 sparse가 잡아내게 합니다(<a href="ch27.html">27장</a>). 언어가 주지 않는 캡슐화를 관례와 도구로 세운 것입니다.</p>
+</div>
+</section>
+<section class="level2" id="path">
+<h2><span class="sec-n">10.5</span>벡터에서 핸들러까지<a aria-label="이 절의 링크" class="anchor" href="#path">#</a></h2>
+<p>이제 인터럽트 하나를 따라갑니다. <a href="ch09.html">9장</a>은 진입 스텁이 <code>pt_regs</code>를 만들고 C 함수를 부르는 데서 끝났습니다.</p>
+<figure class="fig" id="fig-irq-call-path"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 566" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>x86-64 v7.3에서 벡터가 드라이버 핸들러에 닿는 호출 경로: 아키텍처 코드가 벡터로 irq_desc를 찾고, 범용 IRQ 코어의 플로 핸들러와 handle_irq_event가 action 사슬을 돌며 드라이버의 핸들러를 부른다</title>
+
+  <!-- 아키텍처 -->
+  <rect class="panel yellow" x="20" y="14" width="720" height="174" rx="12"/>
+  <text class="t-b tc-yellow" x="34" y="38">아키텍처 코드</text>
+  <text class="t-code end" x="726" y="38">arch/x86/</text>
+  <rect class="box" x="34" y="48" width="692" height="40" rx="8"/>
+  <text class="t-mono t-b" x="46" y="73">asm_common_interrupt</text>
+  <text class="t-xs end" x="714" y="73">스텁이 벡터를 넣고 error_entry가 pt_regs를 만든다 (9장)</text>
+  <path class="ln" d="M120 88 V101" marker-end="url(#ah)"/>
+  <rect class="box" x="34" y="106" width="692" height="70" rx="8"/>
+  <text class="t-mono t-b" x="46" y="130">common_interrupt()</text>
+  <text class="t-xs end" x="714" y="130">irqentry_enter() · IRQ 스택 전환 · irq_enter_rcu()</text>
+  <text class="t-code" x="46" y="158">desc = vector_irq[vector]</text>
+  <text class="t-xs end" x="714" y="158">이 CPU의 표에서 irq_desc를 찾는다</text>
+
+  <!-- 코어 -->
+  <rect class="panel green" x="20" y="200" width="720" height="204" rx="12"/>
+  <text class="t-b tc-green" x="170" y="224">범용 IRQ 코어</text>
+  <text class="t-code end" x="726" y="224">kernel/irq/</text>
+  <rect class="box" x="34" y="236" width="692" height="40" rx="8"/>
+  <text class="t-mono t-b" x="46" y="261">desc-&gt;handle_irq(desc)</text>
+  <text class="t-xs end" x="714" y="261">플로 핸들러(예: handle_edge_irq). lock을 잡고 칩에 ack</text>
+  <path class="ln" d="M120 276 V289" marker-end="url(#ah)"/>
+  <rect class="box" x="34" y="294" width="692" height="40" rx="8"/>
+  <text class="t-mono t-b" x="46" y="319">handle_irq_event(desc)</text>
+  <text class="t-xs end" x="714" y="319">INPROGRESS를 켜고 lock을 푼다</text>
+  <path class="ln" d="M120 334 V347" marker-end="url(#ah)"/>
+  <rect class="box" x="34" y="352" width="692" height="40" rx="8"/>
+  <text class="t-mono t-b" x="46" y="377">__handle_irq_event_percpu(desc)</text>
+  <text class="t-xs end" x="714" y="377">action 사슬을 차례로 돈다</text>
+
+  <!-- 드라이버 -->
+  <rect class="panel purple" x="20" y="416" width="720" height="88" rx="12"/>
+  <text class="t-b tc-purple" x="170" y="440">드라이버</text>
+  <rect class="box" x="34" y="452" width="692" height="40" rx="8"/>
+  <text class="t-mono t-b" x="46" y="477">action-&gt;handler(irq, dev_id)</text>
+  <text class="t-xs end" x="714" y="477">IRQ_HANDLED · IRQ_NONE · IRQ_WAKE_THREAD</text>
+
+  <text class="t-s" x="20" y="528">돌아가는 길에 irq_exit_rcu()가 hardirq 카운트를 내리고 밀린 softirq를 실행한다 (11장).</text>
+  <text class="t-s" x="20" y="550">마지막으로 irqentry_exit()가 선점 여부와 유저 모드 복귀 작업을 처리한다 (6장).</text>
+  <path class="ln" d="M120 176 V231" marker-end="url(#ah)"/>
+  <path class="ln" d="M120 392 V447" marker-end="url(#ah)"/>
+</svg></div><figcaption><b>그림 10-5</b>x86-64, v7.3의 호출 경로. 위에서 아래로 갈수록 하드웨어에서 멀어집니다.</figcaption></figure>
+<p><code>common_interrupt()</code>는 <code>DEFINE_IDTENTRY_IRQ</code> 매크로로 정의됩니다. 매크로가 함수의 겉을 만들고, 개발자가 쓴 본문은 그 안에서 불립니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/idtentry.h#L206" rel="noopener" target="_blank">arch/x86/include/asm/idtentry.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/include/asm/idtentry.h" data-line="206" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="pp">#define DEFINE_IDTENTRY_IRQ</span><span class="op">(</span><span class="pp">func</span><span class="op">)</span><span class="pp">                   </span><span class="op">\</span></span>
+<span id="cb7-2"><span class="dt">static</span><span class="pp"> </span><span class="dt">void</span><span class="pp"> __</span><span class="op">##</span><span class="pp">func</span><span class="op">(</span><span class="kw">struct</span><span class="pp"> pt_regs </span><span class="op">*</span><span class="pp">regs</span><span class="op">,</span><span class="pp"> </span>u32<span class="pp"> vector</span><span class="op">);</span><span class="pp">         </span><span class="op">\</span></span>
+<span id="cb7-3"><span class="pp">                                    </span><span class="op">\</span></span>
+<span id="cb7-4"><span class="pp">__visible noinstr </span><span class="dt">void</span><span class="pp"> func</span><span class="op">(</span><span class="kw">struct</span><span class="pp"> pt_regs </span><span class="op">*</span><span class="pp">regs</span><span class="op">,</span><span class="pp">           </span><span class="op">\</span></span>
+<span id="cb7-5"><span class="pp">                </span><span class="dt">unsigned</span><span class="pp"> </span><span class="dt">long</span><span class="pp"> error_code</span><span class="op">)</span><span class="pp">           </span><span class="op">\</span></span>
+<span id="cb7-6"><span class="op">{</span><span class="pp">                                   </span><span class="op">\</span></span>
+<span id="cb7-7"><span class="pp">    irqentry_state_t state </span><span class="op">=</span><span class="pp"> irqentry_enter</span><span class="op">(</span><span class="pp">regs</span><span class="op">);</span><span class="pp">          </span><span class="op">\</span></span>
+<span id="cb7-8"><span class="pp">    </span>u32<span class="pp"> vector </span><span class="op">=</span><span class="pp"> </span><span class="op">(</span>u32<span class="op">)(</span>u8<span class="op">)</span><span class="pp">error_code</span><span class="op">;</span><span class="pp">               </span><span class="op">\</span></span>
+<span id="cb7-9"><span class="pp">                                    </span><span class="op">\</span></span>
+<span id="cb7-10"><span class="pp">    kvm_set_cpu_l1tf_flush_l1d</span><span class="op">();</span><span class="pp">                                   </span><span class="op">\</span></span>
+<span id="cb7-11"><span class="pp">    instrumentation_begin</span><span class="op">();</span><span class="pp">                    </span><span class="op">\</span></span>
+<span id="cb7-12"><span class="pp">    run_irq_on_irqstack_cond</span><span class="op">(</span><span class="pp">__</span><span class="op">##</span><span class="pp">func</span><span class="op">,</span><span class="pp"> regs</span><span class="op">,</span><span class="pp"> vector</span><span class="op">);</span><span class="pp">       </span><span class="op">\</span></span>
+<span id="cb7-13"><span class="pp">    instrumentation_end</span><span class="op">();</span><span class="pp">                      </span><span class="op">\</span></span>
+<span id="cb7-14"><span class="pp">    irqentry_exit</span><span class="op">(</span><span class="pp">regs</span><span class="op">,</span><span class="pp"> state</span><span class="op">);</span><span class="pp">                 </span><span class="op">\</span></span>
+<span id="cb7-15"><span class="op">}</span><span class="pp">                                   </span><span class="op">\</span></span>
+<span id="cb7-16"><span class="pp">                                    </span><span class="op">\</span></span>
+<span id="cb7-17"><span class="dt">static</span><span class="pp"> noinline </span><span class="dt">void</span><span class="pp"> __</span><span class="op">##</span><span class="pp">func</span><span class="op">(</span><span class="kw">struct</span><span class="pp"> pt_regs </span><span class="op">*</span><span class="pp">regs</span><span class="op">,</span><span class="pp"> </span>u32<span class="pp"> vector</span><span class="op">)</span></span></code></pre></div></div>
+<ul>
+<li><code>irqentry_enter()</code>와 <code>irqentry_exit()</code>가 처리를 감쌉니다. 뒤의 것이 <a href="ch06.html">6장</a>에서 본 복귀 갈림길입니다. 재스케줄 요청과 시그널이 여기서 처리됩니다.</li>
+<li><code>run_irq_on_irqstack_cond()</code>는 CPU마다 하나씩 있는 <strong>IRQ 스택</strong>으로 갈아탄 뒤 본문을 부릅니다. 태스크의 커널 스택은 크기가 정해져 있으므로, 깊은 시스템 콜 도중에 인터럽트가 와도 넘치지 않게 하려는 것입니다. 이 매크로는 본문 앞뒤로 <code>irq_enter_rcu()</code>와 <code>irq_exit_rcu()</code>도 부릅니다. 앞의 것이 <code>preempt_count</code>의 hardirq 칸을 올리고, 뒤의 것이 내린 다음 밀린 softirq를 실행합니다(<a href="ch11.html">11장</a>).</li>
+</ul>
+<p>본문은 짧습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kernel/irq.c#L228" rel="noopener" target="_blank">arch/x86/kernel/irq.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/kernel/irq.c" data-line="228" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="dt">static</span> __always_inline <span class="dt">bool</span> call_irq_handler<span class="op">(</span><span class="dt">int</span> vector<span class="op">,</span> <span class="kw">struct</span> pt_regs <span class="op">*</span>regs<span class="op">)</span></span>
+<span id="cb8-2"><span class="op">{</span></span>
+<span id="cb8-3">    <span class="kw">struct</span> irq_desc <span class="op">*</span>desc <span class="op">=</span> __this_cpu_read<span class="op">(</span>vector_irq<span class="op">[</span>vector<span class="op">]);</span></span>
+<span id="cb8-4"></span>
+<span id="cb8-5">    <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(!</span>IS_ERR_OR_NULL<span class="op">(</span>desc<span class="op">)))</span> <span class="op">{</span></span>
+<span id="cb8-6">        handle_irq<span class="op">(</span>desc<span class="op">,</span> regs<span class="op">);</span></span>
+<span id="cb8-7">        <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb8-8">    <span class="op">}</span></span>
+<span id="cb8-9">    <span class="co">/* ... */</span></span>
+<span id="cb8-10"><span class="op">}</span></span>
+<span id="cb8-11"></span>
+<span id="cb8-12"><span class="co">/* ... */</span></span>
+<span id="cb8-13">DEFINE_IDTENTRY_IRQ<span class="op">(</span>common_interrupt<span class="op">)</span></span>
+<span id="cb8-14"><span class="op">{</span></span>
+<span id="cb8-15">    <span class="kw">struct</span> pt_regs <span class="op">*</span>old_regs <span class="op">=</span> set_irq_regs<span class="op">(</span>regs<span class="op">);</span></span>
+<span id="cb8-16"></span>
+<span id="cb8-17">    <span class="co">/* entry code tells RCU that we're not quiescent.  Check it. */</span></span>
+<span id="cb8-18">    RCU_LOCKDEP_WARN<span class="op">(!</span>rcu_is_watching<span class="op">(),</span> <span class="st">"IRQ failed to wake up RCU"</span><span class="op">);</span></span>
+<span id="cb8-19"></span>
+<span id="cb8-20">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(!</span>call_irq_handler<span class="op">(</span>vector<span class="op">,</span> regs<span class="op">)))</span></span>
+<span id="cb8-21">        apic_eoi<span class="op">();</span></span>
+<span id="cb8-22"></span>
+<span id="cb8-23">    set_irq_regs<span class="op">(</span>old_regs<span class="op">);</span></span>
+<span id="cb8-24"><span class="op">}</span></span></code></pre></div></div>
+<p><code>vector_irq</code>는 CPU별 배열입니다. 256칸이고 칸마다 <code>irq_desc</code> 포인터가 들어 있습니다. 벡터에서 디스크립터를 찾는 일은 배열 읽기 한 번입니다. x86-64에서 <code>handle_irq()</code>는 <code>desc-&gt;handle_irq(desc)</code>, 곧 플로 핸들러를 부르는 것이 전부입니다. 여기서부터는 아키텍처와 상관없는 코드입니다.</p>
+<p>플로 핸들러는 칩과 응답을 주고받은 뒤 <code>handle_irq_event()</code>를 부릅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/handle.c#L255" rel="noopener" target="_blank">kernel/irq/handle.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/irq/handle.c" data-line="255" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1">irqreturn_t handle_irq_event<span class="op">(</span><span class="kw">struct</span> irq_desc <span class="op">*</span>desc<span class="op">)</span></span>
+<span id="cb9-2"><span class="op">{</span></span>
+<span id="cb9-3">    irqreturn_t ret<span class="op">;</span></span>
+<span id="cb9-4"></span>
+<span id="cb9-5">    desc<span class="op">-&gt;</span>istate <span class="op">&amp;=</span> <span class="op">~</span>IRQS_PENDING<span class="op">;</span></span>
+<span id="cb9-6">    irqd_set<span class="op">(&amp;</span>desc<span class="op">-&gt;</span>irq_data<span class="op">,</span> IRQD_IRQ_INPROGRESS<span class="op">);</span></span>
+<span id="cb9-7">    raw_spin_unlock<span class="op">(&amp;</span>desc<span class="op">-&gt;</span>lock<span class="op">);</span></span>
+<span id="cb9-8"></span>
+<span id="cb9-9">    ret <span class="op">=</span> handle_irq_event_percpu<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb9-10"></span>
+<span id="cb9-11">    raw_spin_lock<span class="op">(&amp;</span>desc<span class="op">-&gt;</span>lock<span class="op">);</span></span>
+<span id="cb9-12">    irqd_clear<span class="op">(&amp;</span>desc<span class="op">-&gt;</span>irq_data<span class="op">,</span> IRQD_IRQ_INPROGRESS<span class="op">);</span></span>
+<span id="cb9-13">    <span class="cf">return</span> ret<span class="op">;</span></span>
+<span id="cb9-14"><span class="op">}</span></span></code></pre></div></div>
+<p>이 함수는 <code>desc-&gt;lock</code>을 쥔 채로 불립니다. "처리 중" 표시를 세우고, <strong>락을 풀고</strong>, 드라이버의 핸들러들을 부르고, 다시 락을 잡아 표시를 내립니다. 락을 푸는 이유는 <a href="#three-cases">다음 절</a>에서 봅니다. 핸들러를 실제로 부르는 반복문은 한 단계 더 안에 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/handle.c#L185" rel="noopener" target="_blank">kernel/irq/handle.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/irq/handle.c" data-line="185" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1">irqreturn_t __handle_irq_event_percpu<span class="op">(</span><span class="kw">struct</span> irq_desc <span class="op">*</span>desc<span class="op">)</span></span>
+<span id="cb10-2"><span class="op">{</span></span>
+<span id="cb10-3">    irqreturn_t retval <span class="op">=</span> IRQ_NONE<span class="op">;</span></span>
+<span id="cb10-4">    <span class="dt">unsigned</span> <span class="dt">int</span> irq <span class="op">=</span> desc<span class="op">-&gt;</span>irq_data<span class="op">.</span>irq<span class="op">;</span></span>
+<span id="cb10-5">    <span class="kw">struct</span> irqaction <span class="op">*</span>action<span class="op">;</span></span>
+<span id="cb10-6"></span>
+<span id="cb10-7">    for_each_action_of_desc<span class="op">(</span>desc<span class="op">,</span> action<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-8">        irqreturn_t res<span class="op">;</span></span>
+<span id="cb10-9"></span>
+<span id="cb10-10">        <span class="co">/* ... */</span></span>
+<span id="cb10-11">        trace_irq_handler_entry<span class="op">(</span>irq<span class="op">,</span> action<span class="op">);</span></span>
+<span id="cb10-12">        <span class="co">/* ... */</span></span>
+<span id="cb10-13">            res <span class="op">=</span> action<span class="op">-&gt;</span>handler<span class="op">(</span>irq<span class="op">,</span> action<span class="op">-&gt;</span>dev_id<span class="op">);</span></span>
+<span id="cb10-14">        <span class="co">/* ... */</span></span>
+<span id="cb10-15">        trace_irq_handler_exit<span class="op">(</span>irq<span class="op">,</span> action<span class="op">,</span> res<span class="op">);</span></span>
+<span id="cb10-16"></span>
+<span id="cb10-17">        <span class="cf">if</span> <span class="op">(</span>WARN_ONCE<span class="op">(!</span>irqs_disabled<span class="op">(),</span><span class="st">"irq </span><span class="sc">%u</span><span class="st"> handler </span><span class="sc">%p</span><span class="st">S enabled interrupts</span><span class="sc">\n</span><span class="st">"</span><span class="op">,</span></span>
+<span id="cb10-18">                  irq<span class="op">,</span> action<span class="op">-&gt;</span>handler<span class="op">))</span></span>
+<span id="cb10-19">            local_irq_disable<span class="op">();</span></span>
+<span id="cb10-20"></span>
+<span id="cb10-21">        <span class="co">/* ... IRQ_WAKE_THREAD면 스레드를 깨운다 ... */</span></span>
+<span id="cb10-22"></span>
+<span id="cb10-23">        retval <span class="op">|=</span> res<span class="op">;</span></span>
+<span id="cb10-24">    <span class="op">}</span></span>
+<span id="cb10-25"></span>
+<span id="cb10-26">    <span class="cf">return</span> retval<span class="op">;</span></span>
+<span id="cb10-27"><span class="op">}</span></span></code></pre></div></div>
+<p><code>action</code> 사슬에 달린 핸들러를 <strong>모두</strong> 부릅니다. 선을 나눠 쓰는 경우 어느 장치가 걸었는지 커널은 모르기 때문입니다. 핸들러가 돌려준 값을 OR로 모읍니다. 가운데의 <code>WARN_ONCE</code>는 규칙 하나를 말해 줍니다. 핸들러는 인터럽트가 꺼진 채로 불리고, 켜서 돌아오면 안 됩니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료의 경로는 <code>do_IRQ()</code> → <code>__do_IRQ()</code> → <code>handle_IRQ_event()</code>입니다. <code>do_IRQ()</code>는 <code>irq_desc[]</code> 배열을 IRQ 번호로 찾고, <code>__do_IRQ()</code> 하나가 모든 종류의 인터럽트를 처리하며, <code>handle_IRQ_event()</code>는 등록할 때 <code>SA_INTERRUPT</code> 플래그를 주지 않은 핸들러에 대해서는 <code>local_irq_enable()</code>로 인터럽트를 켠 뒤에 핸들러를 부릅니다. 느린 핸들러가 다른 인터럽트를 오래 막지 않게 하려는 배려였습니다.</p>
+<p>v7.3에는 이 함수들이 없습니다. x86의 <code>do_IRQ()</code>는 5.8에서 <code>common_interrupt()</code>가 되었고, <code>__do_IRQ()</code>는 플로 핸들러들로 대체되었습니다. 핸들러는 예외 없이 인터럽트가 꺼진 채로 실행됩니다. 2010년에 그렇게 바뀌면서 <code>SA_INTERRUPT</code>와 그 뒤를 이은 <code>IRQF_DISABLED</code>는 뜻을 잃고 사라졌습니다. 핸들러 도중에 인터럽트가 겹쳐 들어오면 스택이 얼마나 깊어질지 알 수 없다는 것이 이유였습니다. 오래 걸리는 일은 인터럽트를 켜고 계속하는 것이 아니라 스레드나 softirq로 넘깁니다(<a href="ch11.html">11장</a>).</p>
+</div>
+</section>
+<section class="level2" id="three-cases">
+<h2><span class="sec-n">10.6</span>같은 IRQ를 두 CPU가 만날 때<a aria-label="이 절의 링크" class="anchor" href="#three-cases">#</a></h2>
+<p>핸들러가 실행되는 CPU에서는 인터럽트가 꺼져 있습니다. 그런데 다른 CPU는 사정이 다릅니다. 장치가 인터럽트를 또 걸었고, 그 사이에 친화성이 바뀌었거나 컨트롤러가 다른 CPU를 골랐다면, <strong>같은 IRQ가 다른 CPU에 도착합니다.</strong> 드라이버의 핸들러는 자기가 두 CPU에서 동시에 실행될 수 있다고 가정하고 쓰이지 않았습니다.</p>
+<p>에지 트리거의 플로 핸들러가 이 문제를 푸는 코드입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/chip.c#L827" rel="noopener" target="_blank">kernel/irq/chip.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/irq/chip.c" data-line="827" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1"><span class="dt">void</span> handle_edge_irq<span class="op">(</span><span class="kw">struct</span> irq_desc <span class="op">*</span>desc<span class="op">)</span></span>
+<span id="cb11-2"><span class="op">{</span></span>
+<span id="cb11-3">    guard<span class="op">(</span>raw_spinlock<span class="op">)(&amp;</span>desc<span class="op">-&gt;</span>lock<span class="op">);</span></span>
+<span id="cb11-4"></span>
+<span id="cb11-5">    <span class="cf">if</span> <span class="op">(!</span>irq_can_handle<span class="op">(</span>desc<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb11-6">        desc<span class="op">-&gt;</span>istate <span class="op">|=</span> IRQS_PENDING<span class="op">;</span></span>
+<span id="cb11-7">        mask_ack_irq<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb11-8">        <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb11-9">    <span class="op">}</span></span>
+<span id="cb11-10"></span>
+<span id="cb11-11">    kstat_incr_irqs_this_cpu<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb11-12"></span>
+<span id="cb11-13">    <span class="co">/* Start handling the irq */</span></span>
+<span id="cb11-14">    desc<span class="op">-&gt;</span>irq_data<span class="op">.</span>chip<span class="op">-&gt;</span>irq_ack<span class="op">(&amp;</span>desc<span class="op">-&gt;</span>irq_data<span class="op">);</span></span>
+<span id="cb11-15"></span>
+<span id="cb11-16">    <span class="cf">do</span> <span class="op">{</span></span>
+<span id="cb11-17">        <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(!</span>desc<span class="op">-&gt;</span>action<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb11-18">            mask_irq<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb11-19">            <span class="cf">return</span><span class="op">;</span></span>
+<span id="cb11-20">        <span class="op">}</span></span>
+<span id="cb11-21"></span>
+<span id="cb11-22">        <span class="co">/*</span></span>
+<span id="cb11-23"><span class="co">         * When another irq arrived while we were handling</span></span>
+<span id="cb11-24"><span class="co">         * one, we could have masked the irq.</span></span>
+<span id="cb11-25"><span class="co">         * Reenable it, if it was not disabled in meantime.</span></span>
+<span id="cb11-26"><span class="co">         */</span></span>
+<span id="cb11-27">        <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>desc<span class="op">-&gt;</span>istate <span class="op">&amp;</span> IRQS_PENDING<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb11-28">            <span class="cf">if</span> <span class="op">(!</span>irqd_irq_disabled<span class="op">(&amp;</span>desc<span class="op">-&gt;</span>irq_data<span class="op">)</span> <span class="op">&amp;&amp;</span></span>
+<span id="cb11-29">                irqd_irq_masked<span class="op">(&amp;</span>desc<span class="op">-&gt;</span>irq_data<span class="op">))</span></span>
+<span id="cb11-30">                unmask_irq<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb11-31">        <span class="op">}</span></span>
+<span id="cb11-32"></span>
+<span id="cb11-33">        handle_irq_event<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb11-34"></span>
+<span id="cb11-35">    <span class="op">}</span> <span class="cf">while</span> <span class="op">((</span>desc<span class="op">-&gt;</span>istate <span class="op">&amp;</span> IRQS_PENDING<span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="op">!</span>irqd_irq_disabled<span class="op">(&amp;</span>desc<span class="op">-&gt;</span>irq_data<span class="op">));</span></span>
+<span id="cb11-36"><span class="op">}</span></span></code></pre></div></div>
+<p>인터럽트를 받은 CPU는 세 가지 경우 가운데 하나를 만납니다.</p>
+<figure class="fig" id="fig-three-cases-timeline"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>같은 IRQ를 두 CPU가 만나는 세 가지 경우의 시간선: CPU 0이 처리하는 동안 CPU 1에 같은 IRQ가 오면 CPU 1은 PENDING만 세우고 돌아가고, CPU 0이 끝내기 전에 그것을 보고 한 번 더 처리한다</title>
+
+  <!-- CPU 0 -->
+  <text class="t-b" x="20" y="64">CPU 0</text>
+  <text class="t-xs tc-blue" x="120" y="34">① 아무도 처리 중이 아니다 → 내가 처리한다</text>
+  <rect class="box warm" x="120" y="44" width="60" height="30" rx="5"/>
+  <text class="t-xs t-ink mid" x="150" y="64">ack</text>
+  <rect class="box blue" x="180" y="44" width="220" height="30" rx="5"/>
+  <text class="t-xs t-ink mid" x="235" y="64">핸들러 실행</text>
+  <rect class="box warm" x="400" y="44" width="50" height="30" rx="5"/>
+  <text class="t-xs t-ink mid" x="425" y="64">확인</text>
+  <rect class="box blue" x="450" y="44" width="170" height="30" rx="5"/>
+  <text class="t-xs t-ink mid" x="535" y="64">핸들러 한 번 더</text>
+  <rect class="box warm" x="620" y="44" width="50" height="30" rx="5"/>
+  <text class="t-xs t-ink mid" x="645" y="64">확인</text>
+  <text class="t-xs" x="678" y="64">복귀</text>
+  <text class="t-xs tc-warm" x="400" y="92">③ 끝내기 전에 PENDING을 본다 → 마스크를 풀고 이어서 처리</text>
+
+  <!-- CPU 1 -->
+  <text class="t-b" x="20" y="150">CPU 1</text>
+  <text class="t-xs tc-red" x="290" y="120">② CPU 0이 처리 중이다 → PENDING만 세우고 돌아간다</text>
+  <rect class="box gray" x="120" y="130" width="160" height="30" rx="5"/>
+  <text class="t-xs mid" x="200" y="150">하던 일</text>
+  <rect class="box red" x="280" y="130" width="70" height="30" rx="5"/>
+  <text class="t-xs t-ink mid" x="315" y="150">표시만</text>
+  <rect class="box gray" x="350" y="130" width="380" height="30" rx="5"/>
+  <text class="t-xs mid" x="540" y="150">하던 일로 복귀</text>
+  <path class="ln thin red dash" d="M280 74 V130"/>
+
+  <path class="ln thin muted" d="M20 182 H740"/>
+
+  <!-- 상태 -->
+  <text class="t-code" x="20" y="210">IRQD_IRQ_INPROGRESS</text>
+  <rect class="solid blue" x="180" y="200" width="220" height="10" rx="3"/>
+  <rect class="solid blue" x="450" y="200" width="170" height="10" rx="3"/>
+  <text class="t-code" x="20" y="240">IRQS_PENDING</text>
+  <rect class="solid red" x="315" y="230" width="135" height="10" rx="3"/>
+  <text class="t-code" x="20" y="270">desc-&gt;lock</text>
+  <rect class="solid" x="120" y="260" width="60" height="10" rx="3"/>
+  <rect class="solid" x="280" y="260" width="70" height="10" rx="3"/>
+  <rect class="solid" x="400" y="260" width="50" height="10" rx="3"/>
+  <rect class="solid" x="620" y="260" width="50" height="10" rx="3"/>
+
+  <text class="t-s" x="20" y="312">핸들러는 한 번에 한 CPU에서만 돈다. 늦게 온 CPU는 기다리지 않고 표시만 남긴다.</text>
+  <text class="t-s" x="20" y="334">lock은 상태를 읽고 쓰는 짧은 구간에만 잡는다. 핸들러를 부르는 동안에는 풀려 있다.</text>
+  <text class="t-s" x="20" y="356">그래서 CPU 1은 CPU 0의 핸들러가 끝나기를 기다리지 않고 lock을 얻어 PENDING을 세울 수 있다.</text>
+</svg></div><figcaption><b>그림 10-6</b>두 CPU의 시간선으로 본 세 경우. 아래의 막대는 상태 비트와 락이 켜져 있는 구간입니다.</figcaption></figure>
+<p><strong>① 아무도 처리하고 있지 않다.</strong> <code>irq_can_handle()</code>이 참입니다. 칩에 ack를 보내고 반복문으로 들어가 <code>handle_irq_event()</code>를 부릅니다. 이 함수가 <code>IRQD_IRQ_INPROGRESS</code>를 세우고 락을 풉니다.</p>
+<p><strong>② 다른 CPU가 처리하고 있다.</strong> <code>irq_can_handle()</code>은 <code>IRQD_IRQ_INPROGRESS</code>가 서 있는 것을 보고 거짓을 돌려줍니다. 이 CPU는 핸들러를 부르지 않습니다. <code>IRQS_PENDING</code>만 세우고, 같은 인터럽트가 더 오지 않게 마스크한 뒤 곧바로 돌아갑니다. 핸들러가 끝나기를 기다리지 않습니다.</p>
+<p><strong>③ 처리하던 CPU가 끝내려고 한다.</strong> <code>handle_irq_event()</code>에서 돌아온 CPU는 락을 쥔 채 <code>while</code> 조건을 봅니다. <code>IRQS_PENDING</code>이 서 있으면 처리하는 사이에 요청이 또 왔다는 뜻입니다. 반복문의 처음으로 돌아가 마스크를 풀고 핸들러를 한 번 더 부릅니다. <code>IRQS_PENDING</code>이 없을 때 비로소 빠져나갑니다.</p>
+<p>결과적으로 한 IRQ의 핸들러는 <strong>언제나 한 CPU에서, 차례로</strong> 실행됩니다. 늦게 온 CPU는 일을 넘기고 떠나고, 먼저 온 CPU가 남의 몫까지 처리합니다.</p>
+<p>이렇게 직렬화하는 데는 까닭이 있습니다. 같은 장치의 핸들러를 두 CPU에서 동시에 돌려 봐야 어차피 둘은 같은 장치 레지스터와 같은 드라이버 자료구조를 건드립니다. 드라이버가 자기 락으로 다시 줄을 세워야 하고, 캐시 라인은 두 CPU 사이를 오갑니다. 코어가 미리 줄을 세우면 드라이버는 "내 핸들러는 자기 자신과 겹쳐 실행되지 않는다"고 가정하고 짧게 쓸 수 있습니다.</p>
+<p><code>handle_irq_event()</code>가 핸들러를 부르는 동안 <code>desc-&gt;lock</code>을 푸는 것도 이 구조에 필요합니다. 락을 쥔 채로 핸들러를 부르면 ②의 CPU는 <code>PENDING</code>을 세우려고 락을 기다리며 핸들러가 끝날 때까지 헛돌게 됩니다. 락은 상태 비트를 읽고 쓰는 수십 나노초만 지키고, 핸들러끼리 겹치지 않게 하는 일은 <code>INPROGRESS</code> 비트가 맡습니다. <strong>긴 구간은 플래그로, 플래그는 짧은 락으로</strong> 지키는 방식입니다. 드라이버가 핸들러 안에서 <code>disable_irq_nosync()</code>처럼 같은 디스크립터의 락이 필요한 함수를 부를 수 있는 것도 이 덕분입니다.</p>
+<p>레벨 트리거에는 <code>PENDING</code> 반복문이 없습니다. 마스크를 풀었을 때 선이 아직 올라가 있으면 컨트롤러가 인터럽트를 다시 걸어 주기 때문입니다. 에지는 지나가면 그만이라서 소프트웨어가 "왔었다"는 사실을 기억해 두어야 합니다.</p>
+<details class="deep"><summary><small>더 깊이</small>v7.3의 예외: 친화성이 막 옮겨 온 CPU는 기다린다</summary><div class="deep-body">
+<p>②에는 예외가 하나 있습니다. <code>irq_can_handle()</code> 안의 <code>irq_can_handle_pm()</code>은, 이 IRQ의 목적지가 방금 이 CPU로 바뀌었는데 예전 목적지 CPU가 아직 핸들러를 실행 중이라면 <code>PENDING</code>을 세우지 않습니다. 대신 락을 풀고 <code>IRQD_IRQ_INPROGRESS</code>가 내려갈 때까지 짧게 헛돌며 기다렸다가 자기가 처리합니다(<code>irq_wait_on_inprogress()</code>). 소스 주석이 이유를 적어 두었습니다. 장치가 인터럽트를 매우 빠르게 걸면 예전 CPU는 핸들러를 마칠 때마다 <code>PENDING</code>을 발견해 반복문을 빠져나오지 못하고, 친화성을 옮겼는데도 처리는 계속 예전 CPU에서 일어납니다. 가상 머신에서 실제로 관찰된 현상입니다. 인터럽트를 한 CPU로만 보내는 칩의 에지 인터럽트에만 적용됩니다.</p>
+</div></details>
+</section>
+<section class="level2" id="driver-api">
+<h2><span class="sec-n">10.7</span>드라이버가 쓰는 API<a aria-label="이 절의 링크" class="anchor" href="#driver-api">#</a></h2>
+<p>드라이버는 지금까지 본 구조를 몰라도 됩니다. 함수 몇 개만 씁니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/drivers/net/ethernet/intel/e1000e/netdev.c#L2172" rel="noopener" target="_blank">drivers/net/ethernet/intel/e1000e/netdev.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="drivers/net/ethernet/intel/e1000e/netdev.c" data-line="2172" id="cb12"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb12-1"><span class="dt">static</span> <span class="dt">int</span> e1000_request_irq<span class="op">(</span><span class="kw">struct</span> e1000_adapter <span class="op">*</span>adapter<span class="op">)</span></span>
+<span id="cb12-2"><span class="op">{</span></span>
+<span id="cb12-3">    <span class="kw">struct</span> net_device <span class="op">*</span>netdev <span class="op">=</span> adapter<span class="op">-&gt;</span>netdev<span class="op">;</span></span>
+<span id="cb12-4">    <span class="dt">int</span> err<span class="op">;</span></span>
+<span id="cb12-5"></span>
+<span id="cb12-6">    <span class="cf">if</span> <span class="op">(</span>adapter<span class="op">-&gt;</span>msix_entries<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-7">        err <span class="op">=</span> e1000_request_msix<span class="op">(</span>adapter<span class="op">);</span></span>
+<span id="cb12-8">        <span class="cf">if</span> <span class="op">(!</span>err<span class="op">)</span></span>
+<span id="cb12-9">            <span class="cf">return</span> err<span class="op">;</span></span>
+<span id="cb12-10">        <span class="co">/* ... */</span></span>
+<span id="cb12-11">    <span class="op">}</span></span>
+<span id="cb12-12">    <span class="cf">if</span> <span class="op">(</span>adapter<span class="op">-&gt;</span>flags <span class="op">&amp;</span> FLAG_MSI_ENABLED<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-13">        err <span class="op">=</span> request_irq<span class="op">(</span>adapter<span class="op">-&gt;</span>pdev<span class="op">-&gt;</span>irq<span class="op">,</span> e1000_intr_msi<span class="op">,</span> <span class="dv">0</span><span class="op">,</span></span>
+<span id="cb12-14">                  netdev<span class="op">-&gt;</span>name<span class="op">,</span> netdev<span class="op">);</span></span>
+<span id="cb12-15">        <span class="cf">if</span> <span class="op">(!</span>err<span class="op">)</span></span>
+<span id="cb12-16">            <span class="cf">return</span> err<span class="op">;</span></span>
+<span id="cb12-17">        <span class="co">/* ... */</span></span>
+<span id="cb12-18">    <span class="op">}</span></span>
+<span id="cb12-19"></span>
+<span id="cb12-20">    err <span class="op">=</span> request_irq<span class="op">(</span>adapter<span class="op">-&gt;</span>pdev<span class="op">-&gt;</span>irq<span class="op">,</span> e1000_intr<span class="op">,</span> IRQF_SHARED<span class="op">,</span></span>
+<span id="cb12-21">              netdev<span class="op">-&gt;</span>name<span class="op">,</span> netdev<span class="op">);</span></span>
+<span id="cb12-22">    <span class="cf">if</span> <span class="op">(</span>err<span class="op">)</span></span>
+<span id="cb12-23">        e_err<span class="op">(</span><span class="st">"Unable to allocate interrupt, Error: </span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> err<span class="op">);</span></span>
+<span id="cb12-24"></span>
+<span id="cb12-25">    <span class="cf">return</span> err<span class="op">;</span></span>
+<span id="cb12-26"><span class="op">}</span></span></code></pre></div></div>
+<p><code>request_irq(irq, handler, flags, name, dev_id)</code>는 <code>irqaction</code>을 하나 만들어 그 IRQ의 <code>action</code> 사슬에 답니다. 해제는 <code>free_irq()</code>이고, 장치가 떨어질 때 자동으로 해제되는 <code>devm_request_irq()</code>도 있습니다. 이 드라이버는 MSI-X, MSI, 핀 인터럽트 순으로 시도합니다. 눈여겨볼 것은 마지막 호출의 <code>IRQF_SHARED</code>입니다. 핀 인터럽트는 다른 장치와 선을 나눠 쓸 수 있으므로 이 플래그를 줍니다. MSI에는 주지 않습니다.</p>
+<p>공유 IRQ에서 지켜야 할 약속이 둘 있습니다.</p>
+<ul>
+<li><strong><code>dev_id</code>가 유일해야 합니다.</strong> 핸들러가 불릴 때 두 번째 인자로 돌아오는 값이고, <code>free_irq(irq, dev_id)</code>가 사슬에서 어느 <code>irqaction</code>을 뗄지 찾는 열쇠입니다. 보통 장치 구조체의 포인터를 줍니다.</li>
+<li><strong>핸들러는 먼저 자기 장치가 맞는지 확인해야 합니다.</strong> 사슬의 핸들러가 모두 불리기 때문입니다. e1000e의 <code>e1000_intr()</code>은 장치의 원인 레지스터를 읽어 값이 0이면 <code>IRQ_NONE</code>을 돌려주고 끝냅니다.</li>
+</ul>
+<p>핸들러의 반환값은 셋입니다.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>값</th>
+<th>뜻</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IRQ_NONE</code></td>
+<td>내 장치의 인터럽트가 아니었다</td>
+</tr>
+<tr>
+<td><code>IRQ_HANDLED</code></td>
+<td>처리했다</td>
+</tr>
+<tr>
+<td><code>IRQ_WAKE_THREAD</code></td>
+<td>급한 일만 했다. 나머지를 할 스레드를 깨워 달라</td>
+</tr>
+</tbody>
+</table></div>
+<p>사슬의 모든 핸들러가 <code>IRQ_NONE</code>을 돌려주면 주인 없는 인터럽트입니다. 한두 번은 흔한 일이지만 계속되면 고장입니다. 레벨 트리거 선을 아무도 달래지 않으면 인터럽트가 끝없이 다시 걸려 시스템이 멈춥니다. 코어는 이것을 셉니다. 인터럽트 10만 번 가운데 99,900번 넘게 주인이 없으면 <code>irq N: nobody cared</code>라는 메시지와 함께 그 IRQ를 꺼 버립니다(<code>kernel/irq/spurious.c</code>).</p>
+<p>IRQ를 잠시 꺼 두는 함수는 중첩됩니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/manage.c#L676" rel="noopener" target="_blank">kernel/irq/manage.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/irq/manage.c" data-line="676" id="cb13"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1"><span class="dt">void</span> __disable_irq<span class="op">(</span><span class="kw">struct</span> irq_desc <span class="op">*</span>desc<span class="op">)</span></span>
+<span id="cb13-2"><span class="op">{</span></span>
+<span id="cb13-3">    <span class="cf">if</span> <span class="op">(!</span>desc<span class="op">-&gt;</span>depth<span class="op">++)</span></span>
+<span id="cb13-4">        irq_disable<span class="op">(</span>desc<span class="op">);</span></span>
+<span id="cb13-5"><span class="op">}</span></span></code></pre></div></div>
+<p><code>depth</code>가 0에서 1이 될 때만 실제로 끄고, <code>enable_irq()</code>는 1에서 0이 될 때만 켭니다. 서로 모르는 두 코드가 같은 IRQ를 껐다 켜도 먼저 켠 쪽이 나중 쪽의 구간을 깨뜨리지 않습니다. <code>disable_irq()</code>는 끈 뒤에 다른 CPU에서 실행 중인 핸들러가 끝나기를 기다립니다. 그래서 핸들러가 잡는 락을 쥔 채로 부르면 교착됩니다. 기다리지 않는 판이 <code>disable_irq_nosync()</code>입니다.</p>
+<p><code>request_threaded_irq()</code>는 핸들러를 둘 받습니다. 첫째는 지금까지처럼 hardirq 컨텍스트에서 불리고, <code>IRQ_WAKE_THREAD</code>를 돌려주면 둘째가 <code>irq/9-acpi</code> 같은 이름의 커널 스레드에서 불립니다. 스레드에서는 잠들 수 있고 뮤텍스를 쓸 수 있습니다. 레벨 트리거 인터럽트라면 스레드가 장치를 달랠 때까지 선을 막아 두어야 하는데, 이것을 요청하는 플래그가 <code>IRQF_ONESHOT</code>입니다. 스레드 IRQ와, 보통의 핸들러까지 스레드로 돌리는 강제 스레드화는 <a href="ch11.html">11장</a>에서 다른 지연 처리 수단과 함께 다룹니다.</p>
+</section>
+<section class="level2" id="affinity">
+<h2><span class="sec-n">10.8</span>어느 CPU가 받는가<a aria-label="이 절의 링크" class="anchor" href="#affinity">#</a></h2>
+<p>IRQ마다 <strong>친화성</strong>(affinity) 마스크가 있습니다. 이 인터럽트를 받아도 되는 CPU의 집합입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># cat /proc/irq/142/smp_affinity_list
+0-7
+# cat /proc/irq/142/effective_affinity_list
+3
+# echo 2 &gt; /proc/irq/142/smp_affinity_list</code></pre></div>
+<p><code>smp_affinity_list</code>는 허용된 집합이고 <code>effective_affinity_list</code>는 그 가운데 실제로 받는 CPU입니다. x86의 벡터 도메인은 인터럽트를 한 번에 CPU 하나로만 보내므로 뒤의 것은 언제나 하나입니다. 파일에 쓰면 <code>irq_chip</code>의 <code>irq_set_affinity()</code>가 도메인 계층을 따라 불리고(칩에 따라서는 다음 인터럽트가 올 때까지 미뤄집니다), x86에서는 새 CPU에서 벡터를 하나 받아 그 CPU의 <code>vector_irq[]</code>에 디스크립터를 적은 뒤, MSI 메시지나 IO-APIC 항목의 목적지를 고쳐 씁니다. 옛 CPU의 벡터는 새 벡터로 첫 인터럽트가 온 것을 확인한 다음에 돌려줍니다. 그 사이에 옛 경로로 출발한 인터럽트를 잃지 않기 위해서입니다.</p>
+<p>허용된 CPU가 여럿이면 벡터 할당기가 고릅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/irq/matrix.c#L135" rel="noopener" target="_blank">kernel/irq/matrix.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/irq/matrix.c" data-line="135" id="cb15"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb15-1"><span class="dt">static</span> <span class="dt">unsigned</span> <span class="dt">int</span> matrix_find_best_cpu<span class="op">(</span><span class="kw">struct</span> irq_matrix <span class="op">*</span>m<span class="op">,</span></span>
+<span id="cb15-2">                    <span class="dt">const</span> <span class="kw">struct</span> cpumask <span class="op">*</span>msk<span class="op">)</span></span>
+<span id="cb15-3"><span class="op">{</span></span>
+<span id="cb15-4">    <span class="dt">unsigned</span> <span class="dt">int</span> cpu<span class="op">,</span> best_cpu<span class="op">,</span> maxavl <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb15-5">    <span class="kw">struct</span> cpumap <span class="op">*</span>cm<span class="op">;</span></span>
+<span id="cb15-6"></span>
+<span id="cb15-7">    best_cpu <span class="op">=</span> UINT_MAX<span class="op">;</span></span>
+<span id="cb15-8"></span>
+<span id="cb15-9">    for_each_cpu<span class="op">(</span>cpu<span class="op">,</span> msk<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb15-10">        cm <span class="op">=</span> per_cpu_ptr<span class="op">(</span>m<span class="op">-&gt;</span>maps<span class="op">,</span> cpu<span class="op">);</span></span>
+<span id="cb15-11"></span>
+<span id="cb15-12">        <span class="cf">if</span> <span class="op">(!</span>cm<span class="op">-&gt;</span>online <span class="op">||</span> cm<span class="op">-&gt;</span>available <span class="op">&lt;=</span> maxavl<span class="op">)</span></span>
+<span id="cb15-13">            <span class="cf">continue</span><span class="op">;</span></span>
+<span id="cb15-14"></span>
+<span id="cb15-15">        best_cpu <span class="op">=</span> cpu<span class="op">;</span></span>
+<span id="cb15-16">        maxavl <span class="op">=</span> cm<span class="op">-&gt;</span>available<span class="op">;</span></span>
+<span id="cb15-17">    <span class="op">}</span></span>
+<span id="cb15-18">    <span class="cf">return</span> best_cpu<span class="op">;</span></span>
+<span id="cb15-19"><span class="op">}</span></span></code></pre></div></div>
+<p>기준은 "남은 벡터가 가장 많은 CPU"입니다. 부하가 아니라 벡터 수입니다. 실제 부하에 따라 인터럽트를 옮기는 일은 커널이 하지 않고, 유저 공간의 <code>irqbalance</code> 데몬이 <code>/proc/interrupts</code>를 읽고 <code>smp_affinity</code>에 써서 합니다. 9장에서 본 것처럼 하드웨어의 동적 분배 기능도 쓰지 않습니다. 인터럽트가 CPU 사이를 옮겨 다니면 핸들러가 쓰는 데이터의 캐시가 매번 식기 때문에, 한자리에 두고 필요할 때만 옮기는 쪽이 낫다는 판단입니다.</p>
+<section class="level3" id="관리형-친화성">
+<h3>관리형 친화성</h3>
+<p>NVMe나 서버용 네트워크 카드는 CPU 수만큼 큐를 만들고 큐마다 MSI-X 벡터를 하나씩 둡니다. 이런 장치는 친화성을 유저 공간에 맡기지 않습니다. 드라이버가 <code>pci_alloc_irq_vectors_affinity()</code>로 벡터를 할당하면 코어가 큐들을 CPU에 고르게 펼치고 마스크를 고정합니다. 이것이 <strong>관리형 친화성</strong>(managed affinity)입니다.</p>
+<figure class="fig" id="fig-managed-affinity"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>MSI-X 큐 벡터를 CPU에 하나씩 펼치는 관리형 친화성: CPU마다 자기 vector_irq 표가 있고, CPU가 꺼지면 관리형 IRQ는 끄고 일반 IRQ는 다른 CPU로 옮긴다</title>
+
+  <rect class="box gray" x="20" y="14" width="720" height="44" rx="10"/>
+  <use href="#i-disk" x="30" y="21" width="30" height="30" class="ic gray"/>
+  <text class="t-b" x="70" y="41">NVMe SSD</text>
+  <text class="t-s" x="160" y="41">I/O 큐 4개. 큐마다 MSI-X 벡터 하나, 벡터마다 CPU 하나</text>
+  <path class="ln green" d="M102 58 V85" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M287 58 V85" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M472 58 V85" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M657 58 V85" marker-end="url(#ah-green)"/>
+
+  <!-- CPU 0 -->
+  <rect class="box blue" x="20" y="90" width="165" height="164" rx="10"/>
+  <text class="t-b" x="32" y="112">CPU 0</text>
+  <text class="t-xs end" x="175" y="112">vector_irq[]</text>
+  <rect class="box green" x="30" y="122" width="145" height="46" rx="6"/>
+  <text class="t-code" x="40" y="141">0x41 → IRQ 142</text>
+  <text class="t-xs" x="40" y="159">nvme0q1 · 관리형</text>
+  <rect class="box warm" x="30" y="176" width="145" height="46" rx="6"/>
+  <text class="t-code" x="40" y="195">0x31 → IRQ 1</text>
+  <text class="t-xs" x="40" y="213">i8042 · 일반</text>
+
+  <!-- CPU 1 -->
+  <rect class="box blue" x="205" y="90" width="165" height="164" rx="10"/>
+  <text class="t-b" x="217" y="112">CPU 1</text>
+  <text class="t-xs end" x="360" y="112">vector_irq[]</text>
+  <rect class="box green" x="215" y="122" width="145" height="46" rx="6"/>
+  <text class="t-code" x="225" y="141">0x41 → IRQ 143</text>
+  <text class="t-xs" x="225" y="159">nvme0q2 · 관리형</text>
+
+  <!-- CPU 2 -->
+  <rect class="box blue" x="390" y="90" width="165" height="164" rx="10"/>
+  <text class="t-b" x="402" y="112">CPU 2</text>
+  <text class="t-xs end" x="545" y="112">vector_irq[]</text>
+  <rect class="box green" x="400" y="122" width="145" height="46" rx="6"/>
+  <text class="t-code" x="410" y="141">0x41 → IRQ 144</text>
+  <text class="t-xs" x="410" y="159">nvme0q3 · 관리형</text>
+  <rect class="ghost warm dash" x="400" y="176" width="145" height="46" rx="6"/>
+  <text class="t-code" x="410" y="195">0x35 → IRQ 4</text>
+  <text class="t-xs" x="410" y="213">옮겨 온 뒤</text>
+
+  <!-- CPU 3 -->
+  <rect class="box red" x="575" y="90" width="165" height="164" rx="10"/>
+  <text class="t-b" x="587" y="112">CPU 3</text>
+  <text class="t-xs tc-red end" x="730" y="112">꺼지는 중</text>
+  <rect class="box green" x="585" y="122" width="145" height="46" rx="6"/>
+  <text class="t-code" x="595" y="141">0x42 → IRQ 145</text>
+  <text class="t-xs" x="595" y="159">nvme0q4 · 관리형</text>
+  <rect class="box warm" x="585" y="176" width="145" height="46" rx="6"/>
+  <text class="t-code" x="595" y="195">0x33 → IRQ 4</text>
+  <text class="t-xs" x="595" y="213">ttyS0 · 일반</text>
+  <path class="ln warm dash" d="M585 199 H550" marker-end="url(#ah-warm)"/>
+
+  <text class="t-b" x="20" y="286">CPU 3을 끄면</text>
+  <rect class="box green" x="20" y="300" width="14" height="14" rx="3"/>
+  <text class="t-s" x="44" y="312">관리형(IRQ 145)은 옮기지 않는다. 큐를 멈춘 뒤 인터럽트를 끄고, CPU 3이 돌아오면 다시 켠다.</text>
+  <rect class="box warm" x="20" y="324" width="14" height="14" rx="3"/>
+  <text class="t-s" x="44" y="336">일반(IRQ 4)은 친화성 마스크에 남은 CPU로 옮긴다. 옮겨 간 CPU에서 벡터를 새로 받는다.</text>
+  <text class="t-s" x="20" y="370">벡터 번호는 CPU마다 따로 센다. 큐를 CPU에 하나씩 펼치면 CPU 하나가 쓰는 벡터는 몇 개 되지 않는다.</text>
+</svg></div><figcaption><b>그림 10-7</b>큐 벡터를 CPU에 하나씩 펼친 모습과, CPU가 꺼질 때 관리형 IRQ와 일반 IRQ가 다르게 다뤄지는 방식.</figcaption></figure>
+<p>관리형 IRQ는 <code>/proc/irq/N/smp_affinity</code>에 써도 바뀌지 않습니다. CPU가 꺼질 때의 동작도 다릅니다. 보통의 IRQ는 꺼지는 CPU에서 남은 CPU로 옮겨집니다(<code>irq_migrate_all_off_this_cpu()</code>). 관리형 IRQ는 마스크에 든 CPU가 모두 꺼지면 옮기지 않고 그대로 꺼 둡니다. 그 큐에 요청을 넣을 CPU가 없으니 인터럽트도 올 일이 없습니다.</p>
+<p>이렇게 하는 까닭은 벡터 수입니다. 장치 벡터는 CPU당 200개 남짓입니다. 큐 128개짜리 장치가 둘이면 인터럽트가 256개입니다. CPU 128개에 펼쳐져 있을 때는 CPU마다 둘씩이라 문제가 없지만, 절전에 들어가며 CPU 하나만 남기고 모두 끄면 256개가 한 CPU로 몰려 벡터가 모자랍니다. 관리형은 옮기지 않으므로 이 문제가 생기지 않습니다. 같은 이유로 x86은 보통의 MSI 인터럽트에도 <strong>예약 모드</strong>를 씁니다. 장치가 벡터를 할당만 하고 <code>request_irq()</code>를 부르지 않은 동안에는 실제 벡터를 주지 않고, 전체 수량에서 하나를 빼 두기만 합니다(<code>IRQD_CAN_RESERVE</code>).</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>인터럽트 하나의 정보를 모아 봅니다. 번호는 <code>/proc/interrupts</code>에서 고릅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ grep nvme0q1 /proc/interrupts
+ 142:      70211          0  ...  IR-PCI-MSIX-0000:02:00.0    1-edge      nvme0q1
+$ cat /sys/kernel/irq/142/{chip_name,hwirq,type,actions}
+IR-PCI-MSIX-0000:02:00.0
+1
+edge
+nvme0q1
+$ cat /proc/irq/142/{smp_affinity_list,effective_affinity_list,spurious}
+0
+0
+count 211
+unhandled 0
+last_unhandled 0 ms</code></pre></div>
+<p><code>hwirq</code>가 1, 리눅스 IRQ 번호가 142, 그리고 벡터는 어디에도 나오지 않습니다. 벡터는 <code>CONFIG_GENERIC_IRQ_DEBUGFS</code>가 켜진 커널에서 <code>/sys/kernel/debug/irq/irqs/142</code>를 읽으면 도메인 계층, 상태 비트(<code>IRQD_*</code>)와 함께 볼 수 있습니다.</p>
+<p>어떤 핸들러가 얼마나 자주 불리는지는 추적점으로 셉니다. 스레드 IRQ는 프로세스 목록에 보입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># bpftrace -e 'tracepoint:irq:irq_handler_entry { @[str(args-&gt;name)] = count(); }'
+^C
+@[nvme0q1]: 1203
+@[enp3s0-rx-0]: 8841
+...
+$ ps -e -o pid,cls,rtprio,comm | grep 'irq/'
+    431  FF     50 irq/9-acpi</code></pre></div>
+<p>스레드 IRQ의 스레드는 <code>SCHED_FIFO</code> 우선순위 50으로 돕니다. 핸들러 하나가 걸리는 시간은 <code>trace-cmd record -p function_graph -g handle_irq_event</code>로 볼 수 있습니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.6.18 · 2006</dt>
+<dd>
+범용 IRQ 계층. <code>irq_chip</code>과 플로 핸들러가 들어와 <code>__do_IRQ()</code>를 대체하기 시작합니다.
+</dd>
+<dt>2.6.30 · 2009</dt>
+<dd>
+스레드 인터럽트 핸들러(<code>request_threaded_irq()</code>).
+</dd>
+<dt>4.15 · 2018</dt>
+<dd>
+x86 벡터 관리 재작성. 매트릭스 할당기, 예약 모드, 관리형 벡터.
+</dd>
+<dt>5.8 · 2020</dt>
+<dd>
+x86의 <code>do_IRQ()</code>가 <code>common_interrupt()</code>로 바뀌고 진입 경로가 C로 정리됩니다.
+</dd>
+<dt>6.5 · 2023</dt>
+<dd>
+<code>irq_desc</code>를 메이플 트리에 담습니다.
+</dd>
+</dl>
+</div>
+</section>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>인터럽트에는 번호가 셋 있습니다. 컨트롤러 안의 hwirq, 커널이 붙이는 리눅스 IRQ 번호, CPU가 보는 벡터입니다. <code>irq_domain</code> 계층이 이들을 잇습니다.</li>
+<li><code>irq_desc</code>는 IRQ 하나의 모든 것입니다. 하드웨어 조작은 <code>irq_chip</code>, 순서는 플로 핸들러, 장치별 처리는 <code>irqaction</code> 사슬이 맡습니다.</li>
+<li>상태 비트는 칩 드라이버도 읽는 <code>IRQD_*</code>와 코어만 쓰는 <code>IRQS_*</code>로 나뉘어 있고, 이름과 접근자와 정적 검사로 지켜집니다.</li>
+<li>x86-64에서 벡터는 CPU별 <code>vector_irq[]</code>로 <code>irq_desc</code>가 되고, 플로 핸들러와 <code>handle_irq_event()</code>를 거쳐 드라이버의 핸들러에 닿습니다. 핸들러는 인터럽트가 꺼진 채로 실행됩니다.</li>
+<li>한 IRQ의 핸들러는 한 번에 한 CPU에서만 돕니다. 늦게 온 CPU는 <code>IRQS_PENDING</code>만 세우고 떠나고, 처리하던 CPU가 이어서 처리합니다. <code>desc-&gt;lock</code>은 핸들러를 부르는 동안 풀려 있습니다.</li>
+<li>공유 IRQ에서는 사슬의 핸들러가 모두 불리고, 각자 자기 장치인지 확인해 <code>IRQ_NONE</code>이나 <code>IRQ_HANDLED</code>를 돌려줍니다.</li>
+<li>어느 CPU가 받을지는 친화성 마스크와 벡터 할당기가 정합니다. 멀티큐 장치의 관리형 IRQ는 커널이 CPU에 펼치고 유저 공간은 바꿀 수 없습니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p><code>/proc/interrupts</code>에 <code>16:  ...  IO-APIC  16-fasteoi  ehci_hcd:usb1, i801_smbus</code>라는 줄이 있습니다. 이 IRQ에 인터럽트가 한 번 오면 드라이버의 핸들러는 몇 개 불립니까? 커널은 어느 장치가 건 것인지 어떻게 압니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>둘 다 불립니다. 두 장치가 IO-APIC의 16번 핀을 나눠 쓰고 있고, <code>irq_desc</code>의 <code>action</code> 사슬에 <code>irqaction</code>이 둘 달려 있습니다. <code>__handle_irq_event_percpu()</code>는 사슬을 처음부터 끝까지 돌며 핸들러를 모두 부릅니다. 커널은 어느 장치인지 모릅니다. 각 핸들러가 자기 장치의 상태 레지스터를 읽어 보고, 자기 것이 아니면 <code>IRQ_NONE</code>을, 맞으면 처리한 뒤 <code>IRQ_HANDLED</code>를 돌려줍니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>handle_irq_event()</code>는 드라이버의 핸들러를 부르기 전에 <code>desc-&gt;lock</code>을 풉니다. 락을 쥔 채로 부르면 어떤 문제가 생깁니까? 락을 풀었는데도 핸들러가 두 CPU에서 동시에 실행되지 않는 까닭은 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>락을 쥔 채로 부르면, 그 사이에 같은 IRQ를 받은 다른 CPU가 <code>desc-&gt;lock</code>을 얻으려고 핸들러가 끝날 때까지 인터럽트를 끈 채 헛돕니다. 핸들러 안에서 같은 디스크립터의 락이 필요한 함수(<code>disable_irq_nosync()</code> 등)를 부르면 교착됩니다. 락을 풀기 전에 <code>IRQD_IRQ_INPROGRESS</code>를 세워 두기 때문에 동시 실행은 일어나지 않습니다. 다른 CPU의 플로 핸들러는 락을 잡고 이 비트를 본 뒤 핸들러를 부르지 않고 <code>IRQS_PENDING</code>만 세우고 돌아갑니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>에지 트리거 인터럽트에서, CPU 0이 핸들러를 실행하는 동안 CPU 1에 같은 IRQ가 도착했습니다. 이 두 번째 인터럽트는 결국 누가, 언제 처리합니까? <code>handle_edge_irq()</code>의 코드로 설명해 보세요.</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>CPU 0이 처리합니다. CPU 1은 <code>irq_can_handle()</code>이 거짓이므로 <code>desc-&gt;istate |= IRQS_PENDING</code>을 하고 <code>mask_ack_irq()</code>로 마스크한 뒤 돌아갑니다. CPU 0은 <code>handle_irq_event()</code>에서 돌아와 <code>while ((desc-&gt;istate &amp; IRQS_PENDING) &amp;&amp; ...)</code> 조건을 보고 반복문을 다시 돕니다. 반복문 처음에서 마스크되어 있으면 <code>unmask_irq()</code>로 풀고, <code>handle_irq_event()</code>를 한 번 더 부릅니다. 이 함수가 <code>IRQS_PENDING</code>을 지우므로, 그 사이에 또 오지 않았다면 다음 조건 검사에서 빠져나갑니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>레벨 트리거 선을 쓰는 장치의 드라이버가 핸들러에서 장치의 인터럽트 원인을 지우지 않고 <code>IRQ_HANDLED</code>를 돌려줍니다. 어떤 일이 생깁니까? <code>IRQ_NONE</code>을 돌려주었다면 무엇이 달라집니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>장치가 선을 내리지 않았으므로, <code>handle_level_irq()</code>가 마지막에 마스크를 푸는 순간 인터럽트가 다시 걸립니다. 핸들러가 끝없이 다시 불리고 그 CPU는 다른 일을 하지 못합니다. <code>IRQ_HANDLED</code>를 돌려주면 코어는 정상 처리로 보므로 막을 방법이 없습니다. <code>IRQ_NONE</code>을 돌려주었다면 코어의 가짜 인터럽트 감지가 셉니다. 10만 번 가운데 99,900번 넘게 주인이 없으면 "nobody cared"를 출력하고 그 IRQ를 꺼서 시스템이 멈추는 것을 막습니다. 다만 같은 선을 쓰는 다른 장치도 함께 인터럽트를 잃습니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>CPU 64개짜리 서버에서 NVMe 장치의 큐 인터럽트는 <code>/proc/irq/N/smp_affinity</code>에 써도 바뀌지 않는데, 같은 서버의 직렬 포트 인터럽트는 바뀝니다. 왜 다릅니까? 그리고 CPU 하나를 오프라인으로 만들면 두 인터럽트는 각각 어떻게 됩니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>NVMe 큐 인터럽트는 관리형 친화성(<code>IRQD_AFFINITY_MANAGED</code>)입니다. 드라이버가 벡터를 할당할 때 커널이 큐들을 CPU에 펼쳐 마스크를 정했고, 큐와 CPU의 짝이 블록 계층의 큐 배치와 맞물려 있으므로 유저 공간이 바꾸지 못하게 합니다. 직렬 포트는 보통의 IRQ라서 바꿀 수 있습니다. CPU가 꺼지면 직렬 포트 인터럽트는 친화성 마스크에 남은 CPU로(없으면 켜져 있는 아무 CPU로) 옮겨지고 새 벡터를 받습니다. NVMe 큐 인터럽트는 마스크에 다른 CPU가 남아 있으면 그쪽으로 가고, 그 CPU가 마지막이었다면 옮기지 않고 꺼 둡니다. CPU가 다시 켜지면 되살립니다.</p>
+</div></details></div></div>
+
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>hwirq</dt>
+<dd>
+인터럽트 컨트롤러 안에서의 인터럽트 번호. 핀 번호나 표의 인덱스.
+</dd>
+<dt>irq_domain</dt>
+<dd>
+컨트롤러 하나의 hwirq를 리눅스 IRQ 번호에 대응시키는 객체. 여러 겹으로 계층을 이룬다.
+</dd>
+<dt>irq_desc</dt>
+<dd>
+리눅스 IRQ 번호 하나에 대한 모든 정보를 담은 구조체.
+</dd>
+<dt>irq_chip</dt>
+<dd>
+인터럽트 컨트롤러를 조작하는 콜백 묶음. mask, unmask, ack, eoi, 친화성 설정 등.
+</dd>
+<dt>플로 핸들러<small>flow handler</small></dt>
+<dd>
+신호 방식에 맞춰 칩 콜백과 드라이버 핸들러를 정해진 순서로 부르는 함수.
+</dd>
+<dt>irqaction</dt>
+<dd>
+드라이버가 등록한 핸들러 하나를 나타내는 구조체. 공유 IRQ에서는 사슬로 이어진다.
+</dd>
+<dt>공유 IRQ<small>shared IRQ</small></dt>
+<dd>
+여러 장치가 인터럽트 선 하나를 나눠 쓰는 것. <code>IRQF_SHARED</code>로 등록한다.
+</dd>
+<dt>가짜 인터럽트<small>spurious interrupt</small></dt>
+<dd>
+어느 핸들러도 자기 것이라고 하지 않은 인터럽트.
+</dd>
+<dt>친화성<small>affinity</small></dt>
+<dd>
+인터럽트를 받아도 되는 CPU의 집합. 실제로 받는 CPU는 유효 친화성이라고 한다.
+</dd>
+<dt>관리형 친화성<small>managed affinity</small></dt>
+<dd>
+커널이 멀티큐 장치의 인터럽트를 CPU에 펼쳐 고정하는 방식. 유저 공간에서 바꿀 수 없다.
+</dd>
+<dt>IRQ 스택<small>IRQ stack</small></dt>
+<dd>
+인터럽트 처리에 쓰는 CPU별 전용 스택.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/core-api/genericirq.html" rel="noopener" target="_blank"><code>Documentation/core-api/genericirq.rst</code></a>: 범용 IRQ 계층의 설계. 플로와 칩을 나눈 이유.</li>
+<li><a href="https://docs.kernel.org/core-api/irq/irq-domain.html" rel="noopener" target="_blank"><code>Documentation/core-api/irq/irq-domain.rst</code></a>: <code>irq_domain</code>과 도메인 계층.</li>
+<li><a href="https://docs.kernel.org/core-api/irq/irq-affinity.html" rel="noopener" target="_blank"><code>Documentation/core-api/irq/irq-affinity.rst</code></a>: <code>/proc/irq/N/smp_affinity</code>의 쓰임.</li>
+<li><a href="https://docs.kernel.org/core-api/irq/managed_irq.html" rel="noopener" target="_blank"><code>Documentation/core-api/irq/managed_irq.rst</code></a>: 관리형 인터럽트와 CPU 격리.</li>
+<li><a href="https://docs.kernel.org/PCI/msi-howto.html" rel="noopener" target="_blank"><code>Documentation/PCI/msi-howto.rst</code></a>: 드라이버에서 MSI·MSI-X 벡터를 할당하는 방법.</li>
+<li><a href="https://docs.kernel.org/networking/scaling.html" rel="noopener" target="_blank"><code>Documentation/networking/scaling.rst</code></a>: 네트워크 큐와 IRQ 친화성, <code>irqbalance</code>.</li>
+<li>LWN, <a href="https://lwn.net/Articles/380931/" rel="noopener" target="_blank">Disabling IRQF_DISABLED</a>: 핸들러를 언제나 인터럽트를 끈 채로 실행하게 된 경위.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch09.html"><small>← 9장</small><b>인터럽트 하드웨어</b></a><a class="next" href="ch11.html"><small>11장 →</small><b>Top half와 Bottom half</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#numbers">번호가 셋이다</a><a href="#irq-desc">irq_desc</a><a href="#chip-flow">칩과 플로</a><a href="#state">상태 비트</a><a href="#path">벡터에서 핸들러까지</a><a href="#three-cases">같은 IRQ를 두 CPU가 만날 때</a><a href="#driver-api">드라이버가 쓰는 API</a><a href="#affinity">어느 CPU가 받는가</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

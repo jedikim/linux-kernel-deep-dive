@@ -1,0 +1,65 @@
+<svg viewBox="0 0 760 416" xmlns="http://www.w3.org/2000/svg">
+  <title>프로세스 둘과 스레드 둘의 비교: fork()로 만든 자식은 mm_struct, files_struct, fs_struct, signal_struct, sighand_struct를 각자 따로 갖고, pthread_create()로 만든 스레드는 같은 구조체를 함께 가리킨다. task_struct와 커널 스택은 어느 쪽이든 태스크마다 따로 있다.</title>
+
+  <rect class="panel" x="20" y="16" width="350" height="344" rx="14"/>
+  <text class="t-b" x="34" y="42">fork()로 만든 자식</text>
+  <text class="t-xs" x="34" y="60">태스크 둘, 프로세스 둘. 자원을 전부 따로 갖는다</text>
+  <rect class="box blue" x="34" y="72" width="150" height="50" rx="8"/>
+  <text class="t-code t-b mid" x="109" y="93">task_struct</text>
+  <text class="t-xs mid" x="109" y="112">pid 100 · tgid 100</text>
+  <path class="ln thin blue" d="M109 122 V146" marker-end="url(#ah-blue)"/>
+  <rect class="box blue" x="34" y="152" width="150" height="26" rx="5"/>
+  <text class="t-code mid" x="109" y="170">mm_struct</text>
+  <rect class="box blue" x="34" y="184" width="150" height="26" rx="5"/>
+  <text class="t-code mid" x="109" y="202">files_struct</text>
+  <rect class="box blue" x="34" y="216" width="150" height="26" rx="5"/>
+  <text class="t-code mid" x="109" y="234">fs_struct</text>
+  <rect class="box blue" x="34" y="248" width="150" height="26" rx="5"/>
+  <text class="t-code mid" x="109" y="266">signal_struct</text>
+  <rect class="box blue" x="34" y="280" width="150" height="26" rx="5"/>
+  <text class="t-code mid" x="109" y="298">sighand_struct</text>
+  <rect class="box green" x="206" y="72" width="150" height="50" rx="8"/>
+  <text class="t-code t-b mid" x="281" y="93">task_struct</text>
+  <text class="t-xs mid" x="281" y="112">pid 101 · tgid 101</text>
+  <path class="ln thin green" d="M281 122 V146" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="206" y="152" width="150" height="26" rx="5"/>
+  <text class="t-code mid" x="281" y="170">mm_struct</text>
+  <rect class="box green" x="206" y="184" width="150" height="26" rx="5"/>
+  <text class="t-code mid" x="281" y="202">files_struct</text>
+  <rect class="box green" x="206" y="216" width="150" height="26" rx="5"/>
+  <text class="t-code mid" x="281" y="234">fs_struct</text>
+  <rect class="box green" x="206" y="248" width="150" height="26" rx="5"/>
+  <text class="t-code mid" x="281" y="266">signal_struct</text>
+  <rect class="box green" x="206" y="280" width="150" height="26" rx="5"/>
+  <text class="t-code mid" x="281" y="298">sighand_struct</text>
+  <text class="t-xs mid" x="109" y="328">부모의 것</text>
+  <text class="t-xs mid" x="281" y="328">복사본</text>
+  <text class="t-code mid" x="195" y="350">clone 플래그: SIGCHLD뿐</text>
+
+  <rect class="panel" x="390" y="16" width="350" height="344" rx="14"/>
+  <text class="t-b" x="404" y="42">pthread_create()로 만든 스레드</text>
+  <text class="t-xs" x="404" y="60">태스크 둘, 프로세스 하나. 자원을 함께 가리킨다</text>
+  <rect class="box blue" x="404" y="72" width="150" height="50" rx="8"/>
+  <text class="t-code t-b mid" x="479" y="93">task_struct</text>
+  <text class="t-xs mid" x="479" y="112">pid 100 · tgid 100</text>
+  <rect class="box blue" x="576" y="72" width="150" height="50" rx="8"/>
+  <text class="t-code t-b mid" x="651" y="93">task_struct</text>
+  <text class="t-xs mid" x="651" y="112">pid 102 · tgid 100</text>
+  <path class="ln thin purple" d="M479 122 V134 H540 V146" marker-end="url(#ah-purple)"/>
+  <path class="ln thin purple" d="M651 122 V134 H590 V146" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="480" y="152" width="170" height="26" rx="5"/>
+  <text class="t-code mid" x="565" y="170">mm_struct</text>
+  <rect class="box purple" x="480" y="184" width="170" height="26" rx="5"/>
+  <text class="t-code mid" x="565" y="202">files_struct</text>
+  <rect class="box purple" x="480" y="216" width="170" height="26" rx="5"/>
+  <text class="t-code mid" x="565" y="234">fs_struct</text>
+  <rect class="box purple" x="480" y="248" width="170" height="26" rx="5"/>
+  <text class="t-code mid" x="565" y="266">signal_struct</text>
+  <rect class="box purple" x="480" y="280" width="170" height="26" rx="5"/>
+  <text class="t-code mid" x="565" y="298">sighand_struct</text>
+  <text class="t-xs mid" x="565" y="328">하나를 둘이 가리킨다. 참조 카운트 2</text>
+  <text class="t-code mid" x="565" y="350">CLONE_VM | CLONE_FILES | CLONE_FS | …</text>
+
+  <text class="t-s mid" x="380" y="388">어느 쪽이든 task_struct, 커널 스택, PID, 레지스터, 스케줄링 정보는 태스크마다 따로 있다.</text>
+  <text class="t-s mid" x="380" y="406">커널이 스케줄하는 단위는 언제나 태스크다.</text>
+</svg>

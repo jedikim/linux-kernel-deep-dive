@@ -1,0 +1,43 @@
+<svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg">
+  <title>우선순위 상속은 기다리는 태스크가 생길 때 락 주인의 우선순위를 올리고, 우선순위 상한은 락을 잡는 순간 미리 정한 값으로 올린다</title>
+
+  <!-- 왼쪽: 상속 -->
+  <rect class="panel gray" x="20" y="14" width="350" height="288" rx="14"/>
+  <text class="t-l" x="36" y="42">우선순위 상속</text>
+  <text class="t-xs" x="150" y="42">기다리는 태스크가 생기면 올린다</text>
+
+  <text class="t-xs" x="36" y="88">H 수준</text>
+  <text class="t-xs" x="36" y="154">L 수준</text>
+  <path class="ln thin muted dash" d="M120 70 V160"/>
+  <path class="ln thin muted dash" d="M190 70 V160"/>
+  <path class="ln thin muted dash" d="M290 70 V160"/>
+  <path class="ln blue thick" d="M84 150 H190 V84 H290 V150 H354"/>
+  <text class="t-xs mid" x="120" y="178">락 획득</text>
+  <text class="t-xs mid" x="190" y="178">H가 대기</text>
+  <text class="t-xs mid" x="290" y="178">락 해제</text>
+
+  <text class="t-s" x="36" y="212">· 경합이 없으면 우선순위를 건드리지 않는다</text>
+  <text class="t-s" x="36" y="234">· 락마다 미리 정할 값이 없다</text>
+  <text class="t-s" x="36" y="256">· 주인이 또 기다리는 중이면 사슬을 따라간다</text>
+  <text class="t-s" x="36" y="278">· 리눅스 커널: rt_mutex, FUTEX_LOCK_PI</text>
+
+  <!-- 오른쪽: 상한 -->
+  <rect class="panel gray" x="390" y="14" width="350" height="288" rx="14"/>
+  <text class="t-l" x="406" y="42">우선순위 상한</text>
+  <text class="t-xs" x="520" y="42">락을 잡는 순간 미리 올린다</text>
+
+  <text class="t-xs" x="406" y="88">상한</text>
+  <text class="t-xs" x="406" y="154">L 수준</text>
+  <path class="ln thin muted dash" d="M490 70 V160"/>
+  <path class="ln thin muted dash" d="M560 70 V160"/>
+  <path class="ln thin muted dash" d="M660 70 V160"/>
+  <path class="ln blue thick" d="M454 150 H490 V84 H660 V150 H724"/>
+  <text class="t-xs mid" x="490" y="178">락 획득</text>
+  <text class="t-xs mid" x="560" y="178">H가 대기</text>
+  <text class="t-xs mid" x="660" y="178">락 해제</text>
+
+  <text class="t-s" x="406" y="212">· 잡을 때마다 우선순위를 올리고 내린다</text>
+  <text class="t-s" x="406" y="234">· 락을 쓸 태스크의 최고 우선순위를 알아야 한다</text>
+  <text class="t-s" x="406" y="256">· 사슬을 따라갈 일이 없다</text>
+  <text class="t-s" x="406" y="278">· POSIX: PTHREAD_PRIO_PROTECT</text>
+</svg>

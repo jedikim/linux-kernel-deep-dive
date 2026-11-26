@@ -1,0 +1,80 @@
+<svg viewBox="0 0 760 268" xmlns="http://www.w3.org/2000/svg">
+  <title>KASAN 섀도 메모리: kmalloc(123) 객체의 8바이트 묶음마다 섀도 1바이트가 대응하고, 마지막 묶음의 섀도 03은 앞의 3바이트만 접근 가능함을 뜻한다</title>
+
+  <text class="t-s t-ink t-b" x="40" y="26">메모리: 한 칸이 8바이트</text>
+  <text class="t-xs tc-red end" x="622" y="26">0x…37b에 1바이트 쓰기</text>
+  <path class="ln red" d="M633 16 V60" marker-end="url(#ah-red)"/>
+  <text class="t-code" x="108" y="56">0x…300</text>
+  <text class="t-code" x="652" y="56">0x…380</text>
+
+  <!-- 메모리 -->
+  <rect class="box red" x="40" y="66" width="68" height="34"/>
+  <rect x="40" y="66" width="68" height="34" fill="url(#hatch-red)"/>
+  <rect class="box green" x="108" y="66" width="510" height="34"/>
+  <text class="t-s t-ink mid" x="363" y="88">kmalloc(123)으로 받은 객체 · 8바이트 묶음 15개</text>
+  <rect class="box green" x="618" y="66" width="13" height="34"/>
+  <rect class="box red" x="631" y="66" width="21" height="34"/>
+  <rect x="631" y="66" width="21" height="34" fill="url(#hatch-red)"/>
+  <rect class="box red" x="652" y="66" width="68" height="34"/>
+  <rect x="652" y="66" width="68" height="34" fill="url(#hatch-red)"/>
+
+  <path class="ln thin muted dash" d="M57 100 V142 M91 100 V142 M125 100 V142 M669 100 V142 M703 100 V142"/>
+  <path class="ln thin red dash" d="M635 100 V142"/>
+  <text class="t-code mid" x="380" y="126">shadow = (addr &gt;&gt; 3) + KASAN_SHADOW_OFFSET</text>
+
+  <!-- 섀도 -->
+  <rect class="box red" x="40" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="57" y="167">fc</text>
+  <rect class="box red" x="74" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="91" y="167">fc</text>
+  <rect class="box green" x="108" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="125" y="167">00</text>
+  <rect class="box green" x="142" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="159" y="167">00</text>
+  <rect class="box green" x="176" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="193" y="167">00</text>
+  <rect class="box green" x="210" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="227" y="167">00</text>
+  <rect class="box green" x="244" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="261" y="167">00</text>
+  <rect class="box green" x="278" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="295" y="167">00</text>
+  <rect class="box green" x="312" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="329" y="167">00</text>
+  <rect class="box green" x="346" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="363" y="167">00</text>
+  <rect class="box green" x="380" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="397" y="167">00</text>
+  <rect class="box green" x="414" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="431" y="167">00</text>
+  <rect class="box green" x="448" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="465" y="167">00</text>
+  <rect class="box green" x="482" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="499" y="167">00</text>
+  <rect class="box green" x="516" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="533" y="167">00</text>
+  <rect class="box green" x="550" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="567" y="167">00</text>
+  <rect class="box green" x="584" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="601" y="167">00</text>
+  <rect class="box yellow" x="618" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="635" y="167">03</text>
+  <rect class="box red" x="652" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="669" y="167">fc</text>
+  <rect class="box red" x="686" y="146" width="34" height="32"/>
+  <text class="t-code mid" x="703" y="167">fc</text>
+
+  <text class="t-s t-ink t-b" x="40" y="204">섀도: 한 칸이 1바이트</text>
+  <text class="t-code t-b tc-red mid" x="635" y="196">^</text>
+  <text class="t-xs tc-red end" x="720" y="214">03: 앞의 3바이트만 접근 가능. 네 번째 바이트는 범위 밖이다</text>
+
+  <!-- 범례 -->
+  <rect class="box green" x="40" y="236" width="22" height="16" rx="3"/>
+  <text class="t-xs" x="70" y="249">00 전부 접근 가능</text>
+  <rect class="box yellow" x="200" y="236" width="22" height="16" rx="3"/>
+  <text class="t-xs" x="230" y="249">01–07 앞의 N바이트만</text>
+  <rect class="box red" x="390" y="236" width="22" height="16" rx="3"/>
+  <text class="t-xs" x="420" y="249">fc 객체 사이의 레드존</text>
+  <rect class="box red" x="580" y="236" width="22" height="16" rx="3"/>
+  <text class="t-xs" x="610" y="249">fb 해제된 객체</text>
+</svg>

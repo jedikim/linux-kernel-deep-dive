@@ -1,0 +1,27 @@
+<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg">
+  <title>커널 선점의 두 조건: preempt_count가 0이고 TIF_NEED_RESCHED가 서 있어야 한다</title>
+
+  <rect class="box blue" x="20" y="16" width="410" height="88" rx="12"/>
+  <use href="#i-lock" x="34" y="38" width="40" height="40" class="ic blue"/>
+  <text class="t-l" x="90" y="44">끊어도 되는가</text>
+  <text class="t-mono" x="90" y="67">preempt_count == 0</text>
+  <text class="t-s" x="90" y="90">0이 아니면 락을 쥐었거나 인터럽트를 처리하는 중</text>
+
+  <rect class="box warm" x="20" y="120" width="410" height="88" rx="12"/>
+  <use href="#i-hourglass" x="34" y="142" width="40" height="40" class="ic warm"/>
+  <text class="t-l" x="90" y="148">끊어야 하는가</text>
+  <text class="t-mono" x="90" y="171">TIF_NEED_RESCHED</text>
+  <text class="t-s" x="90" y="194">더 급한 태스크가 기다린다는 스케줄러의 표시</text>
+
+  <path class="ln blue" d="M430 60 H492 V82" marker-end="url(#ah-blue)"/>
+  <path class="ln warm" d="M430 164 H492 V142" marker-end="url(#ah-warm)"/>
+  <circle class="solid" cx="492" cy="112" r="26"/>
+  <text class="t-b t-on mid" x="492" y="117">AND</text>
+  <path class="ln green" d="M518 112 H552" marker-end="url(#ah-green)"/>
+
+  <rect class="box green" x="556" y="76" width="184" height="72" rx="12"/>
+  <text class="t-l mid" x="648" y="106">커널 선점</text>
+  <text class="t-code mid" x="648" y="130">__schedule(SM_PREEMPT)</text>
+
+  <text class="t-s mid" x="380" y="236">한쪽이라도 거짓이면 실행 중인 커널 코드는 끊기지 않고 계속된다</text>
+</svg>

@@ -1,0 +1,55 @@
+<svg viewBox="0 0 760 326" xmlns="http://www.w3.org/2000/svg">
+  <title>부하 분산의 세 단계: 한가한 CPU 0이 MC 도메인의 그룹들을 견주어 가장 바쁜 그룹을 찾고, 그 안의 가장 바쁜 런큐에서 실행 중이 아니고 친화성이 허락하며 캐시가 식은 태스크를 끌어온다.</title>
+
+  <!-- ① 그룹 비교 -->
+  <rect class="panel gray" x="20" y="14" width="340" height="190" rx="14"/>
+  <text class="t-b" x="36" y="38">① 도메인의 그룹을 견준다</text>
+
+  <text class="t-s t-ink" x="36" y="68">코어 0 · CPU 0, 8</text>
+  <rect class="solid blue" x="170" y="56" width="20" height="16" rx="3"/>
+  <text class="t-xs tc-blue" x="198" y="68">내 그룹</text>
+
+  <text class="t-s t-ink" x="36" y="102">코어 1 · CPU 1, 9</text>
+  <rect class="solid" x="170" y="90" width="70" height="16" rx="3"/>
+
+  <text class="t-s t-ink" x="36" y="136">코어 2 · CPU 2, 10</text>
+  <rect class="solid red" x="170" y="124" width="170" height="16" rx="3"/>
+
+  <text class="t-s t-ink" x="36" y="170">코어 3 · CPU 3, 11</text>
+  <rect class="solid" x="170" y="158" width="60" height="16" rx="3"/>
+
+  <text class="t-xs tc-red" x="170" y="192">가장 바쁜 그룹</text>
+  <path class="ln thin red" d="M180 181 V146 H185"/>
+
+  <!-- ② 런큐 -->
+  <rect class="panel red" x="390" y="14" width="350" height="190" rx="14"/>
+  <text class="t-b" x="406" y="38">② 가장 바쁜 런큐 · CPU 2</text>
+
+  <rect class="box" x="406" y="50" width="318" height="30" rx="6"/>
+  <text class="t-s t-ink" x="418" y="70">T1 · 지금 실행 중</text>
+  <text class="t-xs tc-red end" x="712" y="70">뗄 수 없다</text>
+
+  <rect class="box" x="406" y="86" width="318" height="30" rx="6"/>
+  <text class="t-s t-ink" x="418" y="106">T2 · cpus_ptr가 CPU 2뿐</text>
+  <text class="t-xs tc-red end" x="712" y="106">친화성</text>
+
+  <rect class="box" x="406" y="122" width="318" height="30" rx="6"/>
+  <text class="t-s t-ink" x="418" y="142">T3 · 0.1ms 전에 실행</text>
+  <text class="t-xs tc-red end" x="712" y="142">캐시가 따뜻하다</text>
+
+  <rect class="solid green" x="406" y="158" width="318" height="30" rx="6"/>
+  <text class="t-s t-b t-on" x="418" y="178">T4 · 3ms 전에 실행</text>
+  <text class="t-xs t-on end" x="712" y="178">옮긴다</text>
+
+  <path class="ln" d="M360 132 H386" marker-end="url(#ah)"/>
+
+  <!-- ③ 끌어오기 -->
+  <path class="ln green" d="M565 188 V253 H366" marker-end="url(#ah-green)"/>
+  <text class="t-code" x="380" y="272">detach_tasks() → attach_tasks()</text>
+
+  <rect class="box blue" x="20" y="226" width="340" height="54" rx="10"/>
+  <text class="t-b" x="36" y="250">③ CPU 0의 런큐로 끌어온다</text>
+  <text class="t-xs" x="36" y="268">균형을 맞추는 쪽은 언제나 받는 CPU다</text>
+
+  <text class="t-xs mid" x="380" y="310">옮길 것이 없어 실패가 거듭되면 nr_balance_failed가 올라가고, 따뜻한 태스크도 옮기게 된다</text>
+</svg>

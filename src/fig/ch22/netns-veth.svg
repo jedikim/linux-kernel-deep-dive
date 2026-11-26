@@ -1,0 +1,46 @@
+<svg viewBox="0 0 760 356" xmlns="http://www.w3.org/2000/svg">
+  <title>네트워크 네임스페이스 셋: 컨테이너 둘은 각자 lo와 eth0을 갖고, eth0은 veth 쌍의 한쪽 끝이다. 다른 쪽 끝은 호스트 네임스페이스의 브리지에 꽂혀 있고 브리지는 라우팅과 NAT를 거쳐 실제 NIC로 이어진다</title>
+
+  <!-- 컨테이너 A -->
+  <rect class="panel blue" x="20" y="14" width="340" height="112" rx="14"/>
+  <text class="t-b tc-blue" x="36" y="38">컨테이너 A의 네트워크 네임스페이스</text>
+  <rect class="box" x="36" y="68" width="70" height="36" rx="6"/>
+  <text class="t-mono mid" x="71" y="91">lo</text>
+  <rect class="box blue" x="150" y="68" width="120" height="36" rx="6"/>
+  <text class="t-mono mid" x="210" y="91">eth0</text>
+  <text class="t-xs" x="282" y="82">10.0.0.2</text>
+  <text class="t-xs" x="282" y="100">자기 라우팅 표</text>
+
+  <!-- 컨테이너 B -->
+  <rect class="panel green" x="400" y="14" width="340" height="112" rx="14"/>
+  <text class="t-b tc-green" x="416" y="38">컨테이너 B의 네트워크 네임스페이스</text>
+  <rect class="box green" x="416" y="68" width="120" height="36" rx="6"/>
+  <text class="t-mono mid" x="476" y="91">eth0</text>
+  <text class="t-xs" x="548" y="82">10.0.0.3</text>
+  <text class="t-xs" x="548" y="100">자기 포트 공간</text>
+  <rect class="box" x="654" y="68" width="70" height="36" rx="6"/>
+  <text class="t-mono mid" x="689" y="91">lo</text>
+
+  <!-- 호스트 -->
+  <rect class="panel gray" x="20" y="172" width="720" height="142" rx="14"/>
+  <text class="t-b end" x="724" y="196">호스트의 네트워크 네임스페이스</text>
+  <rect class="box blue" x="150" y="204" width="120" height="34" rx="6"/>
+  <text class="t-mono mid" x="210" y="226">veth1a</text>
+  <rect class="box green" x="416" y="204" width="120" height="34" rx="6"/>
+  <text class="t-mono mid" x="476" y="226">veth7c</text>
+  <rect class="box yellow" x="150" y="264" width="386" height="36" rx="6"/>
+  <text class="t-mono t-b mid" x="343" y="287">br0 · 브리지</text>
+  <rect class="box" x="604" y="264" width="120" height="36" rx="6"/>
+  <text class="t-mono mid" x="664" y="287">eth0 · NIC</text>
+
+  <!-- veth 쌍 -->
+  <path class="ln thick blue" d="M210 104 V204"/>
+  <path class="ln thick green" d="M476 104 V204"/>
+  <text class="t-xs" x="220" y="150">veth 쌍: 한쪽에 넣은 패킷이 다른 쪽에서 나온다</text>
+  <path class="ln blue" d="M210 238 V260" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M476 238 V260" marker-end="url(#ah-green)"/>
+  <path class="ln" d="M536 282 H600" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="570" y="258">라우팅 · NAT</text>
+
+  <text class="t-s mid" x="380" y="340">장치 하나는 네임스페이스 하나에만 속한다. veth의 두 끝이 서로 다른 네임스페이스에 놓여 다리가 된다</text>
+</svg>

@@ -1,0 +1,70 @@
+<svg viewBox="0 0 760 412" xmlns="http://www.w3.org/2000/svg">
+  <title>fork, vfork, clone, clone3 시스템 콜과 커널 내부의 kernel_thread, user_mode_thread가 모두 kernel_clone_args를 채워 kernel_clone()으로 모인다. kernel_clone()은 copy_process(), wake_up_new_task()를 차례로 부른다.</title>
+
+  <!-- 왼쪽: 유저가 부르는 시스템 콜 -->
+  <text class="t-s t-ink t-b" x="20" y="20">유저 공간이 부르는 시스템 콜</text>
+
+  <rect class="box blue" x="20" y="30" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="50">fork()</text>
+  <text class="t-code" x="32" y="68">exit_signal = SIGCHLD</text>
+
+  <rect class="box blue" x="20" y="84" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="104">vfork()</text>
+  <text class="t-code" x="32" y="122">flags = CLONE_VFORK | CLONE_VM</text>
+
+  <rect class="box blue" x="20" y="138" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="158">clone(flags, …)</text>
+  <text class="t-xs" x="32" y="176">레지스터로 받은 인자 다섯 개를 옮김</text>
+
+  <rect class="box blue" x="20" y="192" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="212">clone3(&amp;args, size)</text>
+  <text class="t-xs" x="32" y="230">유저 메모리의 구조체를 복사해 옴</text>
+
+  <!-- 왼쪽: 커널 내부 -->
+  <text class="t-s t-ink t-b" x="20" y="266">커널 안에서 부르는 함수</text>
+
+  <rect class="box yellow" x="20" y="276" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="296">kernel_thread()</text>
+  <text class="t-code" x="32" y="314">kthread = 1, CLONE_VM을 더함</text>
+
+  <rect class="box yellow" x="20" y="330" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="350">user_mode_thread()</text>
+  <text class="t-code" x="32" y="368">umh = 1, CLONE_VM을 더함</text>
+
+  <!-- 모으는 선 -->
+  <path class="ln thin" d="M270 53 H296"/>
+  <path class="ln thin" d="M270 107 H296"/>
+  <path class="ln thin" d="M270 161 H296"/>
+  <path class="ln thin" d="M270 215 H296"/>
+  <path class="ln thin" d="M270 299 H296"/>
+  <path class="ln thin" d="M270 353 H296"/>
+  <path class="ln thin" d="M296 53 V353"/>
+  <path class="ln" d="M296 203 H434" marker-end="url(#ah)"/>
+  <text class="t-code mid" x="366" y="194">kernel_clone_args</text>
+  <text class="t-xs mid" x="366" y="222">구조체 하나에 담아</text>
+
+  <!-- 오른쪽: kernel_clone() -->
+  <rect class="panel yellow" x="440" y="30" width="300" height="346" rx="12"/>
+  <text class="t-mono t-b" x="456" y="54">kernel_clone()</text>
+
+  <rect class="box" x="456" y="66" width="268" height="58" rx="8"/>
+  <text class="t-mono t-b" x="470" y="89">copy_process()</text>
+  <text class="t-xs" x="470" y="110">부모를 본떠 태스크를 만든다. 아직 깨우지 않는다</text>
+  <path class="ln" d="M590 124 V138" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="456" y="142" width="268" height="58" rx="8"/>
+  <text class="t-mono t-b" x="470" y="165">wake_up_new_task()</text>
+  <text class="t-xs" x="470" y="186">상태를 TASK_RUNNING으로, 런큐에 올린다</text>
+  <path class="ln" d="M590 200 V214" marker-end="url(#ah)"/>
+
+  <rect class="ghost dash" x="456" y="218" width="268" height="58" rx="8"/>
+  <text class="t-mono t-b" x="470" y="241">wait_for_vfork_done()</text>
+  <text class="t-xs" x="470" y="262">CLONE_VFORK일 때만. 부모가 잠든다</text>
+  <path class="ln" d="M590 276 V290" marker-end="url(#ah)"/>
+
+  <rect class="box blue" x="456" y="294" width="268" height="66" rx="8"/>
+  <text class="t-b" x="470" y="318">부모에게 자식의 PID를 돌려준다</text>
+  <text class="t-code" x="470" y="340">return nr;  /* pid_vnr(pid) */</text>
+
+  <text class="t-s mid" x="380" y="398">io_uring 워커를 만드는 create_io_thread()와 fork_idle()은 copy_process()를 직접 부른다</text>
+</svg>

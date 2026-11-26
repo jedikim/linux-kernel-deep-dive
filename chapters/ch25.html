@@ -1,0 +1,1023 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>C로 쓴 객체지향 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="커널 코드에 반복해서 나오는 설계 패턴">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="C로 쓴 객체지향 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="커널 코드에 반복해서 나오는 설계 패턴">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch25" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html" aria-current="page"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">8부 개발 방법론 › <b>25장 C로 쓴 객체지향</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-gray">
+<div class="ch-kicker"><span class="ch-no">25</span><span class="part">8부 · 개발 방법론</span></div>
+<h1>C로 쓴 객체지향</h1>
+<p class="ch-sub">커널 코드에 반복해서 나오는 설계 패턴</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 50분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/fs/pipe.c" target="_blank" rel="noopener">fs/pipe.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/fs/sync.c" target="_blank" rel="noopener">fs/sync.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/indirect_call_wrapper.h" target="_blank" rel="noopener">include/linux/indirect_call_wrapper.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/container_of.h" target="_blank" rel="noopener">include/linux/container_of.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/list.h" target="_blank" rel="noopener">include/linux/list.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/kref.h" target="_blank" rel="noopener">include/linux/kref.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/virt/kvm/kvm_main.c" target="_blank" rel="noopener">virt/kvm/kvm_main.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/cgroup/namespace.c" target="_blank" rel="noopener">kernel/cgroup/namespace.c</a></div>
+</header><div class="lead">
+<p>리눅스 커널은 C로 쓰여 있습니다. 클래스도, 상속도, 소멸자도, 제네릭도, 예외도 없는 언어입니다. 그런데 커널은 파일시스템 수십 가지를 같은 <code>read()</code>로 다루고, 객체 하나를 리스트 여러 개에 동시에 매달고, 수천 명이 고치는 코드에서 자원이 새지 않게 관리합니다. 언어가 주지 않는 것을 커널은 <strong>관례</strong>로 만들었습니다. 같은 모양의 코드가 서브시스템마다 되풀이되고, 리뷰와 도구가 그 모양을 지킵니다. 이 장은 앞의 장들에서 스쳐 간 그 모양들을 한자리에 모아 이름을 붙입니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>커널은 C에서 "인터페이스 하나, 구현 여럿"을 어떻게 표현하는가?</li>
+<li><code>container_of()</code>는 무엇을 계산하며, 리스트 노드를 객체 안에 넣으면 무엇을 얻는가?</li>
+<li>객체는 언제 해제되는가? 참조 카운트의 규약은 무엇인가?</li>
+<li><code>goto</code> 되돌리기 사다리와 <code>guard()</code>는 같은 문제를 어떻게 다르게 푸는가?</li>
+<li>설정 옵션 수천 개가 <code>#ifdef</code> 범벅이 되지 않게 하는 방법은 무엇인가?</li>
+<li>자주 도는 경로에서 분기와 간접 호출을 없애는 방법은 무엇인가?</li>
+</ul>
+</div>
+<section class="level2" id="ops">
+<h2><span class="sec-n">25.1</span>ops 테이블: 인터페이스와 구현<a aria-label="이 절의 링크" class="anchor" href="#ops">#</a></h2>
+<p><strong>문제.</strong> <code>read()</code> 시스템 콜은 대상이 ext4 파일인지, 파이프인지, <code>/proc</code>의 가상 파일인지 모릅니다. 호출하는 쪽을 고치지 않고 구현을 늘릴 수 있어야 합니다.</p>
+<p><strong>커널의 답.</strong> 함수 포인터를 모은 구조체를 인터페이스로 삼습니다. 이 책에서는 <strong>ops 테이블</strong>이라고 부르겠습니다. 구현하는 쪽은 그 구조체의 인스턴스를 하나 만들어 자기 함수로 채웁니다. <a href="ch20.html">20장</a>에서 ext4의 <code>ext4_file_operations</code>를 보았습니다. 파이프의 것은 이렇습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/fs/pipe.c#L1329" rel="noopener" target="_blank">fs/pipe.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="fs/pipe.c" data-line="1329" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="dt">const</span> <span class="kw">struct</span> file_operations pipefifo_fops <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb1-2">    <span class="op">.</span>open       <span class="op">=</span> fifo_open<span class="op">,</span></span>
+<span id="cb1-3">    <span class="op">.</span>read_iter  <span class="op">=</span> fifo_pipe_read<span class="op">,</span></span>
+<span id="cb1-4">    <span class="op">.</span>write_iter <span class="op">=</span> fifo_pipe_write<span class="op">,</span></span>
+<span id="cb1-5">    <span class="op">.</span>poll       <span class="op">=</span> pipe_poll<span class="op">,</span></span>
+<span id="cb1-6">    <span class="op">.</span>unlocked_ioctl <span class="op">=</span> pipe_ioctl<span class="op">,</span></span>
+<span id="cb1-7">    <span class="op">.</span>release    <span class="op">=</span> pipe_release<span class="op">,</span></span>
+<span id="cb1-8">    <span class="op">.</span>fasync     <span class="op">=</span> pipe_fasync<span class="op">,</span></span>
+<span id="cb1-9">    <span class="op">.</span>splice_write   <span class="op">=</span> iter_file_splice_write<span class="op">,</span></span>
+<span id="cb1-10"><span class="op">};</span></span></code></pre></div></div>
+<p>호출하는 쪽은 객체에 매달린 테이블을 거쳐 부릅니다. <code>fsync()</code> 시스템 콜이 닿는 함수입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/fs/sync.c#L178" rel="noopener" target="_blank">fs/sync.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="fs/sync.c" data-line="178" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><span class="dt">int</span> vfs_fsync_range<span class="op">(</span><span class="kw">struct</span> file <span class="op">*</span>file<span class="op">,</span> loff_t start<span class="op">,</span> loff_t end<span class="op">,</span> <span class="dt">int</span> datasync<span class="op">)</span></span>
+<span id="cb2-2"><span class="op">{</span></span>
+<span id="cb2-3">    <span class="kw">struct</span> inode <span class="op">*</span>inode <span class="op">=</span> file<span class="op">-&gt;</span>f_mapping<span class="op">-&gt;</span>host<span class="op">;</span></span>
+<span id="cb2-4"></span>
+<span id="cb2-5">    <span class="cf">if</span> <span class="op">(!</span>file<span class="op">-&gt;</span>f_op<span class="op">-&gt;</span>fsync<span class="op">)</span></span>
+<span id="cb2-6">        <span class="cf">return</span> <span class="op">-</span>EINVAL<span class="op">;</span></span>
+<span id="cb2-7">    <span class="cf">if</span> <span class="op">(!</span>datasync<span class="op">)</span></span>
+<span id="cb2-8">        sync_lazytime<span class="op">(</span>inode<span class="op">);</span></span>
+<span id="cb2-9">    <span class="cf">return</span> file<span class="op">-&gt;</span>f_op<span class="op">-&gt;</span>fsync<span class="op">(</span>file<span class="op">,</span> start<span class="op">,</span> end<span class="op">,</span> datasync<span class="op">);</span></span>
+<span id="cb2-10"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li>테이블은 <code>const</code>입니다. 읽기 전용 영역에 놓이므로 실행 중에 함수 포인터를 덮어쓰는 공격이 어려워집니다.</li>
+<li><strong>구현하지 않은 연산은 NULL로 둡니다.</strong> 지정 초기화에서 빠진 멤버는 0이 됩니다. 파이프의 테이블에는 <code>.fsync</code>가 없고, 호출하는 쪽이 그것을 확인합니다. 파이프에 <code>fsync()</code>를 부르면 <code>-EINVAL</code>이 돌아오는 까닭입니다. NULL이 "지원하지 않음"이라는 뜻의 값으로 쓰입니다.</li>
+<li>객체가 자기 테이블을 들고 다닙니다(<code>file-&gt;f_op</code>). C++의 가상 함수 테이블 포인터를 손으로 쓴 것입니다.</li>
+</ul>
+<figure class="fig" id="fig-ops-dispatch"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>ops 테이블 디스패치: VFS의 호출부는 struct file이 가리키는 file_operations 테이블을 거쳐 fsync를 호출하고, ext4와 파이프와 proc 파일은 각자 자기 함수로 채운 테이블을 가진다. 구현하지 않은 연산은 NULL이다.</title>
+
+  <!-- 호출부 -->
+  <rect class="box yellow" x="20" y="116" width="190" height="84" rx="12"/>
+  <text class="t-b" x="34" y="141">호출부 · VFS</text>
+  <text class="t-code" x="34" y="164">file-&gt;f_op-&gt;fsync</text>
+  <text class="t-xs" x="34" y="186">구조체의 타입만 안다</text>
+
+  <!-- struct file 셋 -->
+  <rect class="box gray" x="262" y="36" width="126" height="44" rx="8"/>
+  <text class="t-code mid" x="325" y="55">struct file</text>
+  <text class="t-xs mid" x="325" y="72">.f_op</text>
+  <rect class="box gray" x="262" y="136" width="126" height="44" rx="8"/>
+  <text class="t-code mid" x="325" y="155">struct file</text>
+  <text class="t-xs mid" x="325" y="172">.f_op</text>
+  <rect class="box gray" x="262" y="236" width="126" height="44" rx="8"/>
+  <text class="t-code mid" x="325" y="255">struct file</text>
+  <text class="t-xs mid" x="325" y="272">.f_op</text>
+
+  <path class="ln" d="M210 140 H236 V58 H258" marker-end="url(#ah)"/>
+  <path class="ln" d="M210 158 H258" marker-end="url(#ah)"/>
+  <path class="ln" d="M210 176 H236 V258 H258" marker-end="url(#ah)"/>
+
+  <!-- 테이블 셋 -->
+  <rect class="box blue" x="440" y="16" width="300" height="84" rx="10"/>
+  <text class="t-mono t-b" x="454" y="40">ext4_file_operations</text>
+  <text class="t-code" x="454" y="64">.fsync     = ext4_sync_file</text>
+  <text class="t-code" x="454" y="84">.read_iter = ext4_file_read_iter</text>
+
+  <rect class="box green" x="440" y="116" width="300" height="84" rx="10"/>
+  <text class="t-mono t-b" x="454" y="140">pipefifo_fops</text>
+  <text class="t-code tc-muted" x="454" y="164">.fsync     = NULL</text>
+  <text class="t-code" x="454" y="184">.read_iter = fifo_pipe_read</text>
+
+  <rect class="box purple" x="440" y="216" width="300" height="84" rx="10"/>
+  <text class="t-mono t-b" x="454" y="240">proc_reg_file_ops</text>
+  <text class="t-code tc-muted" x="454" y="264">.fsync     = NULL</text>
+  <text class="t-code" x="454" y="284">.read      = proc_reg_read</text>
+
+  <path class="ln blue" d="M388 58 H436" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M388 158 H436" marker-end="url(#ah-green)"/>
+  <path class="ln purple" d="M388 258 H436" marker-end="url(#ah-purple)"/>
+
+  <text class="t-s mid" x="380" y="326">인터페이스는 struct file_operations 하나, 구현은 const 인스턴스 여럿. 적지 않은 멤버는 NULL이 된다</text>
+</svg></div><figcaption><b>그림 25-1</b>인터페이스 하나에 구현 여럿. 호출부는 구조체의 타입만 알고, 어느 구현이 불릴지는 객체가 가리키는 테이블이 정합니다.</figcaption></figure>
+<p>같은 모양이 커널 전체에 있습니다. 스케줄링 클래스의 <code>struct sched_class</code>(<a href="ch04.html">4장</a>), 인터럽트 컨트롤러의 <code>struct irq_chip</code>(<a href="ch10.html">10장</a>), KVM의 <code>struct kvm_x86_ops</code>(<a href="ch23.html">23장</a>), BPF 맵의 <code>struct bpf_map_ops</code>(<a href="ch24.html">24장</a>)가 모두 이것입니다. v7.3의 <code>fs/</code> 아래에만 <code>file_operations</code> 인스턴스가 280개 넘게 정의되어 있습니다.</p>
+<p><strong>비용.</strong> 간접 호출은 직접 호출보다 느립니다. CPU가 목적지를 예측해야 하고, 추측 실행 공격 방어책인 retpoline을 켜면 예측 자체를 못 하게 막기 때문입니다. 커널은 자주 도는 경로에서 두 가지로 줄입니다. 하나는 구현이 사실상 한두 개일 때 그것을 직접 호출로 먼저 시도하는 것입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/indirect_call_wrapper.h#L17" rel="noopener" target="_blank">include/linux/indirect_call_wrapper.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/indirect_call_wrapper.h" data-line="17" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><span class="pp">#define INDIRECT_CALL_1</span><span class="op">(</span><span class="pp">f</span><span class="op">,</span><span class="pp"> f1</span><span class="op">,</span><span class="pp"> </span><span class="op">...)</span><span class="pp">                 </span><span class="op">\</span></span>
+<span id="cb3-2"><span class="pp">    </span><span class="op">({</span><span class="pp">                              </span><span class="op">\</span></span>
+<span id="cb3-3"><span class="pp">        </span><span class="kw">typeof</span><span class="op">(</span><span class="pp">f</span><span class="op">)</span><span class="pp"> __f1 </span><span class="op">=</span><span class="pp"> </span><span class="op">(</span><span class="pp">f</span><span class="op">);</span><span class="pp">                   </span><span class="op">\</span></span>
+<span id="cb3-4"><span class="pp">        likely</span><span class="op">(</span><span class="pp">__f1 </span><span class="op">==</span><span class="pp"> f1</span><span class="op">)</span><span class="pp"> </span><span class="op">?</span><span class="pp"> f1</span><span class="op">(</span><span class="pp">__VA_ARGS__</span><span class="op">)</span><span class="pp"> </span><span class="op">:</span><span class="pp"> __f1</span><span class="op">(</span><span class="pp">__VA_ARGS__</span><span class="op">);</span><span class="pp">   </span><span class="op">\</span></span>
+<span id="cb3-5"><span class="pp">    </span><span class="op">})</span></span></code></pre></div></div>
+<p>IP 계층이 상위 프로토콜 핸들러를 부를 때 <code>INDIRECT_CALL_2(ipprot-&gt;handler, tcp_v4_rcv, udp_rcv, skb)</code>로 씁니다. 포인터가 TCP나 UDP 핸들러와 같으면 직접 호출이 됩니다. 다른 하나는 뒤에서 볼 스태틱 콜입니다.</p>
+</section>
+<section class="level2" id="container-of">
+<h2><span class="sec-n">25.2</span>내장과 container_of<a aria-label="이 절의 링크" class="anchor" href="#container-of">#</a></h2>
+<p><strong>문제.</strong> 공통 부분을 여러 타입이 나눠 가져야 합니다. C에는 상속이 없습니다.</p>
+<p><strong>커널의 답.</strong> 공통 구조체를 구체적인 구조체 <strong>안에 멤버로 넣습니다.</strong> 공통 코드는 안쪽 구조체의 포인터만 다루고, 구체적인 코드는 그 포인터에서 바깥 구조체를 되찾습니다. 되찾는 매크로가 <code>container_of()</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/container_of.h#L19" rel="noopener" target="_blank">include/linux/container_of.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/container_of.h" data-line="19" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="pp">#define container_of</span><span class="op">(</span><span class="pp">ptr</span><span class="op">,</span><span class="pp"> type</span><span class="op">,</span><span class="pp"> member</span><span class="op">)</span><span class="pp"> </span><span class="op">({</span><span class="pp">              </span><span class="op">\</span></span>
+<span id="cb4-2"><span class="pp">    </span><span class="kw">static_assert</span><span class="op">(</span><span class="pp">__same_type</span><span class="op">(*(</span><span class="pp">ptr</span><span class="op">),</span><span class="pp"> typeof_member</span><span class="op">(</span><span class="pp">type</span><span class="op">,</span><span class="pp"> member</span><span class="op">))</span><span class="pp"> </span><span class="op">||</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb4-3"><span class="pp">              __same_type</span><span class="op">(*(</span><span class="pp">ptr</span><span class="op">),</span><span class="pp"> </span><span class="dt">void</span><span class="op">),</span><span class="pp">            </span><span class="op">\</span></span>
+<span id="cb4-4"><span class="pp">              </span><span class="st">"pointer type mismatch in container_of()"</span><span class="op">);</span><span class="pp">   </span><span class="op">\</span></span>
+<span id="cb4-5"><span class="pp">    </span><span class="op">(</span><span class="pp">type </span><span class="op">*)((</span><span class="dt">void</span><span class="pp"> </span><span class="op">*)(</span><span class="pp">ptr</span><span class="op">)</span><span class="pp"> </span><span class="op">-</span><span class="pp"> offsetof</span><span class="op">(</span><span class="pp">type</span><span class="op">,</span><span class="pp"> member</span><span class="op">));</span><span class="pp"> </span><span class="op">})</span></span></code></pre></div></div>
+<p>마지막 줄이 전부입니다. 멤버의 주소에서 그 멤버의 오프셋을 뺍니다. 오프셋은 컴파일할 때 정해지는 상수이므로 실행 비용은 뺄셈 한 번이고, 오프셋이 0이면 그마저 없습니다. 그 위의 <code>static_assert</code>는 <code>ptr</code>이 정말 그 멤버의 타입인지 컴파일할 때 확인합니다.</p>
+<figure class="fig" id="fig-container-of"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 326" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>container_of의 주소 계산: struct kvm_vcpu 안의 preempt_notifier 멤버를 가리키는 포인터에서 그 멤버의 오프셋 8을 빼면 바깥 구조체의 시작 주소가 나온다.</title>
+
+  <text class="t-s t-ink t-b" x="20" y="28">메모리 위의 struct kvm_vcpu 하나</text>
+
+  <!-- 주소 눈금 -->
+  <text class="t-code tc-muted mid" x="60" y="62">…1000</text>
+  <text class="t-code tc-muted mid" x="180" y="62">…1008</text>
+  <path class="ln thin muted" d="M60 68 V78"/>
+  <path class="ln thin muted" d="M180 68 V78"/>
+
+  <!-- 구조체 -->
+  <rect class="box gray" x="60" y="80" width="120" height="52"/>
+  <text class="t-code mid" x="120" y="102">kvm</text>
+  <text class="t-xs mid" x="120" y="120">포인터 8바이트</text>
+  <rect class="box blue" x="180" y="80" width="250" height="52"/>
+  <text class="t-code t-b mid" x="305" y="102">preempt_notifier</text>
+  <text class="t-xs mid" x="305" y="120">안에 넣은 공통 구조체</text>
+  <rect class="box gray" x="430" y="80" width="80" height="52"/>
+  <text class="t-code mid" x="470" y="110">cpu</text>
+  <rect class="box gray" x="510" y="80" width="90" height="52"/>
+  <text class="t-code mid" x="555" y="110">vcpu_id</text>
+  <rect class="box gray" x="600" y="80" width="100" height="52"/>
+  <text class="t-s mid" x="650" y="110">⋯</text>
+
+  <!-- 오프셋 -->
+  <path class="ln thin warm" d="M60 146 H180"/>
+  <path class="ln thin warm" d="M60 140 V152"/>
+  <path class="ln thin warm" d="M180 140 V152"/>
+  <text class="t-xs tc-warm mid" x="120" y="166">offsetof = 8</text>
+
+  <!-- 포인터 둘 -->
+  <path class="ln blue" d="M305 200 V176 H184 V136" marker-end="url(#ah-blue)"/>
+  <rect class="box blue" x="210" y="200" width="250" height="40" rx="8"/>
+  <text class="t-s t-ink" x="222" y="225">스케줄러가 건넨 포인터</text>
+  <text class="t-mono t-b end" x="448" y="225">pn</text>
+
+  <path class="ln green" d="M40 200 V106 H56" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="20" y="200" width="170" height="40" rx="8"/>
+  <text class="t-s t-ink" x="32" y="225">KVM이 원하는 것</text>
+  <text class="t-mono t-b end" x="178" y="225">vcpu</text>
+
+  <rect class="box code" x="20" y="256" width="720" height="56" rx="8"/>
+  <text class="t-code" x="34" y="279">vcpu = (struct kvm_vcpu *)((void *)pn - offsetof(struct kvm_vcpu, preempt_notifier))</text>
+  <text class="t-xs" x="34" y="299">숫자로는 …1008 − 8 = …1000. 오프셋은 컴파일할 때 정해지는 상수라서 실행 비용은 뺄셈 한 번이다</text>
+</svg></div><figcaption><b>그림 25-2</b><code>container_of()</code>의 계산. 안쪽 구조체의 주소에서 오프셋을 빼면 바깥 구조체의 주소가 나옵니다.</figcaption></figure>
+<p><a href="ch23.html">23장</a>의 KVM이 좋은 예입니다. <code>struct kvm_vcpu</code>에는 <code>struct preempt_notifier</code>가 들어 있고, 스케줄러는 이 알림자의 포인터만 알고 콜백을 부릅니다. 콜백은 <code>container_of(pn, struct kvm_vcpu, preempt_notifier)</code>로 자기 vCPU를 찾습니다. 스케줄러는 KVM을 몰라도 됩니다.</p>
+<p>상속과 다른 점이 있습니다. 한 구조체에 공통 구조체를 <strong>여러 개</strong> 넣을 수 있고, 맨 앞이 아니어도 됩니다. 다중 상속에 따르는 문제 없이 "이 객체는 대기 큐에 매달릴 수 있고, 타이머를 가지며, 참조 카운트된다"를 멤버 셋으로 표현합니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p><code>container_of()</code>를 "타입 검사 없는 포인터 뺄셈"이라고 설명하는 자료가 많습니다. v7.3의 정의는 <code>static_assert</code>로 타입을 검사합니다. 그리고 헤더의 주석은 새 코드에 <code>container_of()</code> 대신 <code>container_of_const()</code>를 쓰라고 적고 있습니다. <code>container_of()</code>는 <code>const</code> 포인터를 넣어도 <code>const</code>가 떨어진 포인터를 돌려주기 때문입니다. <code>container_of_const()</code>는 <code>_Generic</code>으로 입력의 <code>const</code> 여부를 결과에 그대로 옮깁니다.</p>
+</div>
+</section>
+<section class="level2" id="lists">
+<h2><span class="sec-n">25.3</span>침습형 리스트<a aria-label="이 절의 링크" class="anchor" href="#lists">#</a></h2>
+<p><strong>문제.</strong> 연결 리스트가 필요한 곳이 수천 군데인데 원소의 타입이 전부 다릅니다.</p>
+<p><strong>커널의 답.</strong> 리스트가 원소를 담지 않습니다. <strong>원소가 리스트 노드를 담습니다.</strong> 노드는 포인터 둘뿐입니다(<code>struct list_head { struct list_head *next, *prev; }</code>). 리스트 코드는 노드끼리만 잇고, 원소는 <code>container_of()</code>로 되찾습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/list.h#L834" rel="noopener" target="_blank">include/linux/list.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/list.h" data-line="834" id="cb5"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb5-1"><span class="pp">#define list_for_each_entry</span><span class="op">(</span><span class="pp">pos</span><span class="op">,</span><span class="pp"> head</span><span class="op">,</span><span class="pp"> member</span><span class="op">)</span><span class="pp">              </span><span class="op">\</span></span>
+<span id="cb5-2"><span class="pp">    </span><span class="cf">for</span><span class="pp"> </span><span class="op">(</span><span class="pp">pos </span><span class="op">=</span><span class="pp"> list_first_entry</span><span class="op">(</span><span class="pp">head</span><span class="op">,</span><span class="pp"> </span><span class="kw">typeof</span><span class="op">(*</span><span class="pp">pos</span><span class="op">),</span><span class="pp"> member</span><span class="op">);</span><span class="pp">    </span><span class="op">\</span></span>
+<span id="cb5-3"><span class="pp">         </span><span class="op">!</span><span class="pp">list_entry_is_head</span><span class="op">(</span><span class="pp">pos</span><span class="op">,</span><span class="pp"> head</span><span class="op">,</span><span class="pp"> member</span><span class="op">);</span><span class="pp">            </span><span class="op">\</span></span>
+<span id="cb5-4"><span class="pp">         pos </span><span class="op">=</span><span class="pp"> list_next_entry</span><span class="op">(</span><span class="pp">pos</span><span class="op">,</span><span class="pp"> member</span><span class="op">))</span></span></code></pre></div></div>
+<p><code>list_first_entry()</code>와 <code>list_next_entry()</code>가 안에서 <code>container_of()</code>를 부릅니다. <code>typeof(*pos)</code> 덕분에 원소 타입을 따로 적지 않아도 됩니다. 쓰는 쪽은 <code>list_for_each_entry(p, &amp;rq-&gt;scx.runnable_list, scx.runnable_node)</code>처럼 "어느 멤버로 이어져 있는지"만 말합니다.</p>
+<figure class="fig" id="fig-intrusive-list"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>외부 리스트와 침습형 리스트 비교: 외부 리스트는 따로 할당한 노드가 객체를 가리키고, 침습형 리스트는 객체 안에 든 노드끼리 이어져 한 객체가 tasks 리스트와 sibling 리스트에 동시에 매달린다.</title>
+
+  <!-- 외부 리스트 -->
+  <text class="t-b" x="20" y="28">외부 리스트 · 노드를 따로 할당한다</text>
+  <rect class="box gray" x="120" y="42" width="130" height="32" rx="6"/>
+  <text class="t-code mid" x="185" y="63">next prev data</text>
+  <rect class="box gray" x="320" y="42" width="130" height="32" rx="6"/>
+  <text class="t-code mid" x="385" y="63">next prev data</text>
+  <rect class="box gray" x="520" y="42" width="130" height="32" rx="6"/>
+  <text class="t-code mid" x="585" y="63">next prev data</text>
+  <path class="ln" d="M250 58 H316" marker-end="url(#ah)"/>
+  <path class="ln" d="M450 58 H516" marker-end="url(#ah)"/>
+  <rect class="box blue" x="140" y="96" width="90" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="185" y="116">객체 A</text>
+  <rect class="box blue" x="340" y="96" width="90" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="385" y="116">객체 B</text>
+  <rect class="box blue" x="540" y="96" width="90" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="585" y="116">객체 C</text>
+  <path class="ln thin" d="M185 74 V92" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M385 74 V92" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M585 74 V92" marker-end="url(#ah)"/>
+  <text class="t-xs" x="20" y="63">리스트 노드</text>
+  <text class="t-xs" x="20" y="116">원소</text>
+
+  <path class="ln thin muted dash" d="M20 148 H740"/>
+
+  <!-- 침습형 리스트 -->
+  <text class="t-b" x="20" y="176">침습형 리스트 · 노드가 객체 안에 있다</text>
+
+  <rect class="box blue" x="100" y="192" width="160" height="104" rx="10"/>
+  <text class="t-code t-b" x="112" y="212">task_struct A</text>
+  <rect class="box yellow" x="112" y="222" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="180" y="240">tasks</text>
+  <rect class="box green" x="112" y="258" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="180" y="276">sibling</text>
+
+  <rect class="box blue" x="320" y="192" width="160" height="104" rx="10"/>
+  <text class="t-code t-b" x="332" y="212">task_struct B</text>
+  <rect class="box yellow" x="332" y="222" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="400" y="240">tasks</text>
+  <rect class="box green" x="332" y="258" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="400" y="276">sibling</text>
+
+  <rect class="box blue" x="540" y="192" width="160" height="104" rx="10"/>
+  <text class="t-code t-b" x="552" y="212">task_struct C</text>
+  <rect class="box yellow" x="552" y="222" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="620" y="240">tasks</text>
+  <rect class="box green" x="552" y="258" width="136" height="26" rx="5"/>
+  <text class="t-code mid" x="620" y="276">sibling</text>
+
+  <path class="ln yellow" d="M248 235 H328" marker-end="url(#ah-yellow)"/>
+  <path class="ln yellow" d="M468 235 H548" marker-end="url(#ah-yellow)"/>
+  <path class="ln green" d="M180 284 V314 H620 V288" marker-end="url(#ah-green)"/>
+
+  <text class="t-xs tc-yellow" x="20" y="240">모든 태스크</text>
+  <text class="t-xs tc-green" x="20" y="276">같은 부모</text>
+  <text class="t-xs tc-green mid" x="400" y="330">A와 C는 형제다. B는 이 리스트에 없다</text>
+
+  <text class="t-s mid" x="380" y="358">넣고 뺄 때 할당이 없고, 한 객체가 여러 리스트에 동시에 들어간다. 원소는 container_of()로 되찾는다</text>
+</svg></div><figcaption><b>그림 25-3</b>외부 리스트는 노드를 따로 할당해 원소를 가리킵니다. 침습형 리스트는 노드가 원소 안에 있어서 할당이 없고, 한 원소가 여러 리스트에 동시에 매달립니다.</figcaption></figure>
+<p>얻는 것은 셋입니다.</p>
+<ul>
+<li><strong>할당이 없습니다.</strong> 리스트에 넣는 일이 실패할 수 없습니다. 메모리가 모자랄 때나 인터럽트 컨텍스트에서 중요합니다.</li>
+<li><strong>한 객체가 여러 리스트에 동시에 들어갑니다.</strong> <code>task_struct</code>는 <code>tasks</code>, <code>children</code>, <code>sibling</code>, <code>thread_node</code> 같은 노드를 여럿 갖고 있고 각각 다른 리스트에 매달립니다.</li>
+<li><strong>객체를 알면 O(1)로 뺍니다.</strong> 노드를 찾으려고 리스트를 훑을 필요가 없습니다.</li>
+</ul>
+<p>같은 방식의 자료구조가 더 있습니다. 해시 버킷용 <code>hlist_node</code>, 레드-블랙 트리의 <code>rb_node</code>가 모두 원소 안에 넣는 노드입니다. 대가는 타입 안전성입니다. 리스트에 엉뚱한 타입을 넣어도 컴파일러가 모릅니다.</p>
+</section>
+<section class="level2" id="refcount">
+<h2><span class="sec-n">25.4</span>수명: 참조 카운트<a aria-label="이 절의 링크" class="anchor" href="#refcount">#</a></h2>
+<p><strong>문제.</strong> 객체를 여러 곳에서 가리킵니다. 가비지 컬렉터가 없으므로 마지막 사용자가 손을 뗀 순간을 직접 알아내 해제해야 합니다.</p>
+<p><strong>커널의 답.</strong> 다른 스레드가 찾을 수 있는 객체에는 참조 카운트를 답니다. 규약은 <code>get</code>과 <code>put</code> 한 쌍입니다. 포인터를 얻어 보관하려면 <code>get</code>으로 카운트를 올리고, 다 쓰면 <code>put</code>으로 내립니다. 0이 되면 <code>put</code>이 해제 함수를 부릅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/kref.h#L62" rel="noopener" target="_blank">include/linux/kref.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/kref.h" data-line="62" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">int</span> kref_put<span class="op">(</span><span class="kw">struct</span> kref <span class="op">*</span>kref<span class="op">,</span> <span class="dt">void</span> <span class="op">(*</span>release<span class="op">)(</span><span class="kw">struct</span> kref <span class="op">*</span>kref<span class="op">))</span></span>
+<span id="cb6-2"><span class="op">{</span></span>
+<span id="cb6-3">    <span class="cf">if</span> <span class="op">(</span>refcount_dec_and_test<span class="op">(&amp;</span>kref<span class="op">-&gt;</span>refcount<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb6-4">        release<span class="op">(</span>kref<span class="op">);</span></span>
+<span id="cb6-5">        <span class="cf">return</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb6-6">    <span class="op">}</span></span>
+<span id="cb6-7">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb6-8"><span class="op">}</span></span></code></pre></div></div>
+<p><code>struct kref</code>는 객체 안에 넣는 멤버이고 <code>release</code>는 <code>container_of()</code>로 객체를 찾아 해제합니다. 앞의 두 패턴이 그대로 쓰였습니다.</p>
+<figure class="fig" id="fig-refcount-life"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>참조 카운트의 일생: 객체를 만든 코드, 해시 테이블, 잠깐 조회한 스레드가 각각 참조를 쥐었다 놓는 동안 카운트가 1, 2, 3, 2, 1을 거쳐 0이 되고, 0이 되는 순간 release 함수가 객체를 해제한다.</title>
+
+  <!-- 사건 -->
+  <text class="t-code mid" x="150" y="24">kref_init</text>
+  <text class="t-code mid" x="250" y="24">get</text>
+  <text class="t-code mid" x="350" y="24">get</text>
+  <text class="t-code mid" x="450" y="24">put</text>
+  <text class="t-code mid" x="550" y="24">put</text>
+  <text class="t-code mid" x="650" y="24">put</text>
+  <path class="ln thin muted dash" d="M150 30 V236"/>
+  <path class="ln thin muted dash" d="M250 30 V236"/>
+  <path class="ln thin muted dash" d="M350 30 V236"/>
+  <path class="ln thin muted dash" d="M450 30 V236"/>
+  <path class="ln thin muted dash" d="M550 30 V236"/>
+  <path class="ln thin muted dash" d="M650 30 V214"/>
+
+  <!-- 누가 쥐고 있나 -->
+  <text class="t-s t-ink" x="20" y="64">만든 코드</text>
+  <rect class="box blue" x="150" y="46" width="400" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="350" y="65">참조 하나</text>
+
+  <text class="t-s t-ink" x="20" y="104">해시 테이블</text>
+  <rect class="box green" x="250" y="86" width="400" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="450" y="105">테이블에 걸려 있는 동안 참조 하나</text>
+
+  <text class="t-s t-ink" x="20" y="144">조회한 스레드</text>
+  <rect class="box purple" x="350" y="126" width="100" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="400" y="145">쓰는 동안</text>
+
+  <!-- 카운트 -->
+  <text class="t-s t-ink t-b" x="20" y="196">카운트</text>
+  <rect class="box" x="150" y="176" width="100" height="32"/><text class="t-mono t-b mid" x="200" y="197">1</text>
+  <rect class="box" x="250" y="176" width="100" height="32"/><text class="t-mono t-b mid" x="300" y="197">2</text>
+  <rect class="box" x="350" y="176" width="100" height="32"/><text class="t-mono t-b mid" x="400" y="197">3</text>
+  <rect class="box" x="450" y="176" width="100" height="32"/><text class="t-mono t-b mid" x="500" y="197">2</text>
+  <rect class="box" x="550" y="176" width="100" height="32"/><text class="t-mono t-b mid" x="600" y="197">1</text>
+  <rect class="box red" x="650" y="176" width="90" height="32"/>
+  <rect x="650" y="176" width="90" height="32" fill="url(#hatch-red)"/>
+  <text class="t-xs tc-red" x="560" y="230">0 → release() → 해제</text>
+
+  <path class="ln thin muted" d="M20 250 H740"/>
+  <text class="t-s" x="20" y="274">포인터를 보관하는 쪽마다 참조 하나를 쥔다. 어느 put이 마지막이 될지는 미리 알 수 없다</text>
+  <text class="t-s" x="20" y="296">빗금 구간에서는 객체가 없다. 0이 된 카운터를 다시 올리는 코드는 해제된 메모리를 쓰게 된다</text>
+</svg></div><figcaption><b>그림 25-4</b>참조 카운트의 일생. 누가 참조를 쥐고 있는지 코드로 말할 수 있어야 하고, 0이 된 뒤에는 누구도 다시 올리면 안 됩니다.</figcaption></figure>
+<p>카운터의 타입은 <code>atomic_t</code>가 아니라 <strong><code>refcount_t</code></strong>입니다. 참조 카운트 버그는 보안 문제로 이어지기 쉽습니다. 카운터가 넘쳐 0으로 돌아가면 쓰는 중인 객체가 해제됩니다. <code>refcount_t</code>는 넘치거나 0 아래로 내려가려 하면 값을 <code>REFCOUNT_SATURATED</code>(<code>INT_MIN / 2</code>)에 <strong>고정</strong>하고 경고를 냅니다. 그 객체는 영영 해제되지 않습니다. 메모리 누수를 택해 해제 후 사용을 피한 것입니다. 0인 카운터를 올리려는 시도에도 경고합니다.</p>
+<p>이 위에 쌓인 것들입니다.</p>
+<ul>
+<li><strong>kobject</strong>는 <code>kref</code>에 이름, 부모, sysfs 디렉터리를 더한 것입니다. 장치 모델의 객체가 모두 이것을 품습니다.</li>
+<li>RCU로 찾은 객체는 그 사이에 카운트가 0이 되었을 수 있으므로 <code>refcount_inc_not_zero()</code>로 올립니다(<a href="ch16.html">16장</a>).</li>
+<li>드라이버는 <code>devm_kzalloc()</code> 같은 <strong>devm</strong> 함수로 자원을 장치에 묶어 둡니다. 장치가 떨어질 때 묶인 자원이 역순으로 해제됩니다.</li>
+</ul>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>코딩 스타일 문서는 락과 참조 카운트를 구분합니다. 락은 자료구조를 <strong>일관되게</strong> 유지하는 도구이고, 참조 카운트는 <strong>메모리</strong>를 관리하는 기법입니다. 보통 둘 다 필요하고 서로를 대신하지 못합니다. 문서의 문장을 옮기면, 다른 스레드가 찾을 수 있는 자료구조에 참조 카운트 없이 접근하고 있다면 거의 확실히 버그입니다. 수명 규칙을 타입(<code>kref</code>)과 함수 쌍(<code>get</code>/<code>put</code>)으로 고정해 두면, 리뷰어는 "이 포인터의 참조는 누가 쥐고 있는가"라는 한 가지 질문으로 코드를 읽을 수 있습니다.</p>
+</div>
+</section>
+<section class="level2" id="errors">
+<h2><span class="sec-n">25.5</span>오류 처리: errno, ERR_PTR, goto<a aria-label="이 절의 링크" class="anchor" href="#errors">#</a></h2>
+<p><strong>문제.</strong> 예외가 없습니다. 실패를 호출자에게 알려야 하고, 실패한 지점까지 얻은 자원을 빠짐없이 되돌려야 합니다.</p>
+<p><strong>알리기.</strong> 정수를 돌려주는 함수는 성공하면 0, 실패하면 <strong>음수 errno</strong>(<code>-ENOMEM</code>, <code>-EINVAL</code>)를 돌려줍니다. 포인터를 돌려주는 함수는 오류 코드를 포인터에 실어 보냅니다. 주소 공간의 맨 위 4095바이트(<code>MAX_ERRNO</code>)에는 유효한 객체가 있을 수 없다는 점을 이용합니다. <code>ERR_PTR(-ENOMEM)</code>은 정수 -12를 포인터로 바꾼 것이고, 받는 쪽은 <code>IS_ERR()</code>로 그 범위인지 확인한 뒤 <code>PTR_ERR()</code>로 코드를 꺼냅니다(<code>include/linux/err.h</code>). NULL과 오류를 구분할 수 있고 반환값 하나로 끝납니다.</p>
+<figure class="fig" id="fig-err-ptr-range"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>포인터에 오류 코드 싣기: 64비트 주소 공간의 맨 끝 4095개 값은 유효한 객체의 주소가 될 수 없으므로 오류 코드로 쓰고, IS_ERR는 포인터가 그 범위에 드는지만 본다.</title>
+
+  <text class="t-s t-ink t-b" x="20" y="28">포인터 하나가 가질 수 있는 값</text>
+
+  <rect class="box gray" x="20" y="44" width="60" height="44"/>
+  <text class="t-code mid" x="50" y="71">NULL</text>
+  <rect class="box blue" x="80" y="44" width="480" height="44"/>
+  <text class="t-s t-ink mid" x="320" y="71">유효한 주소가 있을 수 있는 범위</text>
+  <rect class="box red" x="560" y="44" width="180" height="44"/>
+  <text class="t-s t-ink t-b mid" x="650" y="64">오류 코드</text>
+  <text class="t-xs mid" x="650" y="81">맨 끝 4095개</text>
+
+  <text class="t-code tc-muted" x="20" y="108">0</text>
+  <text class="t-code tc-muted mid" x="560" y="108">0xffff…f001</text>
+  <text class="t-code tc-muted end" x="740" y="108">0xffff…ffff</text>
+
+  <rect class="box code" x="20" y="128" width="350" height="76" rx="8"/>
+  <text class="t-xs" x="34" y="148">돌려주는 쪽</text>
+  <text class="t-code" x="34" y="170">return ERR_PTR(-ENOMEM);</text>
+  <text class="t-xs" x="34" y="190">-12를 포인터로 바꾸면 0xffff…fff4</text>
+
+  <rect class="box code" x="390" y="128" width="350" height="76" rx="8"/>
+  <text class="t-xs" x="404" y="148">받는 쪽</text>
+  <text class="t-code" x="404" y="170">if (IS_ERR(p)) return PTR_ERR(p);</text>
+  <text class="t-xs" x="404" y="190">p ≥ (unsigned long)-4095 인지만 본다</text>
+
+  <path class="ln red" d="M195 128 V118 H630 V92" marker-end="url(#ah-red)"/>
+
+  <text class="t-s mid" x="380" y="232">반환값 하나로 "객체", "없음(NULL)", "실패와 그 이유"를 구분한다</text>
+</svg></div><figcaption><b>그림 25-5</b>포인터에 오류 싣기. 주소 공간 맨 끝의 4095개 값은 오류 코드로 예약되어 있습니다.</figcaption></figure>
+<p><strong>되돌리기.</strong> 자원을 얻은 순서의 반대로 해제하는 레이블을 함수 끝에 쌓고, 실패한 지점에서 알맞은 레이블로 <code>goto</code>합니다. <a href="ch23.html">23장</a>에서 본 vCPU 생성 함수의 끝부분입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/virt/kvm/kvm_main.c#L4283" rel="noopener" target="_blank">virt/kvm/kvm_main.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="virt/kvm/kvm_main.c" data-line="4283" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1">kvm_put_xa_erase<span class="op">:</span></span>
+<span id="cb7-2">    mutex_unlock<span class="op">(&amp;</span>vcpu<span class="op">-&gt;</span>mutex<span class="op">);</span></span>
+<span id="cb7-3">    kvm_put_kvm_no_destroy<span class="op">(</span>kvm<span class="op">);</span></span>
+<span id="cb7-4">    xa_erase<span class="op">(&amp;</span>kvm<span class="op">-&gt;</span>vcpu_array<span class="op">,</span> vcpu<span class="op">-&gt;</span>vcpu_idx<span class="op">);</span></span>
+<span id="cb7-5">unlock_vcpu_destroy<span class="op">:</span></span>
+<span id="cb7-6">    vcpu<span class="op">-&gt;</span>vcpu_idx <span class="op">=</span> <span class="op">-</span><span class="dv">1</span><span class="op">;</span></span>
+<span id="cb7-7">    kvm_dirty_ring_free<span class="op">(&amp;</span>vcpu<span class="op">-&gt;</span>dirty_ring<span class="op">);</span></span>
+<span id="cb7-8">arch_vcpu_destroy<span class="op">:</span></span>
+<span id="cb7-9">    kvm_arch_vcpu_destroy<span class="op">(</span>vcpu<span class="op">);</span></span>
+<span id="cb7-10">vcpu_free_run_page<span class="op">:</span></span>
+<span id="cb7-11">    free_page<span class="op">((</span><span class="dt">unsigned</span> <span class="dt">long</span><span class="op">)</span>vcpu<span class="op">-&gt;</span>run<span class="op">);</span></span>
+<span id="cb7-12">vcpu_free<span class="op">:</span></span>
+<span id="cb7-13">    kmem_cache_free<span class="op">(</span>kvm_vcpu_cache<span class="op">,</span> vcpu<span class="op">);</span></span>
+<span id="cb7-14">vcpu_decrement<span class="op">:</span></span>
+<span id="cb7-15">    kvm<span class="op">-&gt;</span>created_vcpus<span class="op">--;</span></span>
+<span id="cb7-16">    <span class="cf">return</span> r<span class="op">;</span></span>
+<span id="cb7-17"><span class="op">}</span></span></code></pre></div></div>
+<p>위에서 아래로 떨어지며 실행되므로, 늦게 실패할수록 위쪽 레이블로 가서 더 많은 것을 되돌립니다. 레이블 이름은 그 자리에서 하는 일을 말합니다. <a href="ch01.html">1장</a>의 <code>copy_process()</code>에는 이런 레이블이 <code>bad_fork_</code>로 시작하는 것만 21개 있습니다. 이 모양은 단순하고 눈에 보이지만, 자원을 하나 추가할 때 레이블 순서와 모든 <code>goto</code>의 목적지를 다시 맞춰야 합니다. 누수와 이중 해제 버그가 여기서 나옵니다.</p>
+</section>
+<section class="level2" id="cleanup">
+<h2><span class="sec-n">25.6</span>범위 기반 정리: guard()와 자동 해제<a aria-label="이 절의 링크" class="anchor" href="#cleanup">#</a></h2>
+<p>컴파일러에는 변수가 범위를 벗어날 때 지정한 함수를 부르게 하는 <code>cleanup</code> 속성이 있습니다. <code>include/linux/cleanup.h</code>는 이 속성으로 C에 소멸자를 들여왔습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/cgroup/namespace.c#L22" rel="noopener" target="_blank">kernel/cgroup/namespace.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/cgroup/namespace.c" data-line="22" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="dt">static</span> <span class="kw">struct</span> cgroup_namespace <span class="op">*</span>alloc_cgroup_ns<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb8-2"><span class="op">{</span></span>
+<span id="cb8-3">    <span class="kw">struct</span> cgroup_namespace <span class="op">*</span>new_ns __free<span class="op">(</span>kfree<span class="op">)</span> <span class="op">=</span> NULL<span class="op">;</span></span>
+<span id="cb8-4">    <span class="dt">int</span> ret<span class="op">;</span></span>
+<span id="cb8-5"></span>
+<span id="cb8-6">    new_ns <span class="op">=</span> kzalloc_obj<span class="op">(</span><span class="kw">struct</span> cgroup_namespace<span class="op">,</span> GFP_KERNEL_ACCOUNT<span class="op">);</span></span>
+<span id="cb8-7">    <span class="cf">if</span> <span class="op">(!</span>new_ns<span class="op">)</span></span>
+<span id="cb8-8">        <span class="cf">return</span> ERR_PTR<span class="op">(-</span>ENOMEM<span class="op">);</span></span>
+<span id="cb8-9">    ret <span class="op">=</span> ns_common_init<span class="op">(</span>new_ns<span class="op">);</span></span>
+<span id="cb8-10">    <span class="cf">if</span> <span class="op">(</span>ret<span class="op">)</span></span>
+<span id="cb8-11">        <span class="cf">return</span> ERR_PTR<span class="op">(</span>ret<span class="op">);</span></span>
+<span id="cb8-12">    <span class="cf">return</span> no_free_ptr<span class="op">(</span>new_ns<span class="op">);</span></span>
+<span id="cb8-13"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li><code>__free(kfree)</code>가 붙은 변수는 함수의 어느 <code>return</code>에서든 범위를 벗어날 때 <code>kfree()</code>됩니다. 중간의 오류 반환에 정리 코드가 없습니다.</li>
+<li>성공해서 포인터를 내보낼 때는 <code>no_free_ptr()</code>로 감쌉니다. 변수를 NULL로 바꾸고 원래 값을 돌려주므로 자동 해제가 일어나지 않습니다. 소유권을 넘긴다는 표시입니다.</li>
+<li><code>ERR_PTR()</code>과 함께 씁니다. 두 패턴은 겹치지 않습니다.</li>
+</ul>
+<p>락에는 <code>guard()</code>를 씁니다. 파일시스템을 등록하는 함수입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/fs/filesystems.c#L99" rel="noopener" target="_blank">fs/filesystems.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="fs/filesystems.c" data-line="99" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="dt">int</span> register_filesystem<span class="op">(</span><span class="kw">struct</span> file_system_type <span class="op">*</span>fs<span class="op">)</span></span>
+<span id="cb9-2"><span class="op">{</span></span>
+<span id="cb9-3">    <span class="co">/* ... */</span></span>
+<span id="cb9-4">    <span class="cf">if</span> <span class="op">(!</span>hlist_unhashed_lockless<span class="op">(&amp;</span>fs<span class="op">-&gt;</span>list<span class="op">))</span></span>
+<span id="cb9-5">        <span class="cf">return</span> <span class="op">-</span>EBUSY<span class="op">;</span></span>
+<span id="cb9-6"></span>
+<span id="cb9-7">    guard<span class="op">(</span>spinlock<span class="op">)(&amp;</span>file_systems_lock<span class="op">);</span></span>
+<span id="cb9-8">    <span class="cf">if</span> <span class="op">(</span>find_filesystem<span class="op">(</span>fs<span class="op">-&gt;</span>name<span class="op">,</span> strlen<span class="op">(</span>fs<span class="op">-&gt;</span>name<span class="op">)))</span></span>
+<span id="cb9-9">        <span class="cf">return</span> <span class="op">-</span>EBUSY<span class="op">;</span></span>
+<span id="cb9-10">    hlist_add_tail_rcu<span class="op">(&amp;</span>fs<span class="op">-&gt;</span>list<span class="op">,</span> <span class="op">&amp;</span>file_systems<span class="op">);</span></span>
+<span id="cb9-11">    invalidate_filesystems_string<span class="op">();</span></span>
+<span id="cb9-12">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb9-13"><span class="op">}</span></span></code></pre></div></div>
+<p><code>guard(spinlock)(&amp;lock)</code>은 그 자리에서 락을 잡고, 함수가 어디서 끝나든 풉니다. 그 아래의 <code>return -EBUSY</code>에 <code>spin_unlock()</code>이 없어도 됩니다. 구간을 더 좁히려면 <code>scoped_guard(spinlock, &amp;lock) { ... }</code> 블록을 씁니다. 이 함수에는 이 장의 다른 패턴도 들어 있습니다. <code>fs-&gt;list</code>는 구조체에 넣어 둔 <code>hlist_node</code>이고, 넣는 연산은 RCU 판입니다.</p>
+<p>어떤 타입에 어떤 정리 함수를 쓸지는 한 줄로 등록합니다. <code>kfree</code>는 <code>include/linux/slab.h</code>에 <code>DEFINE_FREE(kfree, void *, if (!IS_ERR_OR_NULL(_T)) kfree(_T))</code>로, 뮤텍스 가드는 <code>include/linux/mutex.h</code>에 <code>DEFINE_LOCK_GUARD_1(mutex, struct mutex, mutex_lock(_T-&gt;lock), mutex_unlock(_T-&gt;lock))</code>로 정의되어 있습니다. <code>kfree</code> 쪽 조건이 눈에 띕니다. 변수에 <code>ERR_PTR()</code> 값이 들어 있으면 해제하지 않습니다. 가드의 바탕은 생성자와 소멸자를 한 쌍으로 묶는 <code>DEFINE_CLASS()</code>입니다.</p>
+<figure class="fig" id="fig-goto-vs-guard"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>goto 되돌리기 사다리와 범위 기반 정리 비교: 왼쪽은 실패 지점마다 알맞은 레이블로 뛰어 역순으로 해제하고, 오른쪽은 guard와 __free가 붙은 변수가 범위를 벗어날 때 컴파일러가 선언의 역순으로 정리 코드를 넣는다.</title>
+
+  <!-- 왼쪽 -->
+  <text class="t-b" x="20" y="28">goto 사다리</text>
+  <rect class="box code" x="20" y="40" width="350" height="276" rx="10"/>
+  <text class="t-code" x="34" y="64">mutex_lock(&amp;lock);</text>
+  <text class="t-code" x="34" y="84">a = get_a();</text>
+  <text class="t-code" x="34" y="104">if (!a) { ret = -ENOMEM; goto unlock; }</text>
+  <text class="t-code" x="34" y="124">b = get_b();</text>
+  <text class="t-code" x="34" y="144">if (!b) { ret = -ENOMEM; goto put_a; }</text>
+  <text class="t-code" x="34" y="164">ret = work(a, b);</text>
+  <text class="t-code" x="34" y="184">put_b(b);</text>
+  <text class="t-code tc-warm" x="34" y="208">put_a:</text>
+  <text class="t-code" x="34" y="228">put_a(a);</text>
+  <text class="t-code tc-warm" x="34" y="252">unlock:</text>
+  <text class="t-code" x="34" y="272">mutex_unlock(&amp;lock);</text>
+  <text class="t-code" x="34" y="292">return ret;</text>
+  <path class="ln thin warm" d="M300 148 H346 V204 H90" marker-end="url(#ah-warm)"/>
+  <path class="ln thin warm" d="M312 108 H358 V248 H98" marker-end="url(#ah-warm)"/>
+
+  <!-- 오른쪽 -->
+  <text class="t-b" x="390" y="28">범위 기반 정리</text>
+  <rect class="box code" x="390" y="40" width="350" height="176" rx="10"/>
+  <text class="t-code" x="404" y="64">guard(mutex)(&amp;lock);</text>
+  <text class="t-code" x="404" y="88">struct a *a __free(put_a) = get_a();</text>
+  <text class="t-code" x="404" y="108">if (!a) return -ENOMEM;</text>
+  <text class="t-code" x="404" y="132">struct b *b __free(put_b) = get_b();</text>
+  <text class="t-code" x="404" y="152">if (!b) return -ENOMEM;</text>
+  <text class="t-code" x="404" y="176">return work(a, b);</text>
+  <text class="t-code tc-muted" x="404" y="200">}</text>
+
+  <rect class="box green" x="390" y="232" width="350" height="84" rx="10"/>
+  <text class="t-s t-ink t-b" x="404" y="254">어느 return에서든 컴파일러가 넣는 것</text>
+  <text class="t-code" x="404" y="276">put_b(b)  →  put_a(a)  →  mutex_unlock</text>
+  <text class="t-xs" x="404" y="298">선언의 역순. 아직 선언되지 않은 변수는 건너뛴다</text>
+  <path class="ln green" d="M420 204 V228" marker-end="url(#ah-green)"/>
+
+  <text class="t-s" x="20" y="346">왼쪽: 해제 순서와 goto의 목적지를 사람이 맞춘다. 자원을 하나 더하면 레이블과 모든 goto를 다시 본다</text>
+  <text class="t-s" x="20" y="368">오른쪽: 선언한 자리가 곧 해제 순서다. 실패 경로에 정리 코드가 없다. 두 코드는 설명용으로 단순화한 것이다</text>
+</svg></div><figcaption><b>그림 25-6</b>같은 함수를 두 방식으로 썼을 때. 왼쪽은 해제 순서를 사람이 맞추고, 오른쪽은 선언의 역순으로 컴파일러가 맞춥니다.</figcaption></figure>
+<p>v7.3의 <code>kernel/</code> 디렉터리에서 <code>guard(</code>와 <code>scoped_guard(</code>는 750번쯤, <code>goto</code>는 4,200번쯤 나옵니다. 전환은 진행 중입니다. <code>cleanup.h</code>의 주석은 한 함수 안에서 <code>goto</code> 정리와 범위 기반 정리를 섞지 말라고 적고 있습니다. <code>goto</code>가 범위를 넘나들면 어떤 정리가 실행될지 헷갈리기 때문입니다. 그래도 앞에서 본 vCPU 생성 함수처럼 락은 <code>guard(mutex)</code>로, 나머지는 레이블로 처리한 과도기의 코드가 남아 있습니다.</p>
+</section>
+<section class="level2" id="config">
+<h2><span class="sec-n">25.7</span>설정: Kconfig에서 죽은 코드 제거까지<a aria-label="이 절의 링크" class="anchor" href="#config">#</a></h2>
+<p><strong>문제.</strong> 커널에는 설정 옵션이 수천 개 있습니다. 옵션마다 <code>#ifdef</code>로 코드를 감싸면 읽을 수 없게 되고, 꺼진 쪽 코드는 컴파일되지 않으니 깨져도 모릅니다.</p>
+<p><strong>커널의 답.</strong> <code>#ifdef</code>를 <code>.c</code> 파일에서 몰아내 헤더에 가둡니다. 코딩 스타일 문서의 규칙입니다. 방법은 둘입니다.</p>
+<p>첫째, 기능이 꺼졌을 때를 위한 <strong>빈 인라인 함수</strong>를 헤더에 둡니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/sched/ext.h#L295" rel="noopener" target="_blank">include/linux/sched/ext.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/sched/ext.h" data-line="295" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="pp">#else   </span><span class="co">/* !CONFIG_SCHED_CLASS_EXT */</span></span>
+<span id="cb10-2"></span>
+<span id="cb10-3"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">void</span> sched_ext_dead<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">)</span> <span class="op">{}</span></span>
+<span id="cb10-4"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">void</span> print_scx_info<span class="op">(</span><span class="dt">const</span> <span class="dt">char</span> <span class="op">*</span>log_lvl<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">)</span> <span class="op">{}</span></span>
+<span id="cb10-5"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">void</span> scx_softlockup<span class="op">(</span>u32 dur_s<span class="op">)</span> <span class="op">{}</span></span>
+<span id="cb10-6"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">bool</span> scx_hardlockup<span class="op">(</span><span class="dt">int</span> cpu<span class="op">)</span> <span class="op">{</span> <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span> <span class="op">}</span></span>
+<span id="cb10-7"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">bool</span> scx_rcu_cpu_stall<span class="op">(</span><span class="dt">const</span> <span class="kw">struct</span> cpumask <span class="op">*</span>stalled_mask<span class="op">)</span> <span class="op">{</span> <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span> <span class="op">}</span></span>
+<span id="cb10-8"></span>
+<span id="cb10-9"><span class="pp">#endif  </span><span class="co">/* CONFIG_SCHED_CLASS_EXT */</span></span></code></pre></div></div>
+<p>호출하는 <code>.c</code> 파일은 sched_ext가 켜졌는지 묻지 않고 <code>sched_ext_dead(p)</code>를 부릅니다. 꺼져 있으면 빈 함수가 인라인되어 사라집니다.</p>
+<p>둘째, 조건을 전처리기가 아니라 <strong>C의 <code>if</code></strong>로 씁니다. <code>IS_ENABLED(CONFIG_FOO)</code>는 옵션이 켜져 있으면 1, 아니면 0이 되는 상수식입니다. <a href="ch06.html">6장</a>에서 본 <code>if (IS_ENABLED(CONFIG_DEBUG_ENTRY))</code>가 이 꼴입니다. 컴파일러는 <code>if (0)</code>의 본문을 타입 검사까지 한 뒤 버립니다. 꺼진 설정의 코드도 문법과 타입이 맞는지 항상 확인된다는 점이 <code>#ifdef</code>와 다릅니다.</p>
+<figure class="fig" id="fig-kconfig-dce"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 308" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Kconfig 옵션에서 죽은 코드 제거까지: 옵션이 켜지면 autoconf.h에 매크로가 정의되어 IS_ENABLED가 1이 되고 코드가 남는다. 꺼지면 0이 되어 컴파일러가 본문을 타입 검사한 뒤 지운다.</title>
+
+  <rect class="box code" x="20" y="16" width="720" height="38" rx="8"/>
+  <text class="t-xs" x="34" y="40">소스</text>
+  <text class="t-code" x="80" y="40">if (IS_ENABLED(CONFIG_FOO)) foo_init();</text>
+  <text class="t-xs end" x="728" y="40">.c 파일에 #ifdef가 없다</text>
+
+  <!-- 열 제목 -->
+  <text class="t-xs mid" x="116" y="78">.config</text>
+  <text class="t-xs mid" x="304" y="78">include/generated/autoconf.h</text>
+  <text class="t-xs mid" x="498" y="78">전처리 뒤</text>
+  <text class="t-xs mid" x="664" y="78">기계어</text>
+
+  <!-- 켜짐 -->
+  <rect class="box green" x="20" y="88" width="192" height="46" rx="8"/>
+  <text class="t-code mid" x="116" y="116">CONFIG_FOO=y</text>
+  <rect class="box green" x="224" y="88" width="160" height="46" rx="8"/>
+  <text class="t-code mid" x="304" y="116">#define CONFIG_FOO 1</text>
+  <rect class="box green" x="396" y="88" width="204" height="46" rx="8"/>
+  <text class="t-code mid" x="498" y="116">if (1) foo_init();</text>
+  <rect class="box green" x="612" y="88" width="128" height="46" rx="8"/>
+  <text class="t-code mid" x="676" y="116">call foo_init</text>
+  <path class="ln thin green" d="M212 111 H220" marker-end="url(#ah-green)"/>
+  <path class="ln thin green" d="M384 111 H392" marker-end="url(#ah-green)"/>
+  <path class="ln thin green" d="M600 111 H608" marker-end="url(#ah-green)"/>
+
+  <!-- 꺼짐 -->
+  <rect class="box gray" x="20" y="150" width="192" height="46" rx="8"/>
+  <text class="t-code mid" x="116" y="178"># CONFIG_FOO is not set</text>
+  <rect class="box gray" x="224" y="150" width="160" height="46" rx="8"/>
+  <text class="t-xs mid" x="304" y="178">정의 없음</text>
+  <rect class="box gray" x="396" y="150" width="204" height="46" rx="8"/>
+  <text class="t-code mid" x="498" y="178">if (0) foo_init();</text>
+  <rect class="ghost dash" x="612" y="150" width="128" height="46" rx="8"/>
+  <text class="t-xs mid" x="676" y="178">아무것도 없다</text>
+  <path class="ln thin muted" d="M212 173 H220" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M384 173 H392" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M600 173 H608" marker-end="url(#ah-muted)"/>
+
+  <path class="ln thin muted" d="M20 216 H740"/>
+  <text class="t-s" x="20" y="242">꺼진 쪽도 컴파일러가 본문을 읽는다. 문법과 타입을 검사한 다음에 버린다</text>
+  <text class="t-s" x="20" y="264">#ifdef로 감싼 코드는 꺼진 설정에서 아예 보이지 않아, 깨져도 그 설정으로 빌드하기 전에는 모른다</text>
+  <text class="t-s" x="20" y="286">본문이 그 설정에서만 존재하는 심벌을 쓰면 #ifdef나 헤더의 빈 인라인 함수가 필요하다</text>
+</svg></div><figcaption><b>그림 25-7</b>Kconfig 옵션이 기계어에서 사라지기까지. 판단은 컴파일할 때 끝나고 실행 파일에는 분기가 남지 않습니다.</figcaption></figure>
+</section>
+<section class="level2" id="fastpath">
+<h2><span class="sec-n">25.8</span>빠른 경로를 위해 코드를 고쳐 쓰기<a aria-label="이 절의 링크" class="anchor" href="#fastpath">#</a></h2>
+<p><strong>문제.</strong> 드물게 바뀌는 조건을 자주 도는 경로에서 매번 검사하기가 아깝습니다.</p>
+<p>커널은 단계별로 대응합니다. 가장 가벼운 것은 <code>likely()</code>와 <code>unlikely()</code>입니다. 컴파일러에 어느 쪽이 흔한지 알려 흔한 쪽을 곧게 배치하게 합니다. 분기는 남습니다.</p>
+<p>분기 자체를 없애는 것이 <strong>스태틱 키</strong>(static key)입니다. <code>if (static_branch_unlikely(&amp;key))</code>는 기계어에서 조건 분기가 아닙니다. x86의 구현입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/include/asm/jump_label.h#L35" rel="noopener" target="_blank">arch/x86/include/asm/jump_label.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/include/asm/jump_label.h" data-line="35" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1"><span class="dt">static</span> __always_inline <span class="dt">bool</span> arch_static_branch<span class="op">(</span><span class="kw">struct</span> static_key <span class="op">*</span> <span class="dt">const</span> key<span class="op">,</span> <span class="dt">const</span> <span class="dt">bool</span> branch<span class="op">)</span></span>
+<span id="cb11-2"><span class="op">{</span></span>
+<span id="cb11-3">    asm <span class="cf">goto</span><span class="op">(</span>ARCH_STATIC_BRANCH_ASM<span class="op">(</span><span class="st">"</span><span class="sc">%c</span><span class="st">0 + </span><span class="sc">%c</span><span class="st">1"</span><span class="op">,</span> <span class="st">"%l[l_yes]"</span><span class="op">)</span></span>
+<span id="cb11-4">        <span class="op">:</span> <span class="op">:</span>  <span class="st">"i"</span> <span class="op">(</span>key<span class="op">),</span> <span class="st">"i"</span> <span class="op">(</span>branch<span class="op">)</span> <span class="op">:</span> <span class="op">:</span> l_yes<span class="op">);</span></span>
+<span id="cb11-5"></span>
+<span id="cb11-6">    <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb11-7">l_yes<span class="op">:</span></span>
+<span id="cb11-8">    <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb11-9"><span class="op">}</span></span></code></pre></div></div>
+<p><code>ARCH_STATIC_BRANCH_ASM</code>은 그 자리에 5바이트 NOP을 놓고, <code>__jump_table</code> 섹션에 "이 주소, 건너뛸 목적지, 이 키"라는 항목을 남깁니다. 평소에는 NOP을 지나 <code>return false</code>로 갑니다. 누군가 <code>static_branch_enable(&amp;key)</code>를 부르면 커널이 표를 뒤져 그 키를 쓰는 모든 자리의 NOP을 <code>jmp l_yes</code>로 <strong>고쳐 씁니다.</strong></p>
+<figure class="fig" id="fig-static-key-patch"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 348" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>스태틱 키의 코드 패치: 키가 꺼져 있으면 분기 자리에 5바이트 NOP이 있어 그대로 지나가고, 키를 켜면 커널이 jump table을 보고 그 자리를 jmp 명령어로 고쳐 써서 드문 경로로 보낸다.</title>
+
+  <!-- 꺼짐 -->
+  <text class="t-b" x="20" y="28">키가 꺼져 있을 때</text>
+  <rect class="box code" x="20" y="40" width="320" height="150" rx="10"/>
+  <text class="t-code tc-muted" x="34" y="64">…</text>
+  <rect class="box green" x="30" y="72" width="300" height="28" rx="5"/>
+  <text class="t-code" x="40" y="91">0f 1f 44 00 00   nop</text>
+  <text class="t-code" x="34" y="122">…  흔한 경로가 이어진다</text>
+  <text class="t-code" x="34" y="142">ret</text>
+  <text class="t-code tc-muted" x="34" y="170">l_yes:  드문 경로 (떨어져 있다)</text>
+
+  <!-- 켜짐 -->
+  <text class="t-b" x="420" y="28">키가 켜져 있을 때</text>
+  <rect class="box code" x="420" y="40" width="320" height="150" rx="10"/>
+  <text class="t-code tc-muted" x="434" y="64">…</text>
+  <rect class="box warm" x="430" y="72" width="300" height="28" rx="5"/>
+  <text class="t-code" x="440" y="91">e9 xx xx xx xx   jmp l_yes</text>
+  <text class="t-code tc-muted" x="434" y="122">…  흔한 경로 (건너뛴다)</text>
+  <text class="t-code tc-muted" x="434" y="142">ret</text>
+  <text class="t-code" x="434" y="170">l_yes:  드문 경로</text>
+  <path class="ln warm" d="M716 100 V166 H650" marker-end="url(#ah-warm)"/>
+
+  <!-- 패치 -->
+  <path class="ln" d="M340 86 H416" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="380" y="78">고쳐 쓴다</text>
+
+  <!-- jump table -->
+  <rect class="box yellow" x="20" y="212" width="720" height="62" rx="10"/>
+  <text class="t-b" x="34" y="236">__jump_table 섹션</text>
+  <text class="t-xs" x="34" y="258">분기 자리마다 항목 하나</text>
+  <rect class="box" x="250" y="224" width="150" height="38" rx="6"/>
+  <text class="t-code mid" x="325" y="248">code: 이 자리의 주소</text>
+  <rect class="box" x="410" y="224" width="150" height="38" rx="6"/>
+  <text class="t-code mid" x="485" y="248">target: l_yes</text>
+  <rect class="box" x="570" y="224" width="156" height="38" rx="6"/>
+  <text class="t-code mid" x="648" y="248">key: 어느 키인가</text>
+  <path class="ln thin muted dash" d="M380 212 V92"/>
+
+  <text class="t-s" x="20" y="302">읽는 쪽은 변수를 읽지도 비교하지도 않는다. 꺼져 있을 때의 비용은 NOP 하나다</text>
+  <text class="t-s" x="20" y="324">static_branch_enable()이 표에서 그 키의 항목을 모두 찾아 명령어를 바꾼다. 느린 작업이라 드물게 한다</text>
+</svg></div><figcaption><b>그림 25-8</b>스태틱 키의 두 상태. 조건을 읽고 비교하는 대신 명령어 자체를 바꿉니다.</figcaption></figure>
+<p><a href="ch24.html">24장</a>의 BPF 프로그램 호출부가 실행 시간 통계를 낼지 묻는 자리, sched_ext가 켜져 있는지 묻는 자리가 스태틱 키입니다. 꺼져 있을 때의 비용은 NOP 하나입니다. 대신 켜고 끄는 일은 모든 CPU를 맞춰 세워야 하는 느린 작업입니다.</p>
+<p>같은 발상을 간접 호출에 적용한 것이 <strong>스태틱 콜</strong>(static call)입니다. <a href="ch06.html">6장</a>에서 선점 모델을 고를 때 보았습니다. KVM은 ops 테이블 전체를 스태틱 콜로 바꿉니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kvm/x86.c#L6954" rel="noopener" target="_blank">arch/x86/kvm/x86.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/kvm/x86.c" data-line="6954" id="cb12"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb12-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">void</span> kvm_ops_update<span class="op">(</span><span class="kw">struct</span> kvm_x86_init_ops <span class="op">*</span>ops<span class="op">)</span></span>
+<span id="cb12-2"><span class="op">{</span></span>
+<span id="cb12-3">    memcpy<span class="op">(&amp;</span>kvm_x86_ops<span class="op">,</span> ops<span class="op">-&gt;</span>runtime_ops<span class="op">,</span> <span class="kw">sizeof</span><span class="op">(</span>kvm_x86_ops<span class="op">));</span></span>
+<span id="cb12-4"></span>
+<span id="cb12-5"><span class="pp">#define __KVM_X86_OP</span><span class="op">(</span><span class="pp">func</span><span class="op">)</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb12-6"><span class="pp">    static_call_update</span><span class="op">(</span><span class="pp">kvm_x86_</span><span class="op">##</span><span class="pp">func</span><span class="op">,</span><span class="pp"> kvm_x86_ops</span><span class="op">.</span><span class="pp">func</span><span class="op">);</span></span>
+<span id="cb12-7"><span class="pp">#define KVM_X86_OP</span><span class="op">(</span><span class="pp">func</span><span class="op">)</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb12-8"><span class="pp">    WARN_ON</span><span class="op">(!</span><span class="pp">kvm_x86_ops</span><span class="op">.</span><span class="pp">func</span><span class="op">);</span><span class="pp"> __KVM_X86_OP</span><span class="op">(</span><span class="pp">func</span><span class="op">)</span></span>
+<span id="cb12-9"><span class="pp">#define KVM_X86_OP_OPTIONAL __KVM_X86_OP</span></span>
+<span id="cb12-10"><span class="co">/* ... */</span></span>
+<span id="cb12-11"><span class="pp">#include </span><span class="im">&lt;asm/kvm-x86-ops.h&gt;</span></span>
+<span id="cb12-12"><span class="pp">#undef __KVM_X86_OP</span></span>
+<span id="cb12-13">    <span class="co">/* ... */</span></span>
+<span id="cb12-14"><span class="op">}</span></span></code></pre></div></div>
+<p>모듈이 올라올 때 테이블의 함수 포인터 하나하나에 대해 <code>static_call_update()</code>를 불러 호출 명령어의 목적지를 고칩니다. 그 뒤 <code>kvm_x86_call(vcpu_run)(...)</code>은 인텔이면 <code>vmx_vcpu_run()</code>으로 가는 직접 호출입니다. ops 테이블의 유연함을 유지하면서 간접 호출의 비용만 없앴습니다.</p>
+<p>이 계열에는 CPU 기능에 따라 부팅 때 명령어를 바꿔 넣는 alternatives(<a href="ch23.html">23장</a>의 <code>vmenter.S</code>에 있던 <code>ALTERNATIVE</code>), 락 없이 쓰는 CPU별 변수, 거짓 공유를 막는 캐시 라인 정렬(<a href="ch13.html">13장</a>)이 더 있습니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>설정 가능성과 속도는 보통 맞바꿉니다. 실행 중에 바꿀 수 있게 하려면 변수를 읽고 분기해야 하기 때문입니다. 커널은 "바꾸는 일은 드물고 읽는 일은 잦다"는 비대칭을 이용해 비용을 바꾸는 쪽으로 몰았습니다. 읽는 쪽은 아무것도 읽지 않고, 바꾸는 쪽이 코드를 고쳐 씁니다. RCU가 자료구조에서 한 일을 코드에 대해 한 것입니다. 드문 쪽에 비용을 몰 수 있는지 따져 보는 것은 어디서나 통하는 질문입니다.</p>
+</div>
+</section>
+<section class="level2" id="macros">
+<h2><span class="sec-n">25.9</span>매크로: 제네릭과 코드 생성<a aria-label="이 절의 링크" class="anchor" href="#macros">#</a></h2>
+<p>C에는 템플릿이 없으므로 타입에 무관한 코드는 매크로로 씁니다. 앞에서 본 <code>list_for_each_entry()</code>가 그 예이고, <code>typeof</code>가 타입 인자 노릇을 합니다. 잘 만든 매크로는 함수보다 <strong>더 많은</strong> 검사를 합니다. <code>min()</code>의 핵심부입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/minmax.h#L91" rel="noopener" target="_blank">include/linux/minmax.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/minmax.h" data-line="91" id="cb13"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1"><span class="pp">#define __careful_cmp_once</span><span class="op">(</span><span class="pp">op</span><span class="op">,</span><span class="pp"> x</span><span class="op">,</span><span class="pp"> y</span><span class="op">,</span><span class="pp"> </span>ux<span class="op">,</span><span class="pp"> </span>uy<span class="op">)</span><span class="pp"> </span><span class="op">({</span><span class="pp">     </span><span class="op">\</span></span>
+<span id="cb13-2"><span class="pp">    </span><span class="kw">auto</span><span class="pp"> </span>ux<span class="pp"> </span><span class="op">=</span><span class="pp"> </span><span class="op">(</span><span class="pp">x</span><span class="op">);</span><span class="pp"> </span><span class="kw">auto</span><span class="pp"> </span>uy<span class="pp"> </span><span class="op">=</span><span class="pp"> </span><span class="op">(</span><span class="pp">y</span><span class="op">);</span><span class="pp">           </span><span class="op">\</span></span>
+<span id="cb13-3"><span class="pp">    BUILD_BUG_ON_MSG</span><span class="op">(!</span><span class="pp">__types_ok</span><span class="op">(</span>ux<span class="op">,</span><span class="pp"> </span>uy<span class="op">),</span><span class="pp">       </span><span class="op">\</span></span>
+<span id="cb13-4"><span class="pp">        </span><span class="op">#</span><span class="pp">op</span><span class="st">"("</span><span class="op">#</span><span class="pp">x</span><span class="st">", "</span><span class="op">#</span><span class="pp">y</span><span class="st">") signedness error"</span><span class="op">);</span><span class="pp">    </span><span class="op">\</span></span>
+<span id="cb13-5"><span class="pp">    __cmp</span><span class="op">(</span><span class="pp">op</span><span class="op">,</span><span class="pp"> </span>ux<span class="op">,</span><span class="pp"> </span>uy<span class="op">);</span><span class="pp"> </span><span class="op">})</span></span></code></pre></div></div>
+<p>인자를 임시 변수에 한 번만 담아 <code>min(i++, j)</code> 같은 호출에서 부작용이 두 번 일어나지 않게 하고, 부호 있는 값과 없는 값을 섞어 비교하면 빌드를 실패시킵니다. <code>-1</code>과 <code>1U</code>를 비교하면 <code>-1</code>이 큰 양수로 바뀌는 C의 함정을 컴파일할 때 잡는 것입니다. <code>auto</code>는 커널이 <code>__auto_type</code>으로 정의해 둔 것입니다(<code>include/linux/compiler_types.h</code>).</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료의 <code>min()</code>은 <code>(void)(&amp;_x == &amp;_y)</code>라는 줄로 타입을 검사합니다. 두 인자의 타입이 정확히 같지 않으면 "서로 다른 포인터 타입의 비교" 경고가 나는 것을 이용한 요령이었습니다. <code>int</code>와 <code>long</code>처럼 안전한 조합도 걸려서 <code>min_t()</code>로 강제 변환하는 코드가 늘었고, 그 변환이 오히려 값을 자르는 버그를 만들기도 했습니다. v7.3의 <code>min()</code>은 타입이 달라도 <strong>부호</strong>만 맞으면 통과시킵니다.</p>
+</div>
+<p>자료구조의 API도 같은 방식입니다. 해시 테이블의 <code>hash_for_each_possible()</code>, xarray의 <code>xa_for_each()</code>가 모두 원소 타입을 인자로 받지 않는 순회 매크로입니다.</p>
+<p>매크로의 두 번째 쓰임은 <strong>코드 생성</strong>입니다. 한 줄의 선언에서 여러 조각을 만들어 냅니다.</p>
+<ul>
+<li><code>SYSCALL_DEFINE3(read, ...)</code>는 함수 본체와 인자 변환 래퍼, 추적용 메타데이터를 만듭니다(<a href="ch19.html">19장</a>).</li>
+<li><code>DEFINE_PER_CPU(type, name)</code>은 변수를 CPU별 데이터 섹션에 놓습니다.</li>
+<li><code>TRACE_EVENT()</code>는 추적점의 구조체, 기록 함수, 출력 형식을 한꺼번에 만듭니다.</li>
+<li>바로 위 KVM 코드의 <code>#include &lt;asm/kvm-x86-ops.h&gt;</code>는 <strong>목록 파일을 매크로 정의를 바꿔 가며 여러 번 포함</strong>하는 기법입니다. 그 헤더에는 <code>KVM_X86_OP(vcpu_run)</code> 같은 줄만 있고, 포함하는 쪽이 <code>KVM_X86_OP</code>를 어떻게 정의하느냐에 따라 선언이 되기도, 갱신 코드가 되기도 합니다. 연산을 추가할 때 고칠 곳이 한 줄입니다.</li>
+</ul>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>ops 테이블과 구조체 배치를 직접 찾아봅니다. 커널 소스가 있는 디렉터리에서 실행합니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ grep -rn '^const struct file_operations' fs/ext4/
+fs/ext4/file.c:1035:const struct file_operations ext4_file_operations = {
+fs/ext4/dir.c:698:const struct file_operations ext4_dir_operations = {
+$ grep -c 'bad_fork_.*:$' kernel/fork.c
+21</code></pre></div>
+<p>실행 중인 커널의 구조체 정의는 BTF에서 꺼내 봅니다. 디버그 정보가 든 <code>vmlinux</code>가 있으면 <code>pahole -C kref vmlinux</code>로 멤버의 오프셋과 크기까지 볼 수 있습니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ bpftool btf dump file /sys/kernel/btf/vmlinux format c | grep -A 2 '^struct kref {'
+struct kref {
+    refcount_t refcount;
+};</code></pre></div>
+<p>매크로가 무엇으로 펼쳐지는지는 전처리 결과로 확인합니다. 설정을 마친 소스 트리에서(<a href="ch28.html">28장</a>) <code>make kernel/fork.i</code>를 실행하면 <code>kernel/fork.i</code>에 <code>list_for_each_entry</code>가 풀린 <code>for</code> 문이 보입니다. 스타일 검사는 <code>scripts/checkpatch.pl -f kernel/fork.c</code>로 돌립니다.</p>
+</div>
+</section>
+<section class="level2" id="registration">
+<h2><span class="sec-n">25.10</span>등록, initcall, 링커 섹션<a aria-label="이 절의 링크" class="anchor" href="#registration">#</a></h2>
+<p><strong>문제.</strong> 코어는 드라이버를 몰라야 합니다. 그런데 부팅할 때 누군가는 모든 드라이버의 초기화 함수를 불러야 합니다.</p>
+<p><strong>등록.</strong> 코어가 <code>register_*()</code> 함수를 내놓고 구현이 자기 ops 테이블을 넘깁니다. 앞에서 본 <code>register_filesystem()</code>이 그 꼴입니다. ext4는 초기화 함수에서 <code>register_filesystem(&amp;ext4_fs_type)</code>을 부릅니다. 의존의 방향이 구현에서 코어로만 향합니다. 사건을 알리는 쪽도 같습니다. <strong>알림 사슬</strong>(notifier chain)은 콜백을 담은 <code>struct notifier_block</code>을 리스트에 걸어 두었다가 사건이 나면 차례로 부릅니다.</p>
+<p><strong>initcall.</strong> 그 초기화 함수는 누가 부를까요. 아무도 이름으로 부르지 않습니다. <code>module_init(ext4_init_fs)</code>는 함수 포인터 하나를 <code>.initcall6.init</code> 같은 이름의 <strong>링커 섹션</strong>에 넣습니다. 링커가 모든 오브젝트 파일의 같은 섹션을 이어 붙이면 함수 포인터 배열이 되고, 부팅 코드는 그 배열을 처음부터 끝까지 돕니다. 단계는 <code>core_initcall</code>(1)부터 <code>late_initcall</code>(7)까지이고 <code>module_init</code>은 6단계입니다. 같은 소스를 모듈로 빌드하면 <code>module_init</code>은 모듈 로더가 찾는 <code>init_module</code>의 별칭이 됩니다.</p>
+<p>링커가 표를 모아 주는 이 기법은 곳곳에 쓰입니다. 스태틱 키의 <code>__jump_table</code>이 그랬고, 스케줄링 클래스는 <code>DEFINE_SCHED_CLASS</code>가 클래스마다 다른 섹션에 넣은 것을 링커 스크립트가 우선순위 순서로 늘어놓습니다. 그래서 다음 클래스로 가는 일이 <code>class++</code>입니다. <code>__init</code>이 붙은 함수는 <code>.init.text</code> 섹션에 모였다가 부팅이 끝나면 메모리째 해제됩니다.</p>
+<p><strong>내보내기.</strong> 모듈이 쓸 수 있는 심벌은 <code>EXPORT_SYMBOL_GPL()</code>로 표시한 것뿐입니다. 표시하지 않은 함수는 <code>static</code>이 아니어도 모듈에서 보이지 않습니다. 심벌 네임스페이스(<code>EXPORT_SYMBOL_NS_GPL</code>)로 범위를 더 좁힐 수 있고, v7.3에는 특정 모듈에만 여는 <code>EXPORT_SYMBOL_FOR_MODULES()</code>도 있습니다. 무엇이 인터페이스인지를 코드에 적는 것입니다(<a href="ch26.html">26장</a>).</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>initcall이 불리는 순서는 부팅 인자 <code>initcall_debug</code>를 주고 부팅하면 커널 로그에 남습니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ sudo dmesg | grep -E 'initcall level|ext4_init_fs'
+[    0.2...] entering initcall level: core
+...
+[    1.4...] calling  ext4_init_fs+0x0/0x... @ 1
+[    1.4...] initcall ext4_init_fs+0x0/0x... returned 0 after ... usecs</code></pre></div>
+<p>ext4가 커널에 내장된 경우의 예시입니다. 스태틱 키는 sysctl로 뒤집어 볼 수 있습니다. <code>sysctl kernel.sched_schedstats=1</code>은 스케줄러 통계 코드를 감싼 스태틱 키 <code>sched_schedstats</code>를 켭니다. 그 순간 커널이 해당 분기 자리들의 명령어를 고쳐 씁니다.</p>
+</div>
+</section>
+<section class="level2" id="annotations">
+<h2><span class="sec-n">25.11</span>도구가 읽는 주석<a aria-label="이 절의 링크" class="anchor" href="#annotations">#</a></h2>
+<p><strong>문제.</strong> "이 포인터는 유저 공간 주소다", "이 함수는 락을 쥔 채 불러야 한다" 같은 규칙은 C의 타입으로 표현되지 않습니다. 주석으로 적으면 아무도 검사하지 않습니다.</p>
+<p><strong>커널의 답.</strong> 규칙을 컴파일러와 정적 분석기가 읽을 수 있는 속성으로 적습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>표시</th>
+<th>뜻</th>
+<th>검사하는 도구</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>__user</code>, <code>__iomem</code>, <code>__rcu</code></td>
+<td>직접 역참조하면 안 되는 종류의 포인터</td>
+<td>sparse</td>
+</tr>
+<tr>
+<td><code>__must_check</code></td>
+<td>반환값을 무시하면 안 된다</td>
+<td>컴파일러 경고</td>
+</tr>
+<tr>
+<td><code>__acquires(l)</code>, <code>__releases(l)</code>, <code>__must_hold(l)</code></td>
+<td>함수가 락을 잡는다, 푼다, 쥔 채 불려야 한다</td>
+<td>sparse, Clang</td>
+</tr>
+<tr>
+<td><code>__guarded_by(l)</code></td>
+<td>이 멤버는 그 락을 쥐고 접근한다</td>
+<td>Clang</td>
+</tr>
+<tr>
+<td><code>__counted_by(n)</code></td>
+<td>이 가변 길이 배열의 원소 수는 멤버 <code>n</code>에 있다</td>
+<td>컴파일러의 경계 검사</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>vfs_read()</code>의 선언에서 버퍼는 <code>char __user *buf</code>입니다. 커널 코드가 <code>*buf</code>로 직접 읽으면 sparse가 경고합니다. <code>copy_from_user()</code>를 거쳐야 합니다(<a href="ch19.html">19장</a>). <code>ERR_PTR()</code>의 선언에 붙은 <code>__must_check</code>는 오류 포인터를 버리는 호출을 잡습니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p><code>__acquires()</code>와 <code>__releases()</code>를 "sparse만 읽는 표시"라고 설명한 자료가 많습니다. v7.0부터는 Clang의 <strong>컨텍스트 분석</strong>도 이 표시를 읽습니다(<code>include/linux/compiler-context-analysis.h</code>). <code>CONFIG_WARN_CONTEXT_ANALYSIS</code>를 켜고 대상 디렉터리의 Makefile에서 분석을 켜면, 락을 쥐지 않고 <code>__guarded_by</code> 멤버를 건드리는 코드나 <code>__must_hold</code> 함수를 락 없이 부르는 코드가 컴파일 경고로 나옵니다. <a href="ch06.html">6장</a>의 <code>__raw_spin_lock()</code> 선언에 있던 <code>__acquires(lock) __no_context_analysis</code>가 이 체계의 일부입니다.</p>
+</div>
+<p>품질 도구 전체는 <a href="ch27.html">27장</a>에서 다룹니다. 여기서 볼 것은 방향입니다. 사람이 기억해야 하던 불변식을 코드에 적어 기계가 검사하게 옮겨 갑니다.</p>
+</section>
+<section class="level2" id="style">
+<h2><span class="sec-n">25.12</span>코딩 스타일, 그리고 Rust<a aria-label="이 절의 링크" class="anchor" href="#style">#</a></h2>
+<p><code>Documentation/process/coding-style.rst</code>는 짧은 문서입니다. 뼈대는 이렇습니다.</p>
+<ul>
+<li>들여쓰기는 탭이고 탭은 8칸입니다. 세 단계 넘게 들여쓰게 되면 함수를 고치라는 신호로 봅니다.</li>
+<li>함수는 짧게, 한 가지 일만 합니다. 지역 변수는 5–10개를 넘기지 않습니다.</li>
+<li>구조체와 포인터에 <code>typedef</code>를 쓰지 않습니다. <code>struct task_struct *</code>라고 써야 그것이 구조체의 포인터임이 보입니다.</li>
+<li>주석은 코드가 <strong>무엇을</strong> 하는지 적습니다. 어떻게는 코드가 말합니다.</li>
+</ul>
+<p>취향처럼 보이지만 목적은 하나입니다. 수천 명이 쓴 코드가 한 사람이 쓴 것처럼 읽혀야 리뷰가 됩니다. 이 장의 패턴들도 같은 구실을 합니다. ops 테이블, 내장 노드, <code>get</code>/<code>put</code>을 한 번 익히면 처음 보는 서브시스템에서도 무엇을 찾아야 할지 압니다.</p>
+<p>커널의 Rust 코드는 이 관례들을 언어 기능으로 옮깁니다(<a href="ch27.html">27장</a>).</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/samples/rust/rust_minimal.rs#L29" rel="noopener" target="_blank">samples/rust/rust_minimal.rs</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="samples/rust/rust_minimal.rs" data-line="29" id="cb17"><pre class="sourceCode rust"><code class="sourceCode rust"><span id="cb17-1"><span class="kw">impl</span> <span class="pp">kernel::</span>Module <span class="cf">for</span> RustMinimal <span class="op">{</span></span>
+<span id="cb17-2">    <span class="kw">fn</span> init(_module<span class="op">:</span> <span class="op">&amp;</span><span class="ot">'static</span> ThisModule) <span class="op">-&gt;</span> <span class="dt">Result</span><span class="op">&lt;</span><span class="dt">Self</span><span class="op">&gt;</span> <span class="op">{</span></span>
+<span id="cb17-3">        <span class="pp">pr_info!</span>(<span class="st">"Rust minimal sample (init)</span><span class="sc">\n</span><span class="st">"</span>)<span class="op">;</span></span>
+<span id="cb17-4">        <span class="co">// ...</span></span>
+<span id="cb17-5">        <span class="kw">let</span> <span class="kw">mut</span> numbers <span class="op">=</span> <span class="pp">KVec::</span>new()<span class="op">;</span></span>
+<span id="cb17-6">        numbers<span class="op">.</span>push(<span class="dv">72</span><span class="op">,</span> GFP_KERNEL)<span class="op">?;</span></span>
+<span id="cb17-7">        numbers<span class="op">.</span>push(<span class="dv">108</span><span class="op">,</span> GFP_KERNEL)<span class="op">?;</span></span>
+<span id="cb17-8">        numbers<span class="op">.</span>push(<span class="dv">200</span><span class="op">,</span> GFP_KERNEL)<span class="op">?;</span></span>
+<span id="cb17-9"></span>
+<span id="cb17-10">        <span class="cn">Ok</span>(RustMinimal <span class="op">{</span> numbers <span class="op">}</span>)</span>
+<span id="cb17-11">    <span class="op">}</span></span>
+<span id="cb17-12"><span class="op">}</span></span>
+<span id="cb17-13"></span>
+<span id="cb17-14"><span class="kw">impl</span> <span class="bu">Drop</span> <span class="cf">for</span> RustMinimal <span class="op">{</span></span>
+<span id="cb17-15">    <span class="kw">fn</span> drop(<span class="op">&amp;</span><span class="kw">mut</span> <span class="kw">self</span>) <span class="op">{</span></span>
+<span id="cb17-16">        <span class="pp">pr_info!</span>(<span class="st">"My numbers are {:?}</span><span class="sc">\n</span><span class="st">"</span><span class="op">,</span> <span class="kw">self</span><span class="op">.</span>numbers)<span class="op">;</span></span>
+<span id="cb17-17">        <span class="pp">pr_info!</span>(<span class="st">"Rust minimal sample (exit)</span><span class="sc">\n</span><span class="st">"</span>)<span class="op">;</span></span>
+<span id="cb17-18">    <span class="op">}</span></span>
+<span id="cb17-19"><span class="op">}</span></span></code></pre></div></div>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>C의 관례</th>
+<th>Rust에서</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ops 테이블</td>
+<td>트레이트. 위의 <code>kernel::Module</code>, <code>#[vtable]</code>이 붙은 <code>MiscDevice</code></td>
+</tr>
+<tr>
+<td>음수 errno, <code>ERR_PTR</code></td>
+<td><code>Result</code>. <code>?</code>가 오류면 바로 반환합니다.</td>
+</tr>
+<tr>
+<td><code>goto</code> 사다리, <code>__free()</code></td>
+<td><code>Drop</code>. 범위를 벗어나면 소멸자가 불립니다.</td>
+</tr>
+<tr>
+<td><code>guard(mutex)</code></td>
+<td>락을 잡으면 나오는 <code>Guard</code>. 버려질 때 풉니다.</td>
+</tr>
+<tr>
+<td><code>kref</code>, <code>get</code>/<code>put</code></td>
+<td><code>Arc</code>. 안에 <code>refcount_t</code>가 들어 있습니다.</td>
+</tr>
+</tbody>
+</table></div>
+<p>위 코드의 <code>push(...)?</code>는 할당에 실패하면 그 자리에서 오류를 들고 함수를 떠납니다. 그때 <code>numbers</code>는 <code>Drop</code>으로 정리됩니다. C에서 관례와 리뷰로 지키던 것을 컴파일러가 강제한다는 점이 다릅니다.</p>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.6 계열 · 2004</dt>
+<dd>
+<code>kref</code>. 참조 카운트의 관례가 타입이 됩니다.
+</dd>
+<dt>4.11 · 2017</dt>
+<dd>
+<code>refcount_t</code>. 넘침과 0에서의 증가를 잡는 전용 카운터가 <code>atomic_t</code>에서 갈라집니다.
+</dd>
+<dt>5.10 · 2020</dt>
+<dd>
+스태틱 콜. 간접 호출의 목적지를 코드 패치로 고정합니다.
+</dd>
+<dt>6.1 · 2022</dt>
+<dd>
+Rust 지원이 들어옵니다.
+</dd>
+<dt>6.5 · 2023</dt>
+<dd>
+<code>cleanup.h</code>. <code>guard()</code>와 <code>__free()</code>로 범위 기반 정리를 쓸 수 있게 됩니다.
+</dd>
+<dt>7.0 · 2026</dt>
+<dd>
+Clang의 컨텍스트 분석. 락 주석을 컴파일러가 검사합니다.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>인터페이스는 함수 포인터 구조체로, 구현은 그 <code>const</code> 인스턴스로 표현합니다. 없는 연산은 NULL입니다.</li>
+<li>공통 부분은 구조체 안에 멤버로 넣고 <code>container_of()</code>로 바깥을 되찾습니다. 리스트 노드도 원소 안에 넣어, 할당 없이 여러 리스트에 동시에 매답니다.</li>
+<li>공유되는 객체의 수명은 참조 카운트와 <code>get</code>/<code>put</code> 규약이 정합니다. <code>refcount_t</code>는 넘치면 값을 고정해 해제 후 사용 대신 누수를 택합니다.</li>
+<li>실패는 음수 errno나 <code>ERR_PTR()</code>로 알립니다. 되돌리기는 <code>goto</code> 사다리에서 <code>guard()</code>와 <code>__free()</code>로 옮겨 가는 중입니다.</li>
+<li>설정은 헤더의 빈 인라인 함수와 <code>IS_ENABLED()</code>로 다뤄, <code>.c</code> 파일에 <code>#ifdef</code>를 두지 않고 컴파일러가 죽은 코드를 지우게 합니다.</li>
+<li>자주 도는 경로의 분기와 간접 호출은 스태틱 키와 스태틱 콜이 코드를 고쳐 써서 없앱니다.</li>
+<li>코어와 구현은 등록 함수, initcall, 링커 섹션으로 이어져 코어가 구현의 이름을 모릅니다.</li>
+<li>타입으로 못 적는 규칙은 <code>__user</code>, <code>__must_check</code>, <code>__acquires</code> 같은 속성으로 적어 도구가 검사합니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p><code>struct file_operations</code>에 새 연산 <code>foo</code>를 추가했습니다. 기존 파일시스템 수십 개의 테이블은 고치지 않았습니다. 그래도 빌드되고 동작하는 이유와, 호출부가 지켜야 할 것을 설명해 보세요.</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>각 파일시스템의 테이블은 지정 초기화(<code>.read_iter = ...</code>)로 쓰여 있어서, 언급하지 않은 멤버 <code>foo</code>는 0, 곧 NULL이 됩니다. 구조체 정의만 바뀌고 인스턴스들은 다시 컴파일될 뿐입니다. 호출부는 <code>vfs_fsync_range()</code>가 <code>file-&gt;f_op-&gt;fsync</code>를 확인하듯 <code>foo</code>가 NULL인지 먼저 확인하고, NULL이면 기본 동작을 하거나 "지원하지 않음" 오류를 돌려줘야 합니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>list_for_each_entry(p, &amp;head, node)</code>가 원소의 타입을 인자로 받지 않는데도 <code>p</code>에 올바른 구조체 포인터가 들어가는 과정을 설명해 보세요.</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>매크로가 <code>typeof(*pos)</code>로 <code>p</code>가 가리키는 타입을 얻습니다. <code>list_first_entry()</code>와 <code>list_next_entry()</code>는 리스트 노드의 포인터와 이 타입, 멤버 이름 <code>node</code>를 <code>container_of()</code>에 넘기고, <code>container_of()</code>는 노드 주소에서 <code>offsetof(타입, node)</code>를 빼 바깥 구조체의 주소를 계산합니다. 오프셋은 컴파일 때 상수이므로 실행 비용은 뺄셈 한 번입니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>refcount_t</code>가 넘칠 때 값을 <code>REFCOUNT_SATURATED</code>에 고정하는 설계는 어떤 버그를 어떤 버그로 바꾸는 것입니까? 왜 그쪽이 낫습니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>넘친 카운터가 0 근처로 돌아가면 아직 쓰는 객체가 해제되어 해제 후 사용이 됩니다. 공격자가 그 메모리를 다른 내용으로 채우면 권한 상승으로 이어질 수 있습니다. 고정된 카운터는 다시 0이 되지 않으므로 객체가 영영 해제되지 않습니다. 메모리 누수입니다. 누수는 자원을 낭비할 뿐 메모리 안전을 깨지 않으므로 훨씬 덜 위험합니다. 경고도 함께 나오므로 버그가 드러납니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>alloc_cgroup_ns()</code>에서 <code>return no_free_ptr(new_ns);</code>를 <code>return new_ns;</code>로 바꾸면 무슨 일이 일어납니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>new_ns</code>에는 <code>__free(kfree)</code>가 붙어 있어서 함수가 반환할 때 변수가 범위를 벗어나며 <code>kfree(new_ns)</code>가 실행됩니다. 호출자는 이미 해제된 메모리의 포인터를 받게 되어 해제 후 사용이 됩니다. <code>no_free_ptr()</code>는 변수를 NULL로 바꾸고 원래 값을 돌려주므로, 범위를 벗어날 때의 정리 함수가 NULL을 보고 아무것도 하지 않습니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>전역 변수를 읽어 <code>if</code>로 가르는 것과 스태틱 키는 기계어에서 어떻게 다릅니까? 스태틱 키가 맞지 않는 경우는 언제입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>전역 변수 방식은 실행할 때마다 메모리를 읽고 비교해 조건 분기합니다. 스태틱 키는 그 자리에 NOP 하나(꺼짐)나 무조건 <code>jmp</code> 하나(켜짐)만 있고 메모리를 읽지 않습니다. 상태를 바꿀 때 커널이 <code>__jump_table</code>을 보고 그 키를 쓰는 모든 자리의 명령어를 고쳐 씁니다. 이 패치는 모든 CPU와 맞춰야 하는 느린 작업이므로, 값이 자주 바뀌는 조건이나 객체마다 값이 다른 조건에는 맞지 않습니다.</p>
+</div></details></div></div>
+
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>ops 테이블</dt>
+<dd>
+함수 포인터를 모은 구조체. 인터페이스 구실을 하며 구현마다 인스턴스를 하나씩 둔다.
+</dd>
+<dt>container_of</dt>
+<dd>
+멤버의 주소에서 그 멤버의 오프셋을 빼 바깥 구조체의 주소를 구하는 매크로.
+</dd>
+<dt>침습형 리스트<small>intrusive list</small></dt>
+<dd>
+리스트 노드를 원소 구조체 안에 멤버로 넣는 방식의 리스트.
+</dd>
+<dt>refcount_t</dt>
+<dd>
+참조 카운트 전용 타입. 넘치거나 0 아래로 가려 하면 값을 고정하고 경고한다.
+</dd>
+<dt>kref</dt>
+<dd>
+<code>refcount_t</code>를 감싼 구조체. 0이 되면 넘겨받은 해제 함수를 부르는 <code>kref_put()</code>과 함께 쓴다.
+</dd>
+<dt>ERR_PTR</dt>
+<dd>
+음수 오류 코드를 포인터 값에 실어 돌려주는 방식. <code>IS_ERR()</code>로 확인하고 <code>PTR_ERR()</code>로 꺼낸다.
+</dd>
+<dt>guard</dt>
+<dd>
+락을 잡고, 변수가 범위를 벗어날 때 자동으로 푸는 범위 기반 정리 매크로.
+</dd>
+<dt>IS_ENABLED</dt>
+<dd>
+Kconfig 옵션이 켜졌는지를 컴파일 시점 상수 1이나 0으로 바꾸는 매크로.
+</dd>
+<dt>스태틱 키<small>static key</small></dt>
+<dd>
+분기 자리의 명령어를 NOP과 <code>jmp</code> 사이에서 고쳐 써서, 조건 검사 없이 경로를 켜고 끄는 기법.
+</dd>
+<dt>initcall</dt>
+<dd>
+링커 섹션에 모아 둔 초기화 함수. 부팅 코드가 단계 순서대로 부른다.
+</dd>
+<dt>알림 사슬<small>notifier chain</small></dt>
+<dd>
+사건이 나면 차례로 부를 콜백을 리스트로 걸어 두는 구조.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/process/coding-style.html" rel="noopener" target="_blank"><code>Documentation/process/coding-style.rst</code></a>: 커널 코딩 스타일. 7절이 <code>goto</code>, 11절이 참조 카운트, 21절이 조건부 컴파일입니다.</li>
+<li><a href="https://docs.kernel.org/core-api/kref.html" rel="noopener" target="_blank"><code>Documentation/core-api/kref.rst</code></a>: <code>kref</code>를 쓰는 규칙과 흔한 실수.</li>
+<li><a href="https://docs.kernel.org/core-api/cleanup.html" rel="noopener" target="_blank"><code>Documentation/core-api/cleanup.rst</code></a>: 범위 기반 정리 도우미.</li>
+<li><a href="https://docs.kernel.org/staging/static-keys.html" rel="noopener" target="_blank"><code>Documentation/staging/static-keys.rst</code></a>: 스태틱 키의 API와 구현.</li>
+<li><a href="https://docs.kernel.org/dev-tools/context-analysis.html" rel="noopener" target="_blank"><code>Documentation/dev-tools/context-analysis.rst</code></a>: 컴파일러 기반 컨텍스트 분석.</li>
+<li><a href="https://docs.kernel.org/core-api/kobject.html" rel="noopener" target="_blank"><code>Documentation/core-api/kobject.rst</code></a>: kobject, kset, ktype.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch24.html"><small>← 24장</small><b>eBPF</b></a><a class="next" href="ch26.html"><small>26장 →</small><b>커널은 어떻게 만들어지는가</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#ops">ops 테이블: 인터페이스와 구현</a><a href="#container-of">내장과 container_of</a><a href="#lists">침습형 리스트</a><a href="#refcount">수명: 참조 카운트</a><a href="#errors">오류 처리: errno, ERR_PTR, goto</a><a href="#cleanup">범위 기반 정리: guard()와 자동 해제</a><a href="#config">설정: Kconfig에서 죽은 코드 제거까지</a><a href="#fastpath">빠른 경로를 위해 코드를 고쳐 쓰기</a><a href="#macros">매크로: 제네릭과 코드 생성</a><a href="#registration">등록, initcall, 링커 섹션</a><a href="#annotations">도구가 읽는 주석</a><a href="#style">코딩 스타일, 그리고 Rust</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

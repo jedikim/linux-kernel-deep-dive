@@ -1,0 +1,95 @@
+<svg viewBox="0 0 760 404" xmlns="http://www.w3.org/2000/svg">
+  <title>mm_struct에서 갈라지는 두 장부: mm_mt 메이플 트리는 VMA를, pgd는 페이지 테이블을 가리킨다. VMA 범위 가운데 일부 PTE에만 물리 페이지가 붙어 있다.</title>
+
+  <!-- mm_struct -->
+  <rect class="box" x="20" y="146" width="140" height="96" rx="10"/>
+  <text class="t-mono t-b" x="34" y="170">mm_struct</text>
+  <text class="t-code" x="34" y="196">mm_mt</text>
+  <text class="t-code" x="34" y="222">pgd</text>
+
+  <!-- 1: VMA 장부 -->
+  <text class="t-b tc-blue" x="200" y="24">① VMA: 유효한 범위와 성질</text>
+  <path class="ln blue" d="M160 191 H180 V90 H196" marker-end="url(#ah-blue)"/>
+  <rect class="box blue" x="200" y="70" width="110" height="40" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="255" y="95">메이플 트리</text>
+  <path class="ln thin blue" d="M310 90 H328 V44 H680"/>
+  <path class="ln thin blue" d="M410 44 V56" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M545 44 V56" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M680 44 V56" marker-end="url(#ah-blue)"/>
+
+  <rect class="box blue" x="350" y="60" width="120" height="58" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="410" y="84">VMA · 코드</text>
+  <text class="t-xs mid" x="410" y="104">r-x · 파일 매핑</text>
+  <rect class="box blue" x="485" y="60" width="120" height="58" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="545" y="84">VMA · 힙</text>
+  <text class="t-xs mid" x="545" y="104">rw- · 익명</text>
+  <rect class="box blue" x="620" y="60" width="120" height="58" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="680" y="84">VMA · 스택</text>
+  <text class="t-xs mid" x="680" y="104">rw- · 익명</text>
+
+  <!-- 범위 안내선 -->
+  <path class="ln thin muted dash" d="M350 118 V236 M470 118 V236"/>
+  <path class="ln thin muted dash" d="M485 118 V236 M605 118 V236"/>
+  <path class="ln thin muted dash" d="M620 118 V236 M740 118 V236"/>
+  <text class="t-xs mid" x="410" y="180">같은 주소 범위</text>
+  <text class="t-xs mid" x="545" y="180">같은 주소 범위</text>
+  <text class="t-xs mid" x="680" y="180">같은 주소 범위</text>
+
+  <!-- 2: 페이지 테이블 -->
+  <text class="t-b tc-green" x="200" y="216">② 페이지 테이블</text>
+  <path class="ln green" d="M160 217 H180 V252 H196" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="200" y="232" width="118" height="40" rx="8"/>
+  <text class="t-s t-ink mid" x="259" y="257">PGD → … → PMD</text>
+  <path class="ln green" d="M318 252 H344" marker-end="url(#ah-green)"/>
+
+  <!-- PTE 줄 -->
+  <rect class="solid green" x="350" y="240" width="20" height="24"/>
+  <rect class="solid green" x="370" y="240" width="20" height="24"/>
+  <rect class="solid green" x="390" y="240" width="20" height="24"/>
+  <rect class="ghost dash" x="410" y="240" width="20" height="24"/>
+  <rect class="solid green" x="430" y="240" width="20" height="24"/>
+  <rect class="ghost dash" x="450" y="240" width="20" height="24"/>
+
+  <rect class="solid green" x="485" y="240" width="20" height="24"/>
+  <rect class="solid green" x="505" y="240" width="20" height="24"/>
+  <rect class="ghost dash" x="525" y="240" width="20" height="24"/>
+  <rect class="ghost dash" x="545" y="240" width="20" height="24"/>
+  <rect class="ghost dash" x="565" y="240" width="20" height="24"/>
+  <rect class="ghost dash" x="585" y="240" width="20" height="24"/>
+
+  <rect class="ghost dash" x="620" y="240" width="20" height="24"/>
+  <rect class="ghost dash" x="640" y="240" width="20" height="24"/>
+  <rect class="ghost dash" x="660" y="240" width="20" height="24"/>
+  <rect class="ghost dash" x="680" y="240" width="20" height="24"/>
+  <rect class="solid green" x="700" y="240" width="20" height="24"/>
+  <rect class="solid green" x="720" y="240" width="20" height="24"/>
+
+  <!-- PTE → 물리 페이지 -->
+  <path class="ln thin green" d="M360 264 L415 312 M380 264 L363 312 M400 264 L493 312 M440 264 L571 312"/>
+  <path class="ln thin green" d="M495 264 L441 312 M515 264 L649 312"/>
+  <path class="ln thin green" d="M710 264 L597 312 M730 264 L727 312"/>
+
+  <!-- 물리 페이지 프레임 -->
+  <text class="t-s t-ink t-b" x="200" y="332">물리 페이지</text>
+  <rect class="box green" x="350" y="314" width="26" height="26"/>
+  <rect class="box gray" x="376" y="314" width="26" height="26"/>
+  <rect class="box green" x="402" y="314" width="26" height="26"/>
+  <rect class="box green" x="428" y="314" width="26" height="26"/>
+  <rect class="box gray" x="454" y="314" width="26" height="26"/>
+  <rect class="box green" x="480" y="314" width="26" height="26"/>
+  <rect class="box gray" x="506" y="314" width="26" height="26"/>
+  <rect class="box gray" x="532" y="314" width="26" height="26"/>
+  <rect class="box green" x="558" y="314" width="26" height="26"/>
+  <rect class="box green" x="584" y="314" width="26" height="26"/>
+  <rect class="box gray" x="610" y="314" width="26" height="26"/>
+  <rect class="box green" x="636" y="314" width="26" height="26"/>
+  <rect class="box gray" x="662" y="314" width="26" height="26"/>
+  <rect class="box gray" x="688" y="314" width="26" height="26"/>
+  <rect class="box green" x="714" y="314" width="26" height="26"/>
+
+  <!-- 범례 -->
+  <rect class="solid green" x="200" y="370" width="16" height="16"/>
+  <text class="t-xs" x="224" y="383">물리 페이지가 붙은 PTE</text>
+  <rect class="ghost dash" x="400" y="370" width="16" height="16"/>
+  <text class="t-xs" x="424" y="383">유효한 주소지만 아직 비어 있는 PTE · 첫 접근 때 폴트</text>
+</svg>

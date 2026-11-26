@@ -1,0 +1,59 @@
+<svg viewBox="0 0 760 430" xmlns="http://www.w3.org/2000/svg">
+  <title>KVM의 구조: VMM 프로세스 안에 주 스레드, vCPU 스레드, 게스트 메모리가 있고, 호스트 커널의 KVM 모듈이 스케줄러와 메모리 관리를 그대로 써서 하드웨어의 가상화 기능을 구동한다.</title>
+
+  <!-- 유저 공간 -->
+  <rect class="panel green" x="20" y="16" width="720" height="132" rx="14"/>
+  <text class="t-b tc-green" x="36" y="41">VMM 프로세스 · 유저 공간</text>
+  <rect class="box green" x="36" y="54" width="200" height="80" rx="10"/>
+  <text class="t-b" x="50" y="80">주 스레드</text>
+  <text class="t-s" x="50" y="102">가상 장치 에뮬레이션</text>
+  <text class="t-s" x="50" y="120">디스크 이미지, 소켓</text>
+  <rect class="box blue" x="248" y="54" width="140" height="80" rx="10"/>
+  <text class="t-b mid" x="318" y="80">vCPU 스레드 0</text>
+  <text class="t-code mid" x="318" y="106">ioctl(KVM_RUN)</text>
+  <rect class="box blue" x="398" y="54" width="140" height="80" rx="10"/>
+  <text class="t-b mid" x="468" y="80">vCPU 스레드 1</text>
+  <text class="t-code mid" x="468" y="106">ioctl(KVM_RUN)</text>
+  <rect class="box blue" x="550" y="54" width="174" height="80" rx="10"/>
+  <text class="t-b" x="564" y="80">게스트 메모리</text>
+  <text class="t-s" x="564" y="102">mmap()으로 잡은</text>
+  <text class="t-s" x="564" y="120">프로세스의 가상 메모리</text>
+
+  <!-- 커널 -->
+  <rect class="panel yellow" x="20" y="182" width="720" height="150" rx="14"/>
+  <text class="t-b tc-yellow" x="564" y="240">호스트 커널</text>
+  <rect class="box yellow" x="36" y="214" width="502" height="44" rx="10"/>
+  <text class="t-b" x="50" y="234">KVM 모듈</text>
+  <text class="t-s" x="50" y="251">ioctl 처리 · VM 진입과 exit · 2단계 페이지 테이블 · 가상 LAPIC</text>
+  <rect class="box" x="36" y="268" width="200" height="52" rx="10"/>
+  <text class="t-s t-ink t-b" x="50" y="290">파일시스템 · 네트워크</text>
+  <text class="t-xs" x="50" y="308">VMM이 시스템 콜로 쓴다</text>
+  <rect class="box" x="248" y="268" width="290" height="52" rx="10"/>
+  <text class="t-s t-ink t-b" x="262" y="290">스케줄러</text>
+  <text class="t-xs" x="262" y="308">vCPU 스레드는 보통의 태스크로 스케줄된다</text>
+  <rect class="box" x="550" y="268" width="174" height="52" rx="10"/>
+  <text class="t-s t-ink t-b" x="564" y="290">메모리 관리</text>
+  <text class="t-xs" x="564" y="308">게스트 메모리도 VMA다</text>
+
+  <!-- 경계를 넘는 화살표 -->
+  <path class="ln green" d="M136 134 V210" marker-end="url(#ah-green)"/>
+  <text class="t-xs" x="144" y="168">/dev/kvm, VM fd</text>
+  <path class="ln blue" d="M318 134 V210" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M468 134 V210" marker-end="url(#ah-blue)"/>
+  <text class="t-xs mid" x="393" y="168">vCPU fd</text>
+  <path class="ln thin muted dash" d="M700 134 V264"/>
+
+  <!-- 하드웨어 -->
+  <path class="ln" d="M287 332 V356" marker-end="url(#ah)"/>
+  <text class="t-code" x="296" y="350">VMLAUNCH / VMRESUME</text>
+  <rect class="panel gray" x="20" y="360" width="720" height="54" rx="14"/>
+  <text class="t-b tc-muted" x="36" y="392">하드웨어</text>
+  <rect class="box gray" x="120" y="372" width="190" height="30" rx="8"/>
+  <text class="t-s t-ink mid" x="215" y="392">CPU · VT-x / AMD-V</text>
+  <rect class="box gray" x="322" y="372" width="120" height="30" rx="8"/>
+  <text class="t-s t-ink mid" x="382" y="392">EPT / NPT</text>
+  <rect class="box gray" x="454" y="372" width="130" height="30" rx="8"/>
+  <text class="t-s t-ink mid" x="519" y="392">물리 메모리</text>
+  <rect class="box gray" x="596" y="372" width="128" height="30" rx="8"/>
+  <text class="t-s t-ink mid" x="660" y="392">NIC · 디스크</text>
+</svg>

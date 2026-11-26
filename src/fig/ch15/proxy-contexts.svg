@@ -1,0 +1,42 @@
+<svg viewBox="0 0 760 380" xmlns="http://www.w3.org/2000/svg">
+  <title>프록시 실행: 스케줄러가 고른 태스크 H가 뮤텍스를 기다리는 중이면 blocked_on과 owner를 따라가 락 주인 L을 실행한다. rq-&gt;donor는 H, rq-&gt;curr는 L이 된다</title>
+
+  <rect class="box purple" x="20" y="40" width="190" height="72" rx="10"/>
+  <text class="t-b" x="34" y="64">H</text>
+  <text class="t-xs" x="52" y="64">스케줄러가 고른 태스크</text>
+  <text class="t-code" x="34" y="86">blocked_on = &amp;m</text>
+  <text class="t-xs" x="34" y="103">런큐에 남아 있다</text>
+
+  <rect class="box yellow" x="300" y="40" width="160" height="72" rx="10"/>
+  <text class="t-mono t-b" x="314" y="64">struct mutex m</text>
+  <text class="t-code" x="314" y="86">owner = L</text>
+
+  <rect class="box blue" x="550" y="40" width="190" height="72" rx="10"/>
+  <text class="t-b" x="564" y="64">L</text>
+  <text class="t-xs" x="582" y="64">락 주인 · 실행 가능</text>
+  <text class="t-code" x="564" y="86">blocked_donor = H</text>
+
+  <path class="ln" d="M210 76 H296" marker-end="url(#ah)"/>
+  <text class="t-code mid" x="253" y="66">blocked_on</text>
+  <path class="ln" d="M460 76 H546" marker-end="url(#ah)"/>
+  <text class="t-code mid" x="503" y="66">owner</text>
+  <path class="ln thin muted dash" d="M645 112 V134 H115 V116" marker-end="url(#ah-muted)"/>
+  <text class="t-code tc-muted mid" x="380" y="150">blocked_donor</text>
+
+  <rect class="panel gray" x="20" y="170" width="720" height="160" rx="14"/>
+  <text class="t-b" x="36" y="196">이 CPU의 런큐</text>
+
+  <rect class="box purple" x="36" y="210" width="340" height="104" rx="10"/>
+  <text class="t-mono t-b" x="50" y="234">rq-&gt;donor = H</text>
+  <text class="t-s t-ink t-b" x="50" y="256">스케줄링 컨텍스트</text>
+  <text class="t-s" x="50" y="276">누구의 차례인가. 타임 슬라이스와</text>
+  <text class="t-s" x="50" y="296">vruntime·데드라인은 H의 것으로 계산한다</text>
+
+  <rect class="box blue" x="392" y="210" width="332" height="104" rx="10"/>
+  <text class="t-mono t-b" x="406" y="234">rq-&gt;curr = L</text>
+  <text class="t-s t-ink t-b" x="406" y="256">실행 컨텍스트</text>
+  <text class="t-s" x="406" y="276">누구의 코드가 도는가. 스택, 레지스터,</text>
+  <text class="t-s" x="406" y="296">CPU 친화성은 L의 것이다</text>
+
+  <text class="t-s mid" x="380" y="358">L은 자기 차례가 아니라 H의 차례를 빌려 실행된다. 락을 풀면 H에게 직접 넘긴다</text>
+</svg>

@@ -1,0 +1,50 @@
+<svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg">
+  <title>mutex의 owner 필드: 위쪽 비트는 주인 태스크의 포인터, 아래 세 비트는 WAITERS, HANDOFF, PICKUP 플래그</title>
+
+  <text class="t-h" x="20" y="30">mutex.owner</text>
+  <text class="t-s" x="142" y="30">atomic_long_t 하나에 포인터와 플래그를 함께 담는다</text>
+
+  <text class="t-code mid tc-muted" x="260" y="62">63–3</text>
+  <text class="t-code mid tc-muted" x="540" y="62">2</text>
+  <text class="t-code mid tc-muted" x="620" y="62">1</text>
+  <text class="t-code mid tc-muted" x="700" y="62">0</text>
+
+  <rect class="box blue" x="20" y="70" width="480" height="48"/>
+  <text class="t-b mid" x="260" y="99">주인 태스크의 struct task_struct *</text>
+  <rect class="box purple" x="500" y="70" width="80" height="48"/>
+  <text class="t-mono t-b mid" x="540" y="99">PICKUP</text>
+  <rect class="box warm" x="580" y="70" width="80" height="48"/>
+  <text class="t-mono t-b mid" x="620" y="99">HANDOFF</text>
+  <rect class="box yellow" x="660" y="70" width="80" height="48"/>
+  <text class="t-mono t-b mid" x="700" y="99">WAITERS</text>
+
+  <text class="t-code mid tc-muted" x="260" y="136">owner &amp; ~MUTEX_FLAGS</text>
+  <text class="t-code mid tc-muted" x="540" y="136">0x04</text>
+  <text class="t-code mid tc-muted" x="620" y="136">0x02</text>
+  <text class="t-code mid tc-muted" x="700" y="136">0x01</text>
+
+  <path class="ln thin muted" d="M20 154 H740"/>
+
+  <rect class="box yellow" x="20" y="168" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="44" y="180">WAITERS</text>
+  <text class="t-s" x="130" y="180">대기 목록이 비어 있지 않다. unlock이 누군가를 깨워야 한다</text>
+
+  <rect class="box warm" x="20" y="194" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="44" y="206">HANDOFF</text>
+  <text class="t-s" x="130" y="206">첫 대기자가 락을 또 놓쳤다. 다음 unlock은 그 대기자에게 직접 넘긴다</text>
+
+  <rect class="box purple" x="20" y="220" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="44" y="232">PICKUP</text>
+  <text class="t-s" x="130" y="232">unlock이 다음 주인을 써 넣었다. 그 태스크만 가져갈 수 있다</text>
+
+  <path class="ln thin muted" d="M20 250 H740"/>
+
+  <text class="t-mono" x="20" y="276">0</text>
+  <text class="t-s" x="250" y="276">풀려 있다. cmpxchg(0 → current) 한 번으로 잡는다</text>
+  <text class="t-mono" x="20" y="302">A</text>
+  <text class="t-s" x="250" y="302">A가 쥐고 있고 대기자가 없다. 풀 때도 cmpxchg(A → 0) 한 번</text>
+  <text class="t-mono" x="20" y="328">A | WAITERS</text>
+  <text class="t-s" x="250" y="328">누군가 잠들어 있다. unlock은 느린 경로로 가서 깨운다</text>
+  <text class="t-mono" x="20" y="354">B | WAITERS | PICKUP</text>
+  <text class="t-s" x="250" y="354">앞 주인이 B에게 넘겼다. B가 PICKUP을 지우면 획득이 끝난다</text>
+</svg>

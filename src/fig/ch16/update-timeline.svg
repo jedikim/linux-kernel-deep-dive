@@ -1,0 +1,35 @@
+<svg viewBox="0 0 760 316" xmlns="http://www.w3.org/2000/svg">
+  <title>RCU 갱신의 시간선: 고치는 쪽이 복사본을 고쳐 게시한 뒤 유예 기간을 기다리고, 게시 전에 시작한 읽는 쪽이 모두 끝나야 옛 데이터를 해제한다</title>
+
+  <text class="t-xs tc-warm mid" x="300" y="30">게시</text>
+  <text class="t-xs tc-purple mid" x="560" y="30">유예 기간 끝</text>
+  <path class="ln thin warm dash" d="M300 36 V256"/>
+  <path class="ln thin purple dash" d="M560 36 V256"/>
+
+  <text class="t-s t-ink t-b" x="20" y="70">고치는 쪽</text>
+  <rect class="box warm" x="160" y="50" width="140" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="230" y="70">복사해서 고친다</text>
+  <rect class="box purple" x="300" y="50" width="260" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="430" y="70">유예 기간을 기다린다</text>
+  <rect class="box red" x="560" y="50" width="130" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="625" y="70">옛 데이터 해제</text>
+
+  <text class="t-s t-ink t-b" x="20" y="120">읽는 쪽 A</text>
+  <rect class="box gray" x="200" y="100" width="160" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="280" y="120">옛 데이터를 읽는다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="160">읽는 쪽 B</text>
+  <rect class="box gray" x="260" y="140" width="300" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="410" y="160">옛 데이터를 읽는다 · 오래 걸린다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="200">읽는 쪽 C</text>
+  <rect class="box green" x="330" y="180" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="405" y="200">새 데이터를 읽는다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="240">읽는 쪽 D</text>
+  <rect class="box green" x="500" y="220" width="170" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="585" y="240">새 데이터를 읽는다</text>
+
+  <text class="t-s" x="20" y="282">게시 전에 시작한 A와 B는 옛 데이터를 끝까지 써도 된다. 유예 기간은 둘이 모두 끝날 때까지다</text>
+  <text class="t-s" x="20" y="302">게시 뒤에 시작한 C와 D는 새 데이터만 본다. 유예 기간은 이들을 기다리지 않는다</text>
+</svg>

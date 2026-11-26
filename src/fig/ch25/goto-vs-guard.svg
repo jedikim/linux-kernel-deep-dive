@@ -1,0 +1,41 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>goto 되돌리기 사다리와 범위 기반 정리 비교: 왼쪽은 실패 지점마다 알맞은 레이블로 뛰어 역순으로 해제하고, 오른쪽은 guard와 __free가 붙은 변수가 범위를 벗어날 때 컴파일러가 선언의 역순으로 정리 코드를 넣는다.</title>
+
+  <!-- 왼쪽 -->
+  <text class="t-b" x="20" y="28">goto 사다리</text>
+  <rect class="box code" x="20" y="40" width="350" height="276" rx="10"/>
+  <text class="t-code" x="34" y="64">mutex_lock(&amp;lock);</text>
+  <text class="t-code" x="34" y="84">a = get_a();</text>
+  <text class="t-code" x="34" y="104">if (!a) { ret = -ENOMEM; goto unlock; }</text>
+  <text class="t-code" x="34" y="124">b = get_b();</text>
+  <text class="t-code" x="34" y="144">if (!b) { ret = -ENOMEM; goto put_a; }</text>
+  <text class="t-code" x="34" y="164">ret = work(a, b);</text>
+  <text class="t-code" x="34" y="184">put_b(b);</text>
+  <text class="t-code tc-warm" x="34" y="208">put_a:</text>
+  <text class="t-code" x="34" y="228">put_a(a);</text>
+  <text class="t-code tc-warm" x="34" y="252">unlock:</text>
+  <text class="t-code" x="34" y="272">mutex_unlock(&amp;lock);</text>
+  <text class="t-code" x="34" y="292">return ret;</text>
+  <path class="ln thin warm" d="M300 148 H346 V204 H90" marker-end="url(#ah-warm)"/>
+  <path class="ln thin warm" d="M312 108 H358 V248 H98" marker-end="url(#ah-warm)"/>
+
+  <!-- 오른쪽 -->
+  <text class="t-b" x="390" y="28">범위 기반 정리</text>
+  <rect class="box code" x="390" y="40" width="350" height="176" rx="10"/>
+  <text class="t-code" x="404" y="64">guard(mutex)(&amp;lock);</text>
+  <text class="t-code" x="404" y="88">struct a *a __free(put_a) = get_a();</text>
+  <text class="t-code" x="404" y="108">if (!a) return -ENOMEM;</text>
+  <text class="t-code" x="404" y="132">struct b *b __free(put_b) = get_b();</text>
+  <text class="t-code" x="404" y="152">if (!b) return -ENOMEM;</text>
+  <text class="t-code" x="404" y="176">return work(a, b);</text>
+  <text class="t-code tc-muted" x="404" y="200">}</text>
+
+  <rect class="box green" x="390" y="232" width="350" height="84" rx="10"/>
+  <text class="t-s t-ink t-b" x="404" y="254">어느 return에서든 컴파일러가 넣는 것</text>
+  <text class="t-code" x="404" y="276">put_b(b)  →  put_a(a)  →  mutex_unlock</text>
+  <text class="t-xs" x="404" y="298">선언의 역순. 아직 선언되지 않은 변수는 건너뛴다</text>
+  <path class="ln green" d="M420 204 V228" marker-end="url(#ah-green)"/>
+
+  <text class="t-s" x="20" y="346">왼쪽: 해제 순서와 goto의 목적지를 사람이 맞춘다. 자원을 하나 더하면 레이블과 모든 goto를 다시 본다</text>
+  <text class="t-s" x="20" y="368">오른쪽: 선언한 자리가 곧 해제 순서다. 실패 경로에 정리 코드가 없다. 두 코드는 설명용으로 단순화한 것이다</text>
+</svg>

@@ -1,0 +1,51 @@
+<svg viewBox="0 0 760 400" xmlns="http://www.w3.org/2000/svg">
+  <title>cgroup v2 트리: 루트가 subtree_control로 컨트롤러를 자식에게 내려 주고, 중간 노드는 다시 그 일부를 내려 준다. 프로세스는 잎 cgroup에만 있다</title>
+
+  <rect class="box yellow" x="234" y="14" width="292" height="58" rx="10"/>
+  <text class="t-mono t-b" x="250" y="38">/sys/fs/cgroup</text>
+  <text class="t-xs end" x="512" y="38">루트</text>
+  <text class="t-code" x="250" y="60">subtree_control: cpu io memory pids</text>
+  <path class="ln" d="M380 72 V92 H130 V108" marker-end="url(#ah)"/>
+  <path class="ln" d="M380 92 H630 V108" marker-end="url(#ah)"/>
+  <path class="ln" d="M380 92 V108" marker-end="url(#ah)"/>
+  <rect class="box yellow" x="20" y="112" width="220" height="74" rx="10"/>
+  <text class="t-mono t-b" x="32" y="135">system.slice</text>
+  <text class="t-code" x="32" y="156">subtree_control: memory pids</text>
+  <text class="t-xs" x="32" y="175">프로세스 없음 · 나눠 주기만</text>
+  <rect class="box yellow" x="270" y="112" width="220" height="74" rx="10"/>
+  <text class="t-mono t-b" x="282" y="135">user.slice</text>
+  <text class="t-code" x="282" y="156">subtree_control: (비어 있음)</text>
+  <text class="t-xs" x="282" y="175">자식에게 내려 준 것이 없다</text>
+  <rect class="box yellow" x="520" y="112" width="220" height="74" rx="10"/>
+  <text class="t-mono t-b" x="532" y="135">containers</text>
+  <text class="t-code" x="532" y="156">subtree_control: cpu memory</text>
+  <text class="t-xs" x="532" y="175">프로세스 없음 · 나눠 주기만</text>
+  <path class="ln" d="M130 186 V226" marker-end="url(#ah)"/>
+  <path class="ln" d="M630 186 V206 H530 V226" marker-end="url(#ah)"/>
+  <path class="ln" d="M630 206 H690 V226" marker-end="url(#ah)"/>
+  <rect class="box green" x="20" y="230" width="220" height="104" rx="10"/>
+  <text class="t-mono t-b" x="32" y="253">sshd.service</text>
+  <text class="t-code" x="32" y="275">memory.max = max</text>
+  <text class="t-code" x="32" y="295">pids.max = 512</text>
+  <text class="t-xs tc-green" x="32" y="318">프로세스 2개 · 잎</text>
+  <rect class="box green" x="440" y="230" width="150" height="104" rx="10"/>
+  <text class="t-mono t-b" x="452" y="253">web</text>
+  <text class="t-code" x="452" y="275">cpu.max = 50000</text>
+  <text class="t-code" x="452" y="295">memory.max = 512M</text>
+  <text class="t-xs tc-green" x="452" y="318">프로세스 5개 · 잎</text>
+  <rect class="box green" x="600" y="230" width="140" height="104" rx="10"/>
+  <text class="t-mono t-b" x="612" y="253">db</text>
+  <text class="t-code" x="612" y="275">cpu.weight = 300</text>
+  <text class="t-code" x="612" y="295">memory.low = 1G</text>
+  <text class="t-xs tc-green" x="612" y="318">프로세스 1개 · 잎</text>
+  <text class="t-xs" x="258" y="252">web과 db에는 cpu.*와</text>
+  <text class="t-xs" x="258" y="270">memory.* 파일만 있다.</text>
+  <text class="t-xs" x="258" y="288">io와 pids는 부모가</text>
+  <text class="t-xs" x="258" y="306">내려 주지 않았다</text>
+
+  <rect class="box yellow" x="150" y="358" width="26" height="14" rx="3"/>
+  <text class="t-xs" x="184" y="370">자식에게 자원을 나눠 주는 cgroup</text>
+  <rect class="box green" x="420" y="358" width="26" height="14" rx="3"/>
+  <text class="t-xs" x="454" y="370">프로세스를 담는 cgroup</text>
+  <text class="t-xs mid" x="380" y="390">루트가 아닌 cgroup은 둘 중 하나만 한다 (내부 프로세스 금지)</text>
+</svg>

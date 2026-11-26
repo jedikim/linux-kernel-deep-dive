@@ -1,0 +1,1215 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>fork: 한 번 부르고 두 번 돌아온다 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="fork·vfork·clone이 kernel_clone()으로 모이는 길">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="fork: 한 번 부르고 두 번 돌아온다 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="fork·vfork·clone이 kernel_clone()으로 모이는 길">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch01" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html" aria-current="page"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">1부 태스크 › <b>1장 fork: 한 번 부르고 두 번 돌아온다</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-blue">
+<div class="ch-kicker"><span class="ch-no">01</span><span class="part">1부 · 태스크</span></div>
+<h1>fork: 한 번 부르고 두 번 돌아온다</h1>
+<p class="ch-sub">fork·vfork·clone이 kernel_clone()으로 모이는 길</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 55분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/fork.c" target="_blank" rel="noopener">kernel/fork.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kernel/process.c" target="_blank" rel="noopener">arch/x86/kernel/process.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/entry_64.S" target="_blank" rel="noopener">arch/x86/entry/entry_64.S</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c" target="_blank" rel="noopener">kernel/sched/fair.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/mm/memory.c" target="_blank" rel="noopener">mm/memory.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/uapi/linux/sched.h" target="_blank" rel="noopener">include/uapi/linux/sched.h</a></div>
+</header><div class="lead">
+<p>C 함수는 한 번 부르면 한 번 돌아옵니다. <code>fork()</code>는 그렇지 않아 보입니다. 한 번 불렀는데 부모 프로세스에서 한 번, 새로 생긴 자식 프로세스에서 한 번 돌아오고, 반환값도 서로 다릅니다. 커널 안에 두 번 반환하는 함수가 있는 것은 아닙니다. 커널은 부모를 본뜬 태스크를 하나 만들고, 그 태스크가 방금 같은 시스템 콜에서 돌아오는 것처럼 보이도록 스택과 레지스터를 꾸며 둡니다. 이 장은 그 꾸밈이 v7.3 소스의 어느 줄에 있는지, 태스크 하나를 만들 때 무엇을 복사하고 무엇을 공유하는지 따라갑니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li><code>fork()</code>가 부모에게는 자식의 PID를, 자식에게는 0을 돌려주는 일은 코드 어디에서 일어나는가?</li>
+<li><code>fork</code>, <code>vfork</code>, <code>clone</code>, <code>clone3</code>는 커널 안에서 무엇이 같고 무엇이 다른가?</li>
+<li><code>copy_process()</code>는 어떤 순서로 태스크를 조립하고, 중간에 실패하면 어떻게 되돌리는가?</li>
+<li>수 기가바이트를 쓰는 프로세스의 <code>fork()</code>가 금방 끝나는 까닭은 무엇인가?</li>
+<li><code>vfork()</code>를 부른 부모는 무엇을 기다리고, 누가 깨우는가?</li>
+<li>태스크를 끝없이 만들지 못하게 막는 한도는 어디에서 검사하는가?</li>
+</ul>
+</div>
+<section class="level2" id="returns-twice">
+<h2><span class="sec-n">1.1</span>한 번 부르고 두 번 돌아온다<a aria-label="이 절의 링크" class="anchor" href="#returns-twice">#</a></h2>
+<p><code>fork()</code>는 자신을 부른 프로세스를 복제하는 시스템 콜입니다. 복제가 끝나면 프로세스가 둘이 되고, 둘 다 <code>fork()</code> 바로 다음 줄에서 실행을 잇습니다. 둘을 구별하는 것은 반환값뿐입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-file">fork.c</span><span class="code-ver">C</span></div><div class="sourceCode" id="cb1" name="fork.c"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb1-2"><span class="pp">#include </span><span class="im">&lt;sys/wait.h&gt;</span></span>
+<span id="cb1-3"><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
+<span id="cb1-4"></span>
+<span id="cb1-5"><span class="dt">int</span> main<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb1-6"><span class="op">{</span></span>
+<span id="cb1-7">    pid_t pid <span class="op">=</span> fork<span class="op">();</span></span>
+<span id="cb1-8"></span>
+<span id="cb1-9">    <span class="cf">if</span> <span class="op">(</span>pid <span class="op">==</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb1-10">        printf<span class="op">(</span><span class="st">"자식: pid=</span><span class="sc">%d</span><span class="st"> 부모=</span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> getpid<span class="op">(),</span> getppid<span class="op">());</span></span>
+<span id="cb1-11">        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-12">    <span class="op">}</span></span>
+<span id="cb1-13">    printf<span class="op">(</span><span class="st">"부모: pid=</span><span class="sc">%d</span><span class="st"> 자식=</span><span class="sc">%d\n</span><span class="st">"</span><span class="op">,</span> getpid<span class="op">(),</span> pid<span class="op">);</span></span>
+<span id="cb1-14">    wait<span class="op">(</span>NULL<span class="op">);</span></span>
+<span id="cb1-15">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-16"><span class="op">}</span></span></code></pre></div></div>
+<p>부모에서는 <code>pid</code>에 자식의 PID가, 자식에서는 0이 들어 있습니다. 실패하면 자식은 생기지 않고 부모만 -1을 받습니다.</p>
+<figure class="fig" id="fig-fork-timeline"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 276" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>fork() 시간선: 부모가 시스템 콜 한 번으로 커널에 들어가고, 부모와 자식이 각각 한 번씩 유저 모드로 돌아온다. 부모는 자식의 PID를, 자식은 0을 받는다.</title>
+
+  <text class="t-xs mid" x="230" y="22">fork() 호출</text>
+  <path class="ln thin muted dash" d="M230 28 V50"/>
+  <text class="t-xs mid" x="440" y="22">자식을 런큐에 올림</text>
+  <path class="ln thin muted dash" d="M440 28 V50"/>
+
+  <!-- 부모 -->
+  <text class="t-b" x="20" y="68">부모</text>
+  <text class="t-xs" x="20" y="86">PID 100</text>
+  <rect class="box blue" x="110" y="52" width="120" height="36" rx="6"/>
+  <text class="t-s t-ink mid" x="170" y="75">유저 코드</text>
+  <rect class="box yellow" x="230" y="52" width="250" height="36" rx="6"/>
+  <text class="t-code mid" x="355" y="75">kernel_clone() → copy_process()</text>
+  <rect class="box blue" x="480" y="52" width="260" height="36" rx="6"/>
+  <text class="t-s t-ink mid" x="610" y="75">유저 코드 · fork()가 101을 돌려줌</text>
+
+  <!-- 부모에서 자식으로 -->
+  <path class="ln green" d="M440 88 V136" marker-end="url(#ah-green)"/>
+  <text class="t-code" x="450" y="117">wake_up_new_task()</text>
+  <text class="t-xs end" x="430" y="117">부모를 본떠 만든 태스크를</text>
+
+  <!-- 자식 -->
+  <text class="t-b" x="20" y="158">자식</text>
+  <text class="t-xs" x="20" y="176">PID 101</text>
+  <rect class="ghost dash" x="110" y="142" width="330" height="36" rx="6"/>
+  <text class="t-s mid" x="275" y="165">아직 없다</text>
+  <rect class="box gray" x="440" y="142" width="100" height="36" rx="6"/>
+  <text class="t-s t-ink mid" x="490" y="165">런큐에서 대기</text>
+  <rect class="box yellow" x="540" y="142" width="110" height="36" rx="6"/>
+  <text class="t-code mid" x="595" y="165">ret_from_fork</text>
+  <rect class="box green" x="650" y="142" width="90" height="36" rx="6"/>
+  <text class="t-s t-ink mid" x="695" y="165">0을 돌려줌</text>
+
+  <!-- 같은 자리로 돌아온다 -->
+  <rect class="box code" x="110" y="206" width="630" height="54" rx="8"/>
+  <text class="t-mono t-b" x="126" y="229">pid = fork();</text>
+  <text class="t-s tc-blue t-b" x="300" y="229">부모에서는 pid == 101</text>
+  <text class="t-s tc-green t-b" x="520" y="229">자식에서는 pid == 0</text>
+  <text class="t-s" x="126" y="249">두 태스크 모두 syscall 명령어 바로 다음에서 실행을 잇는다. 다른 것은 반환값 레지스터뿐이다.</text>
+</svg></div><figcaption><b>그림 1-1</b>커널에 들어가는 것은 부모 하나입니다. 나오는 것은 둘입니다. 자식은 시스템 콜에 들어간 적이 없지만, 들어갔다 나오는 것처럼 꾸며진 채로 첫 실행을 시작합니다.</figcaption></figure>
+<p>"두 번 돌아온다"를 풀어 보면 세 가지 일입니다.</p>
+<ol type="1">
+<li>부모는 보통의 시스템 콜처럼 커널에 들어갔다가 나옵니다. 반환값은 새 태스크의 PID입니다.</li>
+<li>그 사이에 커널은 부모를 본떠 새 <strong>태스크</strong>(task)를 만듭니다. 태스크는 커널이 스케줄하는 단위이고, 프로세스든 스레드든 커널 안에서는 <code>struct task_struct</code> 하나로 표현됩니다. 구조체의 내용은 <a href="ch02.html">2장</a>에서 봅니다.</li>
+<li>자식은 시스템 콜에 들어간 적이 없습니다. 커널은 자식의 커널 스택에 "시스템 콜을 마치고 유저 모드로 돌아가는 중"인 모습을 만들어 두고, 반환값 자리에 0을 써 둡니다. 스케줄러가 자식을 처음 고르면 자식은 그 모습을 따라 유저 모드로 나갑니다.</li>
+</ol>
+<p>3번이 이 장의 중심입니다. 먼저 태스크가 만들어지는 길부터 따라갑니다.</p>
+</section>
+<section class="level2" id="kernel-clone">
+<h2><span class="sec-n">1.2</span>네 개의 시스템 콜, 하나의 함수<a aria-label="이 절의 링크" class="anchor" href="#kernel-clone">#</a></h2>
+<p>리눅스에는 태스크를 만드는 시스템 콜이 넷 있습니다. <code>fork</code>, <code>vfork</code>, <code>clone</code>, <code>clone3</code>입니다. 넷은 인자를 받는 방식만 다르고, 하는 일은 같습니다. 인자를 <code>struct kernel_clone_args</code>에 채워 <code>kernel_clone()</code>을 부릅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/fork.c#L2862" rel="noopener" target="_blank">kernel/fork.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/fork.c" data-line="2862" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1">SYSCALL_DEFINE0<span class="op">(</span>fork<span class="op">)</span></span>
+<span id="cb2-2"><span class="op">{</span></span>
+<span id="cb2-3"><span class="pp">#ifdef CONFIG_MMU</span></span>
+<span id="cb2-4">    <span class="kw">struct</span> kernel_clone_args args <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb2-5">        <span class="op">.</span>exit_signal <span class="op">=</span> SIGCHLD<span class="op">,</span></span>
+<span id="cb2-6">    <span class="op">};</span></span>
+<span id="cb2-7"></span>
+<span id="cb2-8">    <span class="cf">return</span> kernel_clone<span class="op">(&amp;</span>args<span class="op">);</span></span>
+<span id="cb2-9"><span class="pp">#else</span></span>
+<span id="cb2-10">    <span class="co">/* can not support in nommu mode */</span></span>
+<span id="cb2-11">    <span class="cf">return</span> <span class="op">-</span>EINVAL<span class="op">;</span></span>
+<span id="cb2-12"><span class="pp">#endif</span></span>
+<span id="cb2-13"><span class="op">}</span></span>
+<span id="cb2-14"><span class="co">/* ... */</span></span>
+<span id="cb2-15">SYSCALL_DEFINE0<span class="op">(</span>vfork<span class="op">)</span></span>
+<span id="cb2-16"><span class="op">{</span></span>
+<span id="cb2-17">    <span class="kw">struct</span> kernel_clone_args args <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb2-18">        <span class="op">.</span>flags      <span class="op">=</span> CLONE_VFORK <span class="op">|</span> CLONE_VM<span class="op">,</span></span>
+<span id="cb2-19">        <span class="op">.</span>exit_signal    <span class="op">=</span> SIGCHLD<span class="op">,</span></span>
+<span id="cb2-20">    <span class="op">};</span></span>
+<span id="cb2-21"></span>
+<span id="cb2-22">    <span class="cf">return</span> kernel_clone<span class="op">(&amp;</span>args<span class="op">);</span></span>
+<span id="cb2-23"><span class="op">}</span></span></code></pre></div></div>
+<p><code>fork</code>는 플래그가 하나도 없습니다. 아무것도 공유하지 않고 전부 복사하라는 뜻입니다. 정한 것은 <code>exit_signal</code> 하나로, 자식이 끝나면 부모에게 <code>SIGCHLD</code>를 보내라는 뜻입니다. <code>vfork</code>는 여기에 플래그 둘을 더합니다. <code>CLONE_VM</code>은 주소 공간을 복사하지 말고 같이 쓰라는 뜻이고, <code>CLONE_VFORK</code>는 자식이 그 주소 공간에서 손을 뗄 때까지 부모를 재우라는 뜻입니다.</p>
+<figure class="fig" id="fig-clone-family"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 412" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>fork, vfork, clone, clone3 시스템 콜과 커널 내부의 kernel_thread, user_mode_thread가 모두 kernel_clone_args를 채워 kernel_clone()으로 모인다. kernel_clone()은 copy_process(), wake_up_new_task()를 차례로 부른다.</title>
+
+  <!-- 왼쪽: 유저가 부르는 시스템 콜 -->
+  <text class="t-s t-ink t-b" x="20" y="20">유저 공간이 부르는 시스템 콜</text>
+
+  <rect class="box blue" x="20" y="30" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="50">fork()</text>
+  <text class="t-code" x="32" y="68">exit_signal = SIGCHLD</text>
+
+  <rect class="box blue" x="20" y="84" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="104">vfork()</text>
+  <text class="t-code" x="32" y="122">flags = CLONE_VFORK | CLONE_VM</text>
+
+  <rect class="box blue" x="20" y="138" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="158">clone(flags, …)</text>
+  <text class="t-xs" x="32" y="176">레지스터로 받은 인자 다섯 개를 옮김</text>
+
+  <rect class="box blue" x="20" y="192" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="212">clone3(&amp;args, size)</text>
+  <text class="t-xs" x="32" y="230">유저 메모리의 구조체를 복사해 옴</text>
+
+  <!-- 왼쪽: 커널 내부 -->
+  <text class="t-s t-ink t-b" x="20" y="266">커널 안에서 부르는 함수</text>
+
+  <rect class="box yellow" x="20" y="276" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="296">kernel_thread()</text>
+  <text class="t-code" x="32" y="314">kthread = 1, CLONE_VM을 더함</text>
+
+  <rect class="box yellow" x="20" y="330" width="250" height="46" rx="8"/>
+  <text class="t-mono t-b" x="32" y="350">user_mode_thread()</text>
+  <text class="t-code" x="32" y="368">umh = 1, CLONE_VM을 더함</text>
+
+  <!-- 모으는 선 -->
+  <path class="ln thin" d="M270 53 H296"/>
+  <path class="ln thin" d="M270 107 H296"/>
+  <path class="ln thin" d="M270 161 H296"/>
+  <path class="ln thin" d="M270 215 H296"/>
+  <path class="ln thin" d="M270 299 H296"/>
+  <path class="ln thin" d="M270 353 H296"/>
+  <path class="ln thin" d="M296 53 V353"/>
+  <path class="ln" d="M296 203 H434" marker-end="url(#ah)"/>
+  <text class="t-code mid" x="366" y="194">kernel_clone_args</text>
+  <text class="t-xs mid" x="366" y="222">구조체 하나에 담아</text>
+
+  <!-- 오른쪽: kernel_clone() -->
+  <rect class="panel yellow" x="440" y="30" width="300" height="346" rx="12"/>
+  <text class="t-mono t-b" x="456" y="54">kernel_clone()</text>
+
+  <rect class="box" x="456" y="66" width="268" height="58" rx="8"/>
+  <text class="t-mono t-b" x="470" y="89">copy_process()</text>
+  <text class="t-xs" x="470" y="110">부모를 본떠 태스크를 만든다. 아직 깨우지 않는다</text>
+  <path class="ln" d="M590 124 V138" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="456" y="142" width="268" height="58" rx="8"/>
+  <text class="t-mono t-b" x="470" y="165">wake_up_new_task()</text>
+  <text class="t-xs" x="470" y="186">상태를 TASK_RUNNING으로, 런큐에 올린다</text>
+  <path class="ln" d="M590 200 V214" marker-end="url(#ah)"/>
+
+  <rect class="ghost dash" x="456" y="218" width="268" height="58" rx="8"/>
+  <text class="t-mono t-b" x="470" y="241">wait_for_vfork_done()</text>
+  <text class="t-xs" x="470" y="262">CLONE_VFORK일 때만. 부모가 잠든다</text>
+  <path class="ln" d="M590 276 V290" marker-end="url(#ah)"/>
+
+  <rect class="box blue" x="456" y="294" width="268" height="66" rx="8"/>
+  <text class="t-b" x="470" y="318">부모에게 자식의 PID를 돌려준다</text>
+  <text class="t-code" x="470" y="340">return nr;  /* pid_vnr(pid) */</text>
+
+  <text class="t-s mid" x="380" y="398">io_uring 워커를 만드는 create_io_thread()와 fork_idle()은 copy_process()를 직접 부른다</text>
+</svg></div><figcaption><b>그림 1-2</b>태스크를 만드는 길은 모두 <code>kernel_clone()</code>으로 모입니다. 커널 스레드도 같은 길을 씁니다. 차이는 <code>kernel_clone_args</code>에 무엇을 적어 넘기느냐뿐입니다.</figcaption></figure>
+<p><code>clone</code>은 플래그를 호출하는 쪽이 정합니다. 32비트 플래그 인자의 아래 8비트(<code>CSIGNAL</code>)는 <code>exit_signal</code>로, 나머지는 <code>flags</code>로 갈라 담습니다. <code>clone3</code>는 인자를 레지스터가 아니라 구조체로 받습니다. 뒤의 <a href="#clone3">clone3 절</a>에서 다룹니다.</p>
+<p>그림 아래쪽의 <code>kernel_thread()</code>는 커널이 자기 일을 시킬 스레드를 만들 때 씁니다. 유저 프로세스와 커널 스레드가 같은 함수로 만들어집니다(<a href="ch02.html">2장</a>).</p>
+<div class="callout note"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-book"></use></svg>참고 · C 라이브러리의 fork()는 fork 시스템 콜을 부르지 않는다</div>
+<p>glibc의 <code>fork()</code> 함수는 <code>clone</code>을 부릅니다. 넘기는 플래그는 <code>CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID | SIGCHLD</code>입니다. 자식의 스레드 ID를 자식 쪽 메모리에 적어 두려는 플래그 둘이 더해졌을 뿐, 공유하는 자원이 없다는 점은 <code>fork</code>와 같습니다. arm64 같은 아키텍처의 64비트 시스템 콜 표(<code>scripts/syscall.tbl</code>)에는 <code>fork</code>와 <code>vfork</code>가 아예 없고 <code>clone</code>과 <code>clone3</code>만 있습니다.</p>
+</div>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>프로그램이 실제로 어떤 시스템 콜로 태스크를 만드는지는 <code>strace</code>로 봅니다. <code>-f</code>는 새로 생긴 자식까지 따라가라는 옵션입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ strace -f -e trace=fork,vfork,clone,clone3 ./fork
+clone(child_stack=NULL, flags=CLONE_CHILD_CLEARTID|CLONE_CHILD_SETTID|SIGCHLD, child_tidptr=0x7f...) = 41172
+...</code></pre></div>
+<p><code>flags</code>에 <code>CLONE_VM</code>이 없으니 주소 공간을 따로 갖는 프로세스가 생긴 것입니다. 같은 명령을 스레드를 만드는 프로그램에 걸면 <code>CLONE_VM|CLONE_FS|CLONE_FILES|CLONE_SIGHAND|CLONE_THREAD|...</code>가 붙은 <code>clone3</code>가 보입니다.</p>
+</div>
+<p><code>kernel_clone()</code>의 뼈대는 이렇습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/fork.c#L2727" rel="noopener" target="_blank">kernel/fork.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/fork.c" data-line="2727" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1">pid_t kernel_clone<span class="op">(</span><span class="kw">struct</span> kernel_clone_args <span class="op">*</span>args<span class="op">)</span></span>
+<span id="cb4-2"><span class="op">{</span></span>
+<span id="cb4-3">    u64 clone_flags <span class="op">=</span> args<span class="op">-&gt;</span>flags<span class="op">;</span></span>
+<span id="cb4-4">    <span class="kw">struct</span> completion vfork<span class="op">;</span></span>
+<span id="cb4-5">    <span class="co">/* ... */</span></span>
+<span id="cb4-6">    p <span class="op">=</span> copy_process<span class="op">(</span>NULL<span class="op">,</span> trace<span class="op">,</span> NUMA_NO_NODE<span class="op">,</span> args<span class="op">);</span></span>
+<span id="cb4-7">    add_latent_entropy<span class="op">();</span></span>
+<span id="cb4-8"></span>
+<span id="cb4-9">    <span class="cf">if</span> <span class="op">(</span>IS_ERR<span class="op">(</span>p<span class="op">))</span></span>
+<span id="cb4-10">        <span class="cf">return</span> PTR_ERR<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb4-11"></span>
+<span id="cb4-12">    <span class="co">/* ... */</span></span>
+<span id="cb4-13">    pid <span class="op">=</span> get_task_pid<span class="op">(</span>p<span class="op">,</span> PIDTYPE_PID<span class="op">);</span></span>
+<span id="cb4-14">    nr <span class="op">=</span> pid_vnr<span class="op">(</span>pid<span class="op">);</span></span>
+<span id="cb4-15">    <span class="co">/* ... */</span></span>
+<span id="cb4-16">    <span class="cf">if</span> <span class="op">(</span>clone_flags <span class="op">&amp;</span> CLONE_VFORK<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-17">        p<span class="op">-&gt;</span>vfork_done <span class="op">=</span> <span class="op">&amp;</span>vfork<span class="op">;</span></span>
+<span id="cb4-18">        init_completion<span class="op">(&amp;</span>vfork<span class="op">);</span></span>
+<span id="cb4-19">        get_task_struct<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb4-20">    <span class="op">}</span></span>
+<span id="cb4-21"></span>
+<span id="cb4-22">    <span class="co">/* ... */</span></span>
+<span id="cb4-23">    wake_up_new_task<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb4-24"></span>
+<span id="cb4-25">    <span class="co">/* ... */</span></span>
+<span id="cb4-26">    <span class="cf">if</span> <span class="op">(</span>clone_flags <span class="op">&amp;</span> CLONE_VFORK<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb4-27">        <span class="cf">if</span> <span class="op">(!</span>wait_for_vfork_done<span class="op">(</span>p<span class="op">,</span> <span class="op">&amp;</span>vfork<span class="op">))</span></span>
+<span id="cb4-28">            ptrace_event_pid<span class="op">(</span>PTRACE_EVENT_VFORK_DONE<span class="op">,</span> pid<span class="op">);</span></span>
+<span id="cb4-29">    <span class="op">}</span></span>
+<span id="cb4-30"></span>
+<span id="cb4-31">    put_pid<span class="op">(</span>pid<span class="op">);</span></span>
+<span id="cb4-32">    <span class="cf">return</span> nr<span class="op">;</span></span>
+<span id="cb4-33"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li>일은 둘로 나뉩니다. <code>copy_process()</code>가 태스크를 <strong>만들고</strong>, <code>wake_up_new_task()</code>가 <strong>깨웁니다</strong>. 만드는 동안 새 태스크는 실행될 수 없는 상태로 남아 있습니다.</li>
+<li>마지막 줄의 <code>return nr</code>이 부모가 받는 반환값입니다. <code>pid_vnr()</code>은 부모가 속한 PID 네임스페이스에서 본 번호를 돌려줍니다(<a href="ch22.html">22장</a>).</li>
+<li>자식이 받을 0은 이 함수에 없습니다. 자식은 이 함수에서 돌아오지 않기 때문입니다.</li>
+</ul>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>많은 책과 블로그가 이 함수를 <code>do_fork()</code>라고 부릅니다. 이 이름은 <code>_do_fork()</code>를 거쳐 v5.10에서 <code>kernel_clone()</code>으로 바뀌었습니다. 인자도 달라졌습니다. 예전에는 <code>clone_flags</code>, <code>stack_start</code>, <code>stack_size</code>, <code>parent_tidptr</code> 같은 값을 하나씩 넘겼지만, 지금은 <code>struct kernel_clone_args</code> 포인터 하나만 넘깁니다.</p>
+</div>
+</section>
+<section class="level2" id="copy-process">
+<h2><span class="sec-n">1.3</span>copy_process(): 태스크를 조립하는 순서<a aria-label="이 절의 링크" class="anchor" href="#copy-process">#</a></h2>
+<p><code>copy_process()</code>는 600줄이 넘는 함수지만 하는 일은 한 문장입니다. 부모의 <code>task_struct</code>를 통째로 복사한 다음, 그대로 두면 안 되는 부분을 하나씩 고칩니다.</p>
+<figure class="fig" id="fig-copy-process-stages"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 566" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>copy_process()의 단계: 플래그 검사, dup_task_struct, 자격 증명과 한도 검사, sched_fork, 플래그에 따라 공유하거나 복사하는 자원들, 네임스페이스, copy_thread, PID 할당, cgroup 확인, 마지막으로 tasklist_lock을 쥐고 태스크 목록에 연결한다. 실패하면 역순으로 되돌린다.</title>
+
+  <!-- 되돌리기 화살표 -->
+  <path class="ln thin red dash" d="M28 470 V28" marker-end="url(#ah-red)"/>
+
+  <!-- 1 -->
+  <rect class="box" x="48" y="16" width="232" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="60" y="38">플래그 조합 검사</text>
+  <text class="t-s" x="294" y="38">CLONE_THREAD는 CLONE_SIGHAND를, 그것은 CLONE_VM을 요구</text>
+
+  <!-- 2 -->
+  <rect class="box yellow" x="48" y="58" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="80">dup_task_struct()</text>
+  <text class="t-s" x="294" y="80">task_struct와 커널 스택을 새로 할당하고 부모 것을 통째로 복사</text>
+
+  <!-- 3 -->
+  <rect class="box yellow" x="48" y="100" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="122">copy_creds() · 한도 검사</text>
+  <text class="t-s" x="294" y="122">자격 증명. RLIMIT_NPROC나 max_threads를 넘으면 -EAGAIN</text>
+
+  <!-- 4 -->
+  <rect class="box yellow" x="48" y="142" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="164">sched_fork()</text>
+  <text class="t-s" x="294" y="164">상태를 TASK_NEW로. 스케줄링 클래스와 우선순위를 정한다</text>
+
+  <!-- 5: 자원 -->
+  <rect class="panel purple" x="48" y="184" width="692" height="118" rx="12"/>
+  <text class="t-s t-ink t-b" x="62" y="207">자원 묶음: 플래그가 서 있으면 참조 카운트만 올려 공유하고, 없으면 새로 복사한다</text>
+
+  <rect class="box" x="62" y="218" width="216" height="32" rx="6"/>
+  <text class="t-code" x="74" y="239">copy_files</text>
+  <text class="t-code tc-purple end" x="268" y="239">CLONE_FILES</text>
+  <rect class="box" x="286" y="218" width="216" height="32" rx="6"/>
+  <text class="t-code" x="298" y="239">copy_fs</text>
+  <text class="t-code tc-purple end" x="492" y="239">CLONE_FS</text>
+  <rect class="box" x="510" y="218" width="216" height="32" rx="6"/>
+  <text class="t-code" x="522" y="239">copy_sighand</text>
+  <text class="t-code tc-purple end" x="716" y="239">CLONE_SIGHAND</text>
+
+  <rect class="box" x="62" y="258" width="216" height="32" rx="6"/>
+  <text class="t-code" x="74" y="279">copy_signal</text>
+  <text class="t-code tc-purple end" x="268" y="279">CLONE_THREAD</text>
+  <rect class="box" x="286" y="258" width="216" height="32" rx="6"/>
+  <text class="t-code" x="298" y="279">copy_mm</text>
+  <text class="t-code tc-purple end" x="492" y="279">CLONE_VM</text>
+  <rect class="box" x="510" y="258" width="216" height="32" rx="6"/>
+  <text class="t-code" x="522" y="279">copy_io</text>
+  <text class="t-code tc-purple end" x="716" y="279">CLONE_IO</text>
+
+  <!-- 6 -->
+  <rect class="box yellow" x="48" y="310" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="332">copy_namespaces()</text>
+  <text class="t-s" x="294" y="332">뜻이 반대다. CLONE_NEW*가 서 있으면 새 네임스페이스를 만든다</text>
+
+  <!-- 7 -->
+  <rect class="box yellow" x="48" y="352" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="374">copy_thread()</text>
+  <text class="t-s" x="294" y="374">자식의 pt_regs와 첫 실행 주소를 꾸민다. 아키텍처별 코드</text>
+
+  <!-- 8 -->
+  <rect class="box yellow" x="48" y="394" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="416">alloc_pid()</text>
+  <text class="t-s" x="294" y="416">PID를 받는다. CLONE_PIDFD면 pidfd도 여기서 준비한다</text>
+
+  <!-- 9 -->
+  <rect class="box yellow" x="48" y="436" width="232" height="34" rx="8"/>
+  <text class="t-code" x="60" y="458">cgroup_can_fork()</text>
+  <text class="t-s" x="294" y="458">cgroup 한도 확인. pids 컨트롤러가 여기서 거절할 수 있다</text>
+
+  <!-- 10 -->
+  <rect class="box green" x="48" y="478" width="232" height="34" rx="8"/>
+  <text class="t-s t-ink t-b" x="60" y="500">tasklist_lock을 쥔 구간</text>
+  <text class="t-s" x="294" y="500">부모의 children 리스트와 PID 해시에 연결. 이제 남에게 보인다</text>
+
+  <text class="t-s tc-red" x="20" y="540">↑ 어디서든 실패하면 goto로 내려가 그때까지 한 일을 역순으로 되돌린다</text>
+  <text class="t-s tc-green end" x="740" y="540">연결을 시작하면 더는 실패하지 않는다</text>
+</svg></div><figcaption><b>그림 1-3</b><code>copy_process()</code>의 큰 단계. 보라색 묶음은 플래그에 따라 공유하거나 복사하는 자원입니다. 새 태스크는 맨 마지막 단계에 가서야 다른 태스크의 눈에 보입니다.</figcaption></figure>
+<p><strong>플래그 검사.</strong> 함수는 말이 안 되는 플래그 조합부터 거릅니다. <code>CLONE_THREAD</code>(같은 스레드 그룹에 넣기)는 <code>CLONE_SIGHAND</code>(시그널 핸들러 공유)를 요구하고, <code>CLONE_SIGHAND</code>는 <code>CLONE_VM</code>을 요구합니다. 주소 공간이 다른데 핸들러 표를 같이 쓰면 핸들러 주소가 한쪽에서는 엉뚱한 곳을 가리키기 때문입니다.</p>
+<p><strong><code>dup_task_struct()</code>.</strong> <code>task_struct</code>와 커널 스택을 새로 할당하고 부모의 <code>task_struct</code>를 그대로 복사합니다. 이 시점의 자식은 포인터까지 부모와 똑같은 복사본입니다. <code>mm</code>, <code>files</code>, <code>fs</code> 같은 포인터가 부모의 구조체를 그대로 가리킵니다.</p>
+<p><strong>자격 증명과 한도.</strong> <code>copy_creds()</code>가 자격 증명을 마련하고, 태스크 수 한도를 넘는지 봅니다. <a href="#limits">한도 절</a>에서 다시 봅니다.</p>
+<p><strong><code>sched_fork()</code>.</strong> 자식의 상태를 <code>TASK_NEW</code>로 둡니다. 이 상태의 태스크는 런큐에 오를 수 없고 시그널로도 깨울 수 없습니다. 조립이 끝나기 전에 누가 실행해 버리는 일을 막는 장치입니다. 우선순위와 스케줄링 클래스도 여기서 정해집니다(<a href="ch04.html">4장</a>).</p>
+<p><strong>자원.</strong> 이제 부모를 가리키고 있는 포인터들을 하나씩 처리합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/fork.c#L2304" rel="noopener" target="_blank">kernel/fork.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/fork.c" data-line="2304" id="cb5"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb5-1">    retval <span class="op">=</span> copy_semundo<span class="op">(</span>clone_flags<span class="op">,</span> p<span class="op">);</span></span>
+<span id="cb5-2">    <span class="cf">if</span> <span class="op">(</span>retval<span class="op">)</span></span>
+<span id="cb5-3">        <span class="cf">goto</span> bad_fork_cleanup_security<span class="op">;</span></span>
+<span id="cb5-4">    retval <span class="op">=</span> copy_files<span class="op">(</span>clone_flags<span class="op">,</span> p<span class="op">,</span> args<span class="op">-&gt;</span>no_files<span class="op">);</span></span>
+<span id="cb5-5">    <span class="cf">if</span> <span class="op">(</span>retval<span class="op">)</span></span>
+<span id="cb5-6">        <span class="cf">goto</span> bad_fork_cleanup_semundo<span class="op">;</span></span>
+<span id="cb5-7">    retval <span class="op">=</span> copy_fs<span class="op">(</span>clone_flags<span class="op">,</span> p<span class="op">,</span></span>
+<span id="cb5-8">             <span class="op">(</span>args<span class="op">-&gt;</span>umh <span class="op">?</span> COPY_FS_UMH <span class="op">:</span> <span class="dv">0</span><span class="op">)</span> <span class="op">|</span></span>
+<span id="cb5-9">             <span class="op">(</span>args<span class="op">-&gt;</span>idle <span class="op">?</span> COPY_FS_IDLE <span class="op">:</span> <span class="dv">0</span><span class="op">));</span></span>
+<span id="cb5-10">    <span class="cf">if</span> <span class="op">(</span>retval<span class="op">)</span></span>
+<span id="cb5-11">        <span class="cf">goto</span> bad_fork_cleanup_files<span class="op">;</span></span>
+<span id="cb5-12">    retval <span class="op">=</span> copy_sighand<span class="op">(</span>clone_flags<span class="op">,</span> p<span class="op">);</span></span>
+<span id="cb5-13">    <span class="cf">if</span> <span class="op">(</span>retval<span class="op">)</span></span>
+<span id="cb5-14">        <span class="cf">goto</span> bad_fork_cleanup_fs<span class="op">;</span></span>
+<span id="cb5-15">    retval <span class="op">=</span> copy_signal<span class="op">(</span>clone_flags<span class="op">,</span> p<span class="op">);</span></span>
+<span id="cb5-16">    <span class="cf">if</span> <span class="op">(</span>retval<span class="op">)</span></span>
+<span id="cb5-17">        <span class="cf">goto</span> bad_fork_cleanup_sighand<span class="op">;</span></span>
+<span id="cb5-18">    retval <span class="op">=</span> copy_mm<span class="op">(</span>clone_flags<span class="op">,</span> p<span class="op">);</span></span>
+<span id="cb5-19">    <span class="cf">if</span> <span class="op">(</span>retval<span class="op">)</span></span>
+<span id="cb5-20">        <span class="cf">goto</span> bad_fork_cleanup_signal<span class="op">;</span></span>
+<span id="cb5-21">    retval <span class="op">=</span> copy_namespaces<span class="op">(</span>clone_flags<span class="op">,</span> p<span class="op">);</span></span>
+<span id="cb5-22">    <span class="cf">if</span> <span class="op">(</span>retval<span class="op">)</span></span>
+<span id="cb5-23">        <span class="cf">goto</span> bad_fork_cleanup_mm<span class="op">;</span></span>
+<span id="cb5-24">    retval <span class="op">=</span> copy_io<span class="op">(</span>clone_flags<span class="op">,</span> p<span class="op">);</span></span>
+<span id="cb5-25">    <span class="cf">if</span> <span class="op">(</span>retval<span class="op">)</span></span>
+<span id="cb5-26">        <span class="cf">goto</span> bad_fork_cleanup_namespaces<span class="op">;</span></span>
+<span id="cb5-27">    retval <span class="op">=</span> copy_thread<span class="op">(</span>p<span class="op">,</span> args<span class="op">);</span></span>
+<span id="cb5-28">    <span class="cf">if</span> <span class="op">(</span>retval<span class="op">)</span></span>
+<span id="cb5-29">        <span class="cf">goto</span> bad_fork_cleanup_io<span class="op">;</span></span></code></pre></div></div>
+<p><code>copy_*()</code> 함수들은 생김새가 같습니다. 해당 플래그가 서 있으면 부모 구조체의 참조 카운트만 올리고 끝냅니다. 없으면 새 구조체를 할당해 내용을 복사하고 자식의 포인터를 그쪽으로 돌립니다. 예를 들어 <code>copy_files()</code>는 <code>CLONE_FILES</code>가 있으면 <code>atomic_inc(&amp;oldf-&gt;count)</code> 한 줄이고, 없으면 <code>dup_fd()</code>로 파일 디스크립터 표를 복제합니다. 프로세스와 스레드의 차이는 이 함수들이 어느 가지를 타느냐로 정해집니다. 플래그와 구조체의 대응은 <a href="ch02.html">2장</a>에 표로 정리했습니다.</p>
+<p><code>copy_namespaces()</code>만은 방향이 반대입니다. 기본이 공유이고, <code>CLONE_NEWPID</code> 같은 <code>CLONE_NEW*</code> 플래그가 있을 때 새로 만듭니다.</p>
+<p><strong><code>copy_thread()</code>.</strong> 자식이 처음 실행될 때 쓸 레지스터와 스택을 꾸밉니다. 아키텍처마다 따로 구현합니다. <a href="#first-run">다음 절</a>의 주제입니다.</p>
+<p><strong>PID.</strong> <code>alloc_pid()</code>가 번호를 받습니다. <code>CLONE_PIDFD</code>가 있으면 그 PID를 가리키는 파일 디스크립터도 여기서 준비합니다.</p>
+<p><strong>cgroup.</strong> <code>cgroup_can_fork()</code>가 cgroup 한도를 확인합니다. 이어 <code>sched_cgroup_fork()</code>가 자식을 지금 CPU의 런큐에 일단 배정합니다.</p>
+<p><strong>연결.</strong> 여기까지 온 자식은 완성되었지만 아직 어디에도 연결되어 있지 않습니다. PID로 찾을 수도 없고 부모의 자식 목록에도 없습니다. 마지막 단계에서 <code>tasklist_lock</code>을 쓰기로 잡고 한꺼번에 연결합니다. 부모의 <code>children</code> 리스트와 전체 태스크 리스트에 넣고, <code>attach_pid()</code>로 PID에서 태스크를 찾을 수 있게 합니다. 락을 쥔 뒤 마지막 확인 두 가지(PID 네임스페이스가 닫히는 중인지, 부모에게 치명적 시그널이 와 있는지)를 통과하면 소스에 <code>/* No more failure paths after this point. */</code>라는 주석이 나옵니다. 그 아래에는 실패로 끝나는 길이 없습니다. 남에게 보이기 시작한 태스크를 거둬들이기는 훨씬 어렵기 때문에, 실패할 수 있는 일을 모두 앞에 몰아 둔 것입니다.</p>
+<div class="callout key"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-bolt"></use></svg>핵심</div>
+<p><code>copy_process()</code>의 순서는 <strong>실패할 수 있는 일을 먼저, 남에게 보이는 일을 맨 나중에</strong>입니다. 태스크는 완성된 뒤에야 시스템에 나타나고, 나타난 뒤에는 생성이 취소되지 않습니다.</p>
+</div>
+<section class="level3" id="실패하면-거꾸로-되돌린다">
+<h3>실패하면 거꾸로 되돌린다</h3>
+<p>위 인용에서 <code>goto</code>의 목적지를 보면 규칙이 있습니다. 어떤 단계가 실패하면 <strong>바로 앞 단계의 정리 라벨</strong>로 갑니다. 라벨들은 함수 끝에 조립의 역순으로 늘어서 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/fork.c#L2613" rel="noopener" target="_blank">kernel/fork.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/fork.c" data-line="2613" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1">bad_fork_cleanup_namespaces<span class="op">:</span></span>
+<span id="cb6-2">    exit_nsproxy_namespaces<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb6-3">bad_fork_cleanup_mm<span class="op">:</span></span>
+<span id="cb6-4">    sched_cache_fork_cleanup<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb6-5">    <span class="cf">if</span> <span class="op">(</span>p<span class="op">-&gt;</span>mm<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb6-6">        mm_clear_owner<span class="op">(</span>p<span class="op">-&gt;</span>mm<span class="op">,</span> p<span class="op">);</span></span>
+<span id="cb6-7">        mmput<span class="op">(</span>p<span class="op">-&gt;</span>mm<span class="op">);</span></span>
+<span id="cb6-8">    <span class="op">}</span></span>
+<span id="cb6-9">bad_fork_cleanup_signal<span class="op">:</span></span>
+<span id="cb6-10">    <span class="cf">if</span> <span class="op">(!(</span>clone_flags <span class="op">&amp;</span> CLONE_THREAD<span class="op">))</span></span>
+<span id="cb6-11">        free_signal_struct<span class="op">(</span>p<span class="op">-&gt;</span>signal<span class="op">);</span></span>
+<span id="cb6-12">bad_fork_cleanup_sighand<span class="op">:</span></span>
+<span id="cb6-13">    __cleanup_sighand<span class="op">(</span>p<span class="op">-&gt;</span>sighand<span class="op">);</span></span>
+<span id="cb6-14">bad_fork_cleanup_fs<span class="op">:</span></span>
+<span id="cb6-15">    exit_fs<span class="op">(</span>p<span class="op">);</span> <span class="co">/* blocking */</span></span>
+<span id="cb6-16">bad_fork_cleanup_files<span class="op">:</span></span>
+<span id="cb6-17">    exit_files<span class="op">(</span>p<span class="op">);</span> <span class="co">/* blocking */</span></span>
+<span id="cb6-18">bad_fork_cleanup_semundo<span class="op">:</span></span>
+<span id="cb6-19">    exit_sem<span class="op">(</span>p<span class="op">);</span></span></code></pre></div></div>
+<p><code>copy_mm()</code>이 실패하면 <code>bad_fork_cleanup_signal</code>로 뛰고, 거기서부터 아래로 흘러내리며 시그널, 핸들러 표, 파일시스템 정보, 파일 표를 차례로 풉니다. <code>mm</code>은 만들지 못했으니 풀지 않습니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>자원을 여러 개 차례로 얻는 함수에서 중간 실패를 다루는 방법으로, 커널은 <code>goto</code>와 역순 라벨을 표준처럼 씁니다. 얻는 순서와 푸는 순서가 거울처럼 마주 보기 때문에, 새 단계를 끼워 넣을 때 고칠 곳이 분명합니다. C에는 예외도 소멸자도 없으므로 이 규율이 없으면 실패 경로마다 정리 코드를 복사해 넣게 되고, 하나를 빠뜨리는 순간 누수가 생깁니다. 라벨 이름은 "어디서 실패했나"가 아니라 "무엇을 정리하나"(<code>bad_fork_cleanup_mm</code>)로 짓습니다. 커널은 여기에 범위 기반 정리(<code>guard()</code>, <code>__free()</code>)를 더해 가고 있습니다. 두 방식의 비교는 <a href="ch25.html">25장</a>에 있습니다.</p>
+</div>
+</section>
+</section>
+<section class="level2" id="first-run">
+<h2><span class="sec-n">1.4</span>자식의 첫 실행<a aria-label="이 절의 링크" class="anchor" href="#first-run">#</a></h2>
+<p><code>fork()</code>가 자식에게 0을 돌려주는 코드는 <code>copy_thread()</code>에 있습니다. x86-64의 구현에서 관련된 줄만 추리면 이렇습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kernel/process.c#L170" rel="noopener" target="_blank">arch/x86/kernel/process.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/kernel/process.c" data-line="170" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="dt">int</span> copy_thread<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="dt">const</span> <span class="kw">struct</span> kernel_clone_args <span class="op">*</span>args<span class="op">)</span></span>
+<span id="cb7-2"><span class="op">{</span></span>
+<span id="cb7-3">    u64 clone_flags <span class="op">=</span> args<span class="op">-&gt;</span>flags<span class="op">;</span></span>
+<span id="cb7-4">    <span class="dt">unsigned</span> <span class="dt">long</span> sp <span class="op">=</span> args<span class="op">-&gt;</span>stack<span class="op">;</span></span>
+<span id="cb7-5">    <span class="co">/* ... */</span></span>
+<span id="cb7-6">    childregs <span class="op">=</span> task_pt_regs<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb7-7">    fork_frame <span class="op">=</span> container_of<span class="op">(</span>childregs<span class="op">,</span> <span class="kw">struct</span> fork_frame<span class="op">,</span> regs<span class="op">);</span></span>
+<span id="cb7-8">    frame <span class="op">=</span> <span class="op">&amp;</span>fork_frame<span class="op">-&gt;</span>frame<span class="op">;</span></span>
+<span id="cb7-9"></span>
+<span id="cb7-10">    frame<span class="op">-&gt;</span>bp <span class="op">=</span> encode_frame_pointer<span class="op">(</span>childregs<span class="op">);</span></span>
+<span id="cb7-11">    frame<span class="op">-&gt;</span>ret_addr <span class="op">=</span> <span class="op">(</span><span class="dt">unsigned</span> <span class="dt">long</span><span class="op">)</span> ret_from_fork_asm<span class="op">;</span></span>
+<span id="cb7-12">    p<span class="op">-&gt;</span>thread<span class="op">.</span>sp <span class="op">=</span> <span class="op">(</span><span class="dt">unsigned</span> <span class="dt">long</span><span class="op">)</span> fork_frame<span class="op">;</span></span>
+<span id="cb7-13">    <span class="co">/* ... */</span></span>
+<span id="cb7-14">    frame<span class="op">-&gt;</span>bx <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb7-15">    <span class="op">*</span>childregs <span class="op">=</span> <span class="op">*</span>current_pt_regs<span class="op">();</span></span>
+<span id="cb7-16">    childregs<span class="op">-&gt;</span>ax <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb7-17">    <span class="cf">if</span> <span class="op">(</span>sp<span class="op">)</span></span>
+<span id="cb7-18">        childregs<span class="op">-&gt;</span>sp <span class="op">=</span> sp<span class="op">;</span></span>
+<span id="cb7-19">    <span class="co">/* ... */</span></span>
+<span id="cb7-20"><span class="op">}</span></span></code></pre></div></div>
+<p>이 코드를 읽으려면 구조체 두 개를 알아야 합니다.</p>
+<p><code>struct pt_regs</code>는 유저 모드에서 커널로 들어올 때 유저 쪽 레지스터를 저장해 두는 틀입니다. 커널 스택의 맨 꼭대기에 놓입니다. 유저 모드로 나갈 때 커널은 이 틀에 담긴 값을 CPU 레지스터에 도로 싣습니다. 시스템 콜의 반환값도 이 틀의 <code>ax</code> 칸에 적어 두었다가 그때 함께 실립니다(<a href="ch19.html">19장</a>).</p>
+<p><code>struct inactive_task_frame</code>은 실행 중이 아닌 태스크의 스택 포인터가 가리키는 자리에 놓이는 틀입니다. 컨텍스트 스위치는 떠나는 태스크의 레지스터 몇 개를 스택에 밀어 넣고 스택 포인터를 <code>thread.sp</code>에 저장한 다음, 들어오는 태스크의 <code>thread.sp</code>를 스택 포인터로 삼아 그 레지스터들을 도로 꺼냅니다. 맨 마지막에 꺼내는 것이 <code>ret_addr</code>, 곧 "어디로 돌아가 실행을 이을 것인가"입니다(<a href="ch04.html">4장</a>).</p>
+<figure class="fig" id="fig-child-stack"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>copy_thread()가 꾸민 자식의 커널 스택(x86-64): 맨 위에 ax를 0으로 고친 pt_regs, 그 아래에 ret_addr가 ret_from_fork_asm인 inactive_task_frame이 놓인다. 자식은 처음 스케줄될 때 이 틀을 따라 ret_from_fork_asm, ret_from_fork를 거쳐 유저 모드로 나간다.</title>
+
+  <!-- 왼쪽: 스택 -->
+  <text class="t-b" x="20" y="24">자식의 커널 스택</text>
+  <text class="t-xs end" x="330" y="24">높은 주소 ↑</text>
+
+  <rect class="box blue" x="20" y="36" width="310" height="112" rx="10"/>
+  <text class="t-mono t-b" x="34" y="59">struct pt_regs</text>
+  <text class="t-xs end" x="318" y="59">유저 레지스터 저장 영역</text>
+  <rect class="box" x="34" y="70" width="282" height="30" rx="6"/>
+  <text class="t-code" x="46" y="90">ip, sp, flags, …</text>
+  <text class="t-xs end" x="306" y="90">부모 것을 그대로 복사</text>
+  <rect class="box green" x="34" y="106" width="282" height="30" rx="6"/>
+  <text class="t-mono t-b" x="46" y="126">ax = 0</text>
+  <text class="t-xs end" x="306" y="126">자식이 받을 반환값</text>
+
+  <rect class="box yellow" x="20" y="156" width="310" height="148" rx="10"/>
+  <text class="t-mono t-b" x="34" y="179">struct inactive_task_frame</text>
+  <rect class="box warm" x="34" y="190" width="282" height="30" rx="6"/>
+  <text class="t-code t-b" x="46" y="210">ret_addr = ret_from_fork_asm</text>
+  <rect class="box" x="34" y="226" width="282" height="30" rx="6"/>
+  <text class="t-code" x="46" y="246">bp</text>
+  <text class="t-xs end" x="306" y="246">프레임 포인터</text>
+  <rect class="box" x="34" y="262" width="282" height="30" rx="6"/>
+  <text class="t-code" x="46" y="282">bx = 0, r12 … r15</text>
+  <text class="t-xs end" x="306" y="282">커널 스레드면 bx = 함수</text>
+
+  <path class="ln thin" d="M175 332 V310" marker-end="url(#ah)"/>
+  <text class="t-code" x="186" y="328">thread.sp가 가리키는 곳</text>
+  <rect class="ghost dash" x="20" y="340" width="310" height="36" rx="10"/>
+  <text class="t-s mid" x="175" y="363">빈 스택. 아래로 자란다</text>
+
+  <!-- 오른쪽: 첫 실행 -->
+  <text class="t-b" x="380" y="24">자식이 처음 CPU를 받을 때</text>
+
+  <rect class="box" x="380" y="36" width="360" height="62" rx="10"/>
+  <text class="t-b" x="394" y="60">① 스케줄러가 자식으로 스위치</text>
+  <text class="t-code" x="394" y="82">__switch_to_asm: rsp ← thread.sp, pop × 6</text>
+  <path class="ln" d="M560 98 V112" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="380" y="116" width="360" height="62" rx="10"/>
+  <text class="t-b" x="394" y="140">② ret이 ret_addr를 꺼낸다</text>
+  <text class="t-code" x="394" y="162">ret_from_fork_asm → call ret_from_fork</text>
+  <path class="ln" d="M560 178 V192" marker-end="url(#ah)"/>
+
+  <rect class="box" x="380" y="196" width="360" height="62" rx="10"/>
+  <text class="t-b" x="394" y="220">③ 스위치 뒷정리를 하고 출구로</text>
+  <text class="t-code" x="394" y="242">schedule_tail() → syscall_exit_to_user_mode()</text>
+  <path class="ln" d="M560 258 V272" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="380" y="276" width="360" height="62" rx="10"/>
+  <text class="t-b" x="394" y="300">④ pt_regs를 레지스터에 싣고 유저 모드로</text>
+  <text class="t-s" x="394" y="322">rax = 0인 채로 syscall 다음 명령어에서 실행을 잇는다</text>
+
+  <text class="t-s" x="380" y="363">두 구조체를 묶은 것이 struct fork_frame이다.</text>
+</svg></div><figcaption><b>그림 1-4</b><code>copy_thread()</code>가 꾸민 자식의 커널 스택과, 그 스택을 따라가는 자식의 첫 실행. 자식은 한 번도 실행된 적이 없지만, 스케줄러가 보기에는 "전에 스위치되어 나갔던 태스크"와 똑같이 생겼습니다.</figcaption></figure>
+<p>이제 인용한 코드가 읽힙니다.</p>
+<ul>
+<li><code>*childregs = *current_pt_regs()</code>: 부모의 <code>pt_regs</code>를 자식의 스택 꼭대기에 통째로 복사합니다. 부모가 <code>syscall</code> 명령어를 실행한 순간의 유저 레지스터입니다. 명령어 포인터, 유저 스택 포인터, 플래그가 다 들어 있습니다. 그래서 자식은 부모와 <strong>같은 유저 주소</strong>에서 실행을 잇습니다.</li>
+<li><code>childregs-&gt;ax = 0</code>: 복사본의 반환값 칸만 0으로 고칩니다. <strong>이 한 줄이 자식의 <code>fork()</code> 반환값입니다.</strong></li>
+<li><code>frame-&gt;ret_addr = ret_from_fork_asm</code>: 자식이 처음 스위치되어 들어올 때 뛸 주소를 정합니다.</li>
+<li><code>p-&gt;thread.sp = fork_frame</code>: 스케줄러가 스택 포인터로 삼을 곳을 이 틀의 시작으로 맞춥니다.</li>
+</ul>
+<p>부모 쪽은 따로 손댈 것이 없습니다. 시스템 콜 진입 코드가 모든 시스템 콜에 대해 <code>regs-&gt;ax = x64_sys_call(regs, nr)</code>로 반환값을 적기 때문입니다(<code>arch/x86/entry/syscall_64.c</code>). 부모의 <code>ax</code>는 평소의 경로가, 자식의 <code>ax</code>는 <code>copy_thread()</code>가 채웁니다.</p>
+<p>스케줄러가 자식을 처음 고르면 <code>ret_addr</code>에 적어 둔 곳에서 실행이 시작됩니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/entry/entry_64.S#L228" rel="noopener" target="_blank">arch/x86/entry/entry_64.S</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/entry/entry_64.S" data-line="228" id="cb8"><pre class="sourceCode asm"><code class="sourceCode fasm"><span id="cb8-1">SYM_CODE_START<span class="op">(</span>ret_from_fork_asm<span class="op">)</span></span>
+<span id="cb8-2">    /* ... */</span>
+<span id="cb8-3">    <span class="bu">movq</span>    <span class="op">%</span><span class="kw">rax</span><span class="op">,</span> <span class="op">%</span><span class="kw">rdi</span>      <span class="op">/*</span> prev <span class="op">*/</span></span>
+<span id="cb8-4">    <span class="bu">movq</span>    <span class="op">%</span><span class="kw">rsp</span><span class="op">,</span> <span class="op">%</span><span class="kw">rsi</span>      <span class="op">/*</span> regs <span class="op">*/</span></span>
+<span id="cb8-5">    <span class="bu">movq</span>    <span class="op">%</span><span class="kw">rbx</span><span class="op">,</span> <span class="op">%</span><span class="kw">rdx</span>      <span class="op">/*</span> fn <span class="op">*/</span></span>
+<span id="cb8-6">    <span class="bu">movq</span>    <span class="op">%</span><span class="kw">r12</span><span class="op">,</span> <span class="op">%</span><span class="kw">rcx</span>      <span class="op">/*</span> fn_arg <span class="op">*/</span></span>
+<span id="cb8-7">    <span class="cf">call</span>    ret_from_fork</span>
+<span id="cb8-8"></span>
+<span id="cb8-9">    /* ... */</span>
+<span id="cb8-10">#ifdef CONFIG_X86_FRED</span>
+<span id="cb8-11">    ALTERNATIVE <span class="st">"jmp swapgs_restore_regs_and_return_to_usermode"</span><span class="op">,</span> <span class="op">\</span></span>
+<span id="cb8-12">            <span class="st">"jmp asm_fred_exit_user"</span><span class="op">,</span> X86_FEATURE_FRED</span>
+<span id="cb8-13">#else</span>
+<span id="cb8-14">    <span class="cf">jmp</span> swapgs_restore_regs_and_return_to_usermode</span>
+<span id="cb8-15">#endif</span>
+<span id="cb8-16">SYM_CODE_END<span class="op">(</span>ret_from_fork_asm<span class="op">)</span></span></code></pre></div></div>
+<p>이 시점에 스택 포인터는 <code>inactive_task_frame</code>을 다 꺼내고 <code>pt_regs</code>의 시작을 가리킵니다. 그래서 <code>%rsp</code>를 그대로 <code>regs</code> 인자로 넘깁니다. 어셈블리가 하는 일은 인자 넷을 맞춰 C 함수를 부르는 것뿐입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kernel/process.c#L151" rel="noopener" target="_blank">arch/x86/kernel/process.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/kernel/process.c" data-line="151" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1">__visible <span class="dt">void</span> ret_from_fork<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>prev<span class="op">,</span> <span class="kw">struct</span> pt_regs <span class="op">*</span>regs<span class="op">,</span></span>
+<span id="cb9-2">                     <span class="dt">int</span> <span class="op">(*</span>fn<span class="op">)(</span><span class="dt">void</span> <span class="op">*),</span> <span class="dt">void</span> <span class="op">*</span>fn_arg<span class="op">)</span></span>
+<span id="cb9-3"><span class="op">{</span></span>
+<span id="cb9-4">    schedule_tail<span class="op">(</span>prev<span class="op">);</span></span>
+<span id="cb9-5"></span>
+<span id="cb9-6">    <span class="co">/* Is this a kernel thread? */</span></span>
+<span id="cb9-7">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>fn<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb9-8">        fn<span class="op">(</span>fn_arg<span class="op">);</span></span>
+<span id="cb9-9">        <span class="co">/*</span></span>
+<span id="cb9-10"><span class="co">         * A kernel thread is allowed to return here after successfully</span></span>
+<span id="cb9-11"><span class="co">         * calling kernel_execve().  Exit to userspace to complete the</span></span>
+<span id="cb9-12"><span class="co">         * execve() syscall.</span></span>
+<span id="cb9-13"><span class="co">         */</span></span>
+<span id="cb9-14">        regs<span class="op">-&gt;</span>ax <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb9-15">    <span class="op">}</span></span>
+<span id="cb9-16"></span>
+<span id="cb9-17">    syscall_exit_to_user_mode<span class="op">(</span>regs<span class="op">);</span></span>
+<span id="cb9-18"><span class="op">}</span></span></code></pre></div></div>
+<p><code>schedule_tail()</code>은 컨텍스트 스위치의 뒷정리입니다. 보통의 태스크는 <code>schedule()</code> 안에서 스위치되어 나갔다가 같은 함수 안으로 돌아와 뒷정리를 직접 합니다. 처음 실행되는 자식은 <code>schedule()</code>을 부른 적이 없으니 그 뒷부분을 여기서 따로 불러 줍니다. 런큐 락을 풀고 선점을 다시 켜는 일이 들어 있습니다.</p>
+<p><code>syscall_exit_to_user_mode()</code>는 모든 시스템 콜이 끝날 때 지나는 출구입니다. 자식은 입구를 지난 적이 없는데 출구로만 나갑니다. 그 뒤 어셈블리 코드가 <code>pt_regs</code>를 레지스터에 싣고 유저 모드로 넘어갑니다. <code>rax</code>에는 0이 실립니다.</p>
+<p><code>ret_from_fork()</code>의 <code>fn</code>은 커널 스레드를 위한 가지입니다. 유저 프로세스에서는 <code>copy_thread()</code>가 <code>frame-&gt;bx = 0</code>으로 두었으므로 NULL입니다. 커널 스레드가 이 길을 어떻게 쓰는지는 <a href="ch02.html">2장</a>에서 봅니다.</p>
+</section>
+<section class="level2" id="who-first">
+<h2><span class="sec-n">1.5</span>부모와 자식, 누가 먼저 도는가<a aria-label="이 절의 링크" class="anchor" href="#who-first">#</a></h2>
+<p><code>copy_process()</code>가 돌려준 자식은 <code>TASK_NEW</code> 상태입니다. <code>wake_up_new_task()</code>(<code>kernel/sched/core.c</code>)가 이것을 실행 가능한 태스크로 바꿉니다. 하는 일은 넷입니다. 상태를 <code>TASK_RUNNING</code>으로 바꾸고, <code>select_task_rq()</code>에 <code>WF_FORK</code> 플래그를 주어 자식이 돌 CPU를 고르고(<a href="ch07.html">7장</a>), <code>activate_task()</code>로 그 CPU의 런큐에 넣고, <code>wakeup_preempt()</code>로 지금 도는 태스크를 밀어내야 할지 묻습니다.</p>
+<p>마지막 질문에 fair 클래스는 이렇게 답합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/fair.c#L10217" rel="noopener" target="_blank">kernel/sched/fair.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/fair.c" data-line="10217" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1">    <span class="co">/*</span></span>
+<span id="cb10-2"><span class="co">     * Ignore wakee preemption on WF_FORK as it is less likely that</span></span>
+<span id="cb10-3"><span class="co">     * there is shared data as exec often follow fork.</span></span>
+<span id="cb10-4"><span class="co">     */</span></span>
+<span id="cb10-5">    <span class="cf">if</span> <span class="op">(</span>wake_flags <span class="op">&amp;</span> WF_FORK<span class="op">)</span></span>
+<span id="cb10-6">        <span class="cf">goto</span> update<span class="op">;</span></span></code></pre></div></div>
+<p>방금 <code>fork</code>로 생긴 태스크는 깨어났다는 이유로 현재 태스크를 선점하지 않습니다. 보통의 깨우기에서는 깨운 쪽과 깨어난 쪽이 같은 데이터를 다루는 일이 많아 깨어난 쪽을 빨리 돌리는 것이 이롭지만, <code>fork</code> 뒤에는 대개 <code>exec</code>가 따라와 그런 이점이 없다는 것이 주석의 설명입니다.</p>
+<p>그렇다고 "부모가 먼저"라는 보장이 생기는 것은 아닙니다. 자식이 다른 CPU의 런큐에 놓이면 부모가 <code>kernel_clone()</code>에서 빠져나오기도 전에 자식이 유저 코드를 실행할 수 있습니다.</p>
+<div class="callout warn"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-warn"></use></svg>주의</div>
+<p><code>fork()</code> 뒤에 부모와 자식 중 누가 먼저 실행되는지는 정해져 있지 않습니다. 순서에 기대는 코드는 경쟁 조건입니다. 순서가 필요하면 파이프나 시그널 같은 명시적인 동기화를 써야 합니다.</p>
+</div>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>예전 자료에는 "리눅스는 자식을 먼저 실행한다. 부모가 먼저 돌며 쓰기 시 복사를 일으키는 낭비를 피하려는 것이다"라는 설명이 자주 나옵니다. 이 동작을 고르는 <code>kernel.sched_child_runs_first</code>라는 sysctl도 있었습니다. v7.3의 스케줄러에는 그런 규칙도, 그 sysctl도 없습니다. <code>WF_FORK</code> 깨우기는 선점을 일으키지 않을 뿐이고, 순서는 자식이 어느 CPU에 놓이느냐와 그때의 런큐 사정에 달려 있습니다.</p>
+</div>
+</section>
+<section class="level2" id="cow">
+<h2><span class="sec-n">1.6</span>쓰기 시 복사<a aria-label="이 절의 링크" class="anchor" href="#cow">#</a></h2>
+<p><code>fork</code>는 주소 공간을 복사합니다. 그런데 수 기가바이트를 쓰는 프로세스의 <code>fork</code>도 그만한 메모리를 복사하는 데 걸릴 시간보다 훨씬 빨리 끝납니다. 메모리의 내용은 복사하지 않기 때문입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/fork.c#L1568" rel="noopener" target="_blank">kernel/fork.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/fork.c" data-line="1568" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1"><span class="dt">static</span> <span class="dt">int</span> copy_mm<span class="op">(</span>u64 clone_flags<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>tsk<span class="op">)</span></span>
+<span id="cb11-2"><span class="op">{</span></span>
+<span id="cb11-3">    <span class="kw">struct</span> mm_struct <span class="op">*</span>mm<span class="op">,</span> <span class="op">*</span>oldmm<span class="op">;</span></span>
+<span id="cb11-4"></span>
+<span id="cb11-5">    <span class="co">/* ... */</span></span>
+<span id="cb11-6">    oldmm <span class="op">=</span> current<span class="op">-&gt;</span>mm<span class="op">;</span></span>
+<span id="cb11-7">    <span class="cf">if</span> <span class="op">(!</span>oldmm<span class="op">)</span></span>
+<span id="cb11-8">        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb11-9"></span>
+<span id="cb11-10">    <span class="cf">if</span> <span class="op">(</span>clone_flags <span class="op">&amp;</span> CLONE_VM<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb11-11">        mmget<span class="op">(</span>oldmm<span class="op">);</span></span>
+<span id="cb11-12">        mm <span class="op">=</span> oldmm<span class="op">;</span></span>
+<span id="cb11-13">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb11-14">        mm <span class="op">=</span> dup_mm<span class="op">(</span>tsk<span class="op">,</span> current<span class="op">-&gt;</span>mm<span class="op">);</span></span>
+<span id="cb11-15">        <span class="cf">if</span> <span class="op">(!</span>mm<span class="op">)</span></span>
+<span id="cb11-16">            <span class="cf">return</span> <span class="op">-</span>ENOMEM<span class="op">;</span></span>
+<span id="cb11-17">    <span class="op">}</span></span>
+<span id="cb11-18"></span>
+<span id="cb11-19">    tsk<span class="op">-&gt;</span>mm <span class="op">=</span> mm<span class="op">;</span></span>
+<span id="cb11-20">    tsk<span class="op">-&gt;</span>active_mm <span class="op">=</span> mm<span class="op">;</span></span>
+<span id="cb11-21">    sched_cache_fork<span class="op">(</span>tsk<span class="op">);</span></span>
+<span id="cb11-22">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb11-23"><span class="op">}</span></span></code></pre></div></div>
+<p><code>copy_*()</code>의 생김새 그대로입니다. <code>CLONE_VM</code>이 있으면 <code>mmget()</code>으로 참조 카운트만 올리고 부모의 <code>mm_struct</code>를 같이 씁니다. 스레드를 만들 때와 <code>vfork</code>가 이 가지입니다. 없으면 <code>dup_mm()</code>이 새 <code>mm_struct</code>를 만듭니다.</p>
+<p><code>dup_mm()</code>이 부르는 <code>dup_mmap()</code>(<code>mm/mmap.c</code>)은 부모의 <strong>VMA</strong>(가상 메모리 영역, 주소 공간의 한 구간을 나타내는 구조체)를 하나씩 돌며 자식 것을 만들고, 구간마다 <code>copy_page_range()</code>로 페이지 테이블을 복사합니다. 복사하는 것은 "어느 가상 주소가 어느 물리 페이지에 대응하는가"를 적은 표이지 페이지의 내용이 아닙니다. 표의 항목(PTE) 하나를 복사할 때 이런 일을 합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/mm/memory.c#L1189" rel="noopener" target="_blank">mm/memory.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="mm/memory.c" data-line="1189" id="cb12"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb12-1">    <span class="co">/* If it's a COW mapping, write protect it both processes. */</span></span>
+<span id="cb12-2">    <span class="cf">if</span> <span class="op">(</span>vma_is_cow_mapping<span class="op">(</span>src_vma<span class="op">)</span> <span class="op">&amp;&amp;</span> writable<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-3">        wrprotect_ptes<span class="op">(</span>src_mm<span class="op">,</span> addr<span class="op">,</span> src_pte<span class="op">,</span> nr<span class="op">);</span></span>
+<span id="cb12-4">        pte <span class="op">=</span> pte_wrprotect<span class="op">(</span>pte<span class="op">);</span></span>
+<span id="cb12-5">    <span class="op">}</span></span>
+<span id="cb12-6"></span>
+<span id="cb12-7">    <span class="co">/* If it's a shared mapping, mark it clean in the child. */</span></span>
+<span id="cb12-8">    <span class="cf">if</span> <span class="op">(</span>src_vma<span class="op">-&gt;</span>vm_flags <span class="op">&amp;</span> VM_SHARED<span class="op">)</span></span>
+<span id="cb12-9">        pte <span class="op">=</span> pte_mkclean<span class="op">(</span>pte<span class="op">);</span></span>
+<span id="cb12-10">    pte <span class="op">=</span> pte_mkold<span class="op">(</span>pte<span class="op">);</span></span>
+<span id="cb12-11"></span>
+<span id="cb12-12">    set_ptes<span class="op">(</span>dst_vma<span class="op">-&gt;</span>vm_mm<span class="op">,</span> addr<span class="op">,</span> dst_pte<span class="op">,</span> pte<span class="op">,</span> nr<span class="op">);</span></span></code></pre></div></div>
+<p>쓸 수 있던 사적(private) 매핑의 항목은 <strong>부모 쪽과 자식 쪽을 모두</strong> 읽기 전용으로 바꿉니다. <code>wrprotect_ptes()</code>가 부모의 항목을, <code>pte_wrprotect()</code>가 자식에게 줄 항목을 고칩니다. 이제 두 프로세스가 같은 물리 페이지를 읽기 전용으로 함께 가리킵니다.</p>
+<figure class="fig" id="fig-cow"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 290" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>쓰기 시 복사: fork() 직후에는 부모와 자식의 페이지 테이블 항목이 같은 물리 페이지를 읽기 전용으로 가리킨다. 자식이 페이지 B에 쓰면 폴트가 나고, 새 페이지 B′에 복사한 뒤 자식의 항목만 그쪽을 가리키게 된다.</title>
+
+  <!-- 왼쪽: fork 직후 -->
+  <rect class="panel" x="20" y="16" width="350" height="230" rx="14"/>
+  <text class="t-b" x="34" y="42">fork() 직후</text>
+  <text class="t-xs" x="34" y="60">페이지 테이블만 복사한다. 물리 페이지는 그대로다</text>
+
+  <text class="t-xs mid" x="84" y="84">부모의 PTE</text>
+  <text class="t-xs mid" x="195" y="84">물리 페이지</text>
+  <text class="t-xs mid" x="306" y="84">자식의 PTE</text>
+
+  <rect class="box blue" x="34" y="92" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="84" y="112">A · 읽기만</text>
+  <rect class="box gray" x="155" y="92" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="195" y="112">페이지 A</text>
+  <rect class="box green" x="256" y="92" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="306" y="112">A · 읽기만</text>
+  <path class="ln thin blue" d="M134 107 H150" marker-end="url(#ah-blue)"/>
+  <path class="ln thin green" d="M256 107 H240" marker-end="url(#ah-green)"/>
+
+  <rect class="box blue" x="34" y="134" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="84" y="154">B · 읽기만</text>
+  <rect class="box gray" x="155" y="134" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="195" y="154">페이지 B</text>
+  <rect class="box green" x="256" y="134" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="306" y="154">B · 읽기만</text>
+  <path class="ln thin blue" d="M134 149 H150" marker-end="url(#ah-blue)"/>
+  <path class="ln thin green" d="M256 149 H240" marker-end="url(#ah-green)"/>
+
+  <text class="t-xs mid" x="195" y="200">쓰기 가능하던 항목을 부모 쪽까지</text>
+  <text class="t-xs mid" x="195" y="218">읽기 전용으로 바꿔 둔다</text>
+
+  <!-- 오른쪽: 자식이 쓴 뒤 -->
+  <rect class="panel" x="390" y="16" width="350" height="230" rx="14"/>
+  <text class="t-b" x="404" y="42">자식이 B에 쓴 뒤</text>
+  <text class="t-xs" x="404" y="60">페이지 폴트 → 새 페이지에 복사 → 자식 항목만 교체</text>
+
+  <text class="t-xs mid" x="454" y="84">부모의 PTE</text>
+  <text class="t-xs mid" x="565" y="84">물리 페이지</text>
+  <text class="t-xs mid" x="676" y="84">자식의 PTE</text>
+
+  <rect class="box blue" x="404" y="92" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="454" y="112">A · 읽기만</text>
+  <rect class="box gray" x="525" y="92" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="565" y="112">페이지 A</text>
+  <rect class="box green" x="626" y="92" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="676" y="112">A · 읽기만</text>
+  <path class="ln thin blue" d="M504 107 H520" marker-end="url(#ah-blue)"/>
+  <path class="ln thin green" d="M626 107 H610" marker-end="url(#ah-green)"/>
+
+  <rect class="box blue" x="404" y="134" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="454" y="154">B · 읽기만</text>
+  <rect class="box gray" x="525" y="134" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="565" y="154">페이지 B</text>
+  <path class="ln thin blue" d="M504 149 H520" marker-end="url(#ah-blue)"/>
+
+  <rect class="box green" x="626" y="134" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink t-b mid" x="676" y="154">B′ · 읽고 쓰기</text>
+  <rect class="solid green" x="525" y="176" width="80" height="30" rx="6"/>
+  <text class="t-s t-on t-b mid" x="565" y="196">페이지 B′</text>
+  <path class="ln thin green" d="M676 164 V191 H610" marker-end="url(#ah-green)"/>
+
+  <text class="t-xs" x="404" y="230">부모의 B는 부모가 쓸 때까지 읽기 전용으로 남는다</text>
+
+  <text class="t-s mid" x="380" y="272">복사는 쓰는 쪽이 페이지 폴트를 낼 때, 쓴 페이지 하나에 대해서만 일어난다</text>
+</svg></div><figcaption><b>그림 1-5</b><code>fork</code> 직후에는 물리 페이지가 하나도 늘지 않습니다. 어느 한쪽이 쓰려는 순간에 그 페이지만 복사됩니다.</figcaption></figure>
+<p>그 뒤 어느 쪽이든 그 페이지에 쓰려 하면 CPU가 페이지 폴트를 냅니다. 폴트 핸들러는 VMA를 보고 "원래는 쓸 수 있는 구간"임을 확인한 뒤, 새 페이지를 할당해 내용을 복사하고 폴트를 낸 쪽의 항목만 새 페이지를 가리키게 합니다. 이것이 <strong>쓰기 시 복사</strong>(copy-on-write, COW)입니다. 남은 쪽이 나중에 쓰려 할 때는 그 페이지를 혼자 쓰고 있음을 확인하고 복사 없이 쓰기 권한만 되살립니다. 폴트 처리의 전체 흐름은 <a href="ch17.html">17장</a>에서 다룹니다.</p>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"<code>fork</code>는 프로세스의 메모리를 전부 복사하므로 큰 프로세스에서는 쓰면 안 된다." 복사하는 것은 메모리가 아니라 페이지 테이블입니다. 다만 공짜는 아닙니다. 페이지 테이블의 크기는 매핑된 메모리에 비례하므로 큰 프로세스일수록 <code>fork</code>가 오래 걸리고, <code>dup_mmap()</code>은 그동안 부모의 <code>mmap_lock</code>을 쓰기로 쥡니다. <code>fork</code> 뒤에 부모가 메모리를 많이 고치면 페이지마다 폴트와 복사가 일어납니다. 스냅숏을 뜨려고 <code>fork</code>하는 프로그램이 치르는 비용이 이것입니다.</p>
+</div>
+<p><code>copy_page_range()</code>는 복사를 건너뛰기도 합니다. 파일을 매핑한 구간 가운데 사적인 수정본이 없는 것은 페이지 테이블을 복사하지 않습니다(<code>vma_needs_copy()</code>). 자식이 그 주소를 건드릴 때 폴트를 통해 페이지 캐시에서 다시 채울 수 있기 때문입니다.</p>
+</section>
+<section class="level2" id="vfork-exec">
+<h2><span class="sec-n">1.7</span>vfork와 exec<a aria-label="이 절의 링크" class="anchor" href="#vfork-exec">#</a></h2>
+<p><code>fork</code> 다음에는 대개 <code>exec</code>가 옵니다. 이 경우 자식은 방금 복사한 주소 공간을 거의 쓰지 않고 버립니다. 페이지 테이블 복사가 낭비입니다.</p>
+<p><code>vfork</code>는 이 낭비를 없앱니다. 주소 공간을 복사하지 않고 부모 것을 빌려 씁니다. 대신 둘이 같은 메모리와 같은 스택에서 동시에 돌면 서로를 망가뜨리므로, 자식이 주소 공간에서 손을 뗄 때까지 부모를 재웁니다.</p>
+<figure class="fig" id="fig-fork-vs-vfork"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 322" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>fork와 vfork의 시간선 비교: fork는 주소 공간을 복사한 뒤 부모와 자식이 함께 실행된다. vfork는 복사하지 않고, 자식이 execve나 exit로 부모의 mm에서 손을 뗄 때까지 부모가 잠들어 기다린다.</title>
+
+  <!-- 위: fork -->
+  <text class="t-b" x="20" y="26">fork() 뒤에 execve()</text>
+
+  <text class="t-s t-ink t-b" x="20" y="60">부모</text>
+  <rect class="box yellow" x="110" y="40" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="185" y="60">fork(): mm을 복사</text>
+  <rect class="box blue" x="260" y="40" width="480" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="500" y="60">부모는 기다리지 않고 계속 실행</text>
+
+  <text class="t-s t-ink t-b" x="20" y="100">자식</text>
+  <rect class="box green" x="260" y="80" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="335" y="100">복사본 mm으로 실행</text>
+  <rect class="box yellow" x="410" y="80" width="90" height="30" rx="6"/>
+  <text class="t-code mid" x="455" y="100">execve()</text>
+  <rect class="box green" x="500" y="80" width="240" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="100">새 프로그램</text>
+  <text class="t-s mid" x="425" y="134">자식은 방금 복사한 페이지 테이블을 execve()에서 통째로 버린다</text>
+
+  <path class="ln thin muted dash" d="M20 154 H740"/>
+
+  <!-- 아래: vfork -->
+  <text class="t-b" x="20" y="184">vfork() 뒤에 execve()</text>
+
+  <text class="t-s t-ink t-b" x="20" y="218">부모</text>
+  <rect class="box yellow" x="110" y="198" width="70" height="30" rx="6"/>
+  <text class="t-code mid" x="145" y="218">vfork()</text>
+  <rect class="box red" x="180" y="198" width="240" height="30" rx="6"/>
+  <rect x="180" y="198" width="240" height="30" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box blue" x="420" y="198" width="320" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="580" y="218">부모 재개</text>
+
+  <text class="t-s t-ink t-b" x="20" y="258">자식</text>
+  <rect class="box green" x="180" y="238" width="150" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="255" y="258">부모의 mm을 빌려 실행</text>
+  <rect class="box yellow" x="330" y="238" width="90" height="30" rx="6"/>
+  <text class="t-code mid" x="375" y="258">execve()</text>
+  <rect class="box green" x="420" y="238" width="320" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="580" y="258">새 프로그램</text>
+
+  <path class="ln thin blue dash" d="M420 190 V276"/>
+  <text class="t-s tc-red" x="186" y="296">부모는 wait_for_vfork_done()에서 잠든다</text>
+  <text class="t-s tc-blue end" x="740" y="296">mm_release()가 complete()로 깨운다</text>
+</svg></div><figcaption><b>그림 1-6</b><code>fork</code>는 복사 비용을 치르고 부모와 자식이 함께 돕니다. <code>vfork</code>는 복사하지 않는 대신 부모가 멈춥니다.</figcaption></figure>
+<p>부모가 잠드는 곳은 앞에서 본 <code>kernel_clone()</code>의 끝부분입니다. <code>CLONE_VFORK</code>가 있으면 스택에 <code>struct completion</code>을 하나 만들어 자식의 <code>vfork_done</code>에 걸어 두고, 자식을 깨운 뒤 <code>wait_for_vfork_done()</code>에서 그 completion을 기다립니다. <strong>completion</strong>은 "어떤 일이 끝났다"는 신호 하나를 기다리는 커널의 동기화 도구입니다(<a href="ch03.html">3장</a>).</p>
+<p>깨우는 쪽은 <code>mm_release()</code>입니다. 태스크가 <code>mm</code>에서 손을 뗄 때 불리는 함수입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/fork.c#L1503" rel="noopener" target="_blank">kernel/fork.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/fork.c" data-line="1503" id="cb13"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1">    <span class="co">/*</span></span>
+<span id="cb13-2"><span class="co">     * All done, finally we can wake up parent and return this mm to him.</span></span>
+<span id="cb13-3"><span class="co">     * Also kthread_stop() uses this completion for synchronization.</span></span>
+<span id="cb13-4"><span class="co">     */</span></span>
+<span id="cb13-5">    <span class="cf">if</span> <span class="op">(</span>tsk<span class="op">-&gt;</span>vfork_done<span class="op">)</span></span>
+<span id="cb13-6">        complete_vfork_done<span class="op">(</span>tsk<span class="op">);</span></span></code></pre></div></div>
+<p><code>mm_release()</code>가 불리는 길은 둘입니다. 자식이 <code>execve()</code>에 성공해 새 주소 공간으로 갈아탈 때와 자식이 종료할 때입니다. 어느 쪽이든 자식은 더는 부모의 메모리를 건드리지 않으므로 부모를 깨워도 안전합니다.</p>
+<div class="callout warn"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-warn"></use></svg>주의</div>
+<p><code>vfork()</code>로 생긴 자식은 부모의 스택 위에서 돕니다. 자식이 <code>vfork()</code>를 부른 함수에서 <code>return</code>하거나 지역 변수를 고치면 부모의 스택이 깨집니다. 자식이 해도 되는 일은 사실상 <code>execve()</code>와 <code>_exit()</code>뿐입니다. 그래서 유저 프로그램은 보통 <code>posix_spawn()</code>을 씁니다. glibc의 <code>posix_spawn()</code>은 <code>CLONE_VM | CLONE_VFORK</code>로 <code>clone</code>을 부르되 자식에게 따로 마련한 스택을 줍니다. 복사 비용이 없다는 이점은 얻고 스택을 함께 쓰는 위험은 피합니다.</p>
+</div>
+<section class="level3" id="exec-태스크는-그대로-주소-공간만-바꾼다">
+<h3>exec: 태스크는 그대로, 주소 공간만 바꾼다</h3>
+<p><code>execve()</code>는 새 태스크를 만들지 않습니다. 지금 태스크의 <code>task_struct</code>와 PID는 그대로 두고 그 안에서 실행할 프로그램을 바꿉니다. ELF 로더 같은 실행 파일 형식 핸들러가 <code>begin_new_exec()</code>(<code>fs/exec.c</code>)를 부르면 다음 일이 차례로 일어납니다.</p>
+<ul>
+<li>스레드 그룹의 다른 스레드를 모두 끝냅니다(<code>de_thread()</code>). <code>exec</code> 뒤에는 스레드가 하나만 남습니다.</li>
+<li>파일 디스크립터 표를 남과 공유하고 있었다면 떼어 내고, <code>O_CLOEXEC</code>가 붙은 디스크립터를 닫습니다.</li>
+<li><code>exec_mmap()</code>이 <code>tsk-&gt;mm</code>을 미리 만들어 둔 새 <code>mm_struct</code>로 바꿉니다. 이 안에서 앞의 <code>mm_release()</code>가 불립니다.</li>
+<li>등록해 둔 시그널 핸들러를 기본 동작으로 되돌립니다. 예전 프로그램의 핸들러 주소는 새 주소 공간에서 뜻이 없기 때문입니다.</li>
+</ul>
+<p>마지막에 핸들러는 <code>pt_regs</code>의 명령어 포인터와 스택 포인터를 새 프로그램의 진입점과 새 스택으로 고칩니다. <code>fork</code>에서 본 것과 같은 요령입니다. 유저 모드로 돌아가는 길에 실릴 레지스터를 바꿔 놓으면, 돌아간 곳은 새 프로그램의 첫 명령어입니다.</p>
+<p><code>begin_new_exec()</code>의 주석은 이 함수를 "돌아올 수 없는 지점"이라고 부릅니다. 이 뒤에 실패하면 돌아갈 예전 프로그램이 없으므로 태스크를 죽이는 수밖에 없습니다. 그래서 파일을 열고 권한을 확인하는, 실패할 만한 일은 모두 이 지점 앞에서 끝냅니다. <code>copy_process()</code>와 같은 순서입니다.</p>
+<p>태스크가 끝나는 길인 <code>exit</code>는 상태 전이와 함께 <a href="ch03.html">3장</a>에서 다룹니다.</p>
+</section>
+</section>
+<section class="level2" id="clone3">
+<h2><span class="sec-n">1.8</span>clone3와 늘어나는 플래그<a aria-label="이 절의 링크" class="anchor" href="#clone3">#</a></h2>
+<p><code>clone</code>의 플래그 인자는 32비트이고, 그중 8비트는 종료 시그널 번호입니다. 남은 24비트는 다 찼습니다. 인자 수도 레지스터로 넘길 수 있는 한계에 가깝습니다. 그래서 인자를 구조체로 받는 <code>clone3</code>가 만들어졌습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/uapi/linux/sched.h#L102" rel="noopener" target="_blank">include/uapi/linux/sched.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/uapi/linux/sched.h" data-line="102" id="cb14"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb14-1"><span class="kw">struct</span> clone_args <span class="op">{</span></span>
+<span id="cb14-2">    __aligned_u64 flags<span class="op">;</span></span>
+<span id="cb14-3">    __aligned_u64 pidfd<span class="op">;</span></span>
+<span id="cb14-4">    __aligned_u64 child_tid<span class="op">;</span></span>
+<span id="cb14-5">    __aligned_u64 parent_tid<span class="op">;</span></span>
+<span id="cb14-6">    __aligned_u64 exit_signal<span class="op">;</span></span>
+<span id="cb14-7">    __aligned_u64 stack<span class="op">;</span></span>
+<span id="cb14-8">    __aligned_u64 stack_size<span class="op">;</span></span>
+<span id="cb14-9">    __aligned_u64 tls<span class="op">;</span></span>
+<span id="cb14-10">    __aligned_u64 set_tid<span class="op">;</span></span>
+<span id="cb14-11">    __aligned_u64 set_tid_size<span class="op">;</span></span>
+<span id="cb14-12">    __aligned_u64 cgroup<span class="op">;</span></span>
+<span id="cb14-13"><span class="op">};</span></span>
+<span id="cb14-14"><span class="pp">#endif</span></span>
+<span id="cb14-15"></span>
+<span id="cb14-16"><span class="pp">#define CLONE_ARGS_SIZE_VER0 </span><span class="dv">64</span><span class="pp"> </span><span class="co">/* sizeof first published struct */</span></span>
+<span id="cb14-17"><span class="pp">#define CLONE_ARGS_SIZE_VER1 </span><span class="dv">80</span><span class="pp"> </span><span class="co">/* sizeof second published struct */</span></span>
+<span id="cb14-18"><span class="pp">#define CLONE_ARGS_SIZE_VER2 </span><span class="dv">88</span><span class="pp"> </span><span class="co">/* sizeof third published struct */</span></span></code></pre></div></div>
+<p>호출은 <code>clone3(&amp;args, sizeof(args))</code>입니다. 두 번째 인자가 핵심입니다. 유저 프로그램은 자기가 컴파일될 때 알던 구조체의 크기를 함께 넘기고, 커널은 그 크기를 보고 어느 판의 구조체인지 압니다.</p>
+<figure class="fig" id="fig-clone-args"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 344" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>struct clone_args의 배치와 크기 버전: 처음 여덟 필드 64바이트가 VER0, set_tid와 set_tid_size를 더한 80바이트가 VER1, cgroup을 더한 88바이트가 VER2이다. 커널은 넘겨받은 크기가 자기가 아는 크기와 다를 때 0으로 채우거나 0인지 검사해 호환성을 지킨다.</title>
+
+  <text class="t-mono t-b" x="64" y="26">struct clone_args</text>
+  <text class="t-xs end" x="56" y="26">오프셋</text>
+  <text class="t-code tc-muted end" x="56" y="57">0</text>
+  <rect class="box blue" x="64" y="40" width="186" height="24"/>
+  <text class="t-code" x="76" y="57">flags</text>
+  <text class="t-code tc-muted end" x="56" y="81">8</text>
+  <rect class="box blue" x="64" y="64" width="186" height="24"/>
+  <text class="t-code" x="76" y="81">pidfd</text>
+  <text class="t-code tc-muted end" x="56" y="105">16</text>
+  <rect class="box blue" x="64" y="88" width="186" height="24"/>
+  <text class="t-code" x="76" y="105">child_tid</text>
+  <text class="t-code tc-muted end" x="56" y="129">24</text>
+  <rect class="box blue" x="64" y="112" width="186" height="24"/>
+  <text class="t-code" x="76" y="129">parent_tid</text>
+  <text class="t-code tc-muted end" x="56" y="153">32</text>
+  <rect class="box blue" x="64" y="136" width="186" height="24"/>
+  <text class="t-code" x="76" y="153">exit_signal</text>
+  <text class="t-code tc-muted end" x="56" y="177">40</text>
+  <rect class="box blue" x="64" y="160" width="186" height="24"/>
+  <text class="t-code" x="76" y="177">stack</text>
+  <text class="t-code tc-muted end" x="56" y="201">48</text>
+  <rect class="box blue" x="64" y="184" width="186" height="24"/>
+  <text class="t-code" x="76" y="201">stack_size</text>
+  <text class="t-code tc-muted end" x="56" y="225">56</text>
+  <rect class="box blue" x="64" y="208" width="186" height="24"/>
+  <text class="t-code" x="76" y="225">tls</text>
+  <text class="t-code tc-muted end" x="56" y="249">64</text>
+  <rect class="box green" x="64" y="232" width="186" height="24"/>
+  <text class="t-code" x="76" y="249">set_tid</text>
+  <text class="t-code tc-muted end" x="56" y="273">72</text>
+  <rect class="box green" x="64" y="256" width="186" height="24"/>
+  <text class="t-code" x="76" y="273">set_tid_size</text>
+  <text class="t-code tc-muted end" x="56" y="297">80</text>
+  <rect class="box purple" x="64" y="280" width="186" height="24"/>
+  <text class="t-code" x="76" y="297">cgroup</text>
+
+  <path class="ln thin blue" d="M256 42 H264 V230 H256"/>
+  <text class="t-s t-ink t-b" x="274" y="132">VER0 · 64바이트</text>
+  <text class="t-xs" x="274" y="150">v5.3, clone3()와 함께</text>
+  <path class="ln thin green" d="M256 234 H264 V278 H256"/>
+  <text class="t-s t-ink t-b" x="274" y="252">VER1 · 80바이트</text>
+  <text class="t-xs" x="274" y="270">v5.5, PID 지정</text>
+  <path class="ln thin purple" d="M256 282 H264 V302 H256"/>
+  <text class="t-s t-ink t-b" x="274" y="297">VER2 · 88바이트</text>
+  <text class="t-xs" x="274" y="315">v5.7, CLONE_INTO_CGROUP</text>
+
+  <text class="t-b" x="450" y="26">넘겨받은 size가 커널이 아는 크기와 다를 때</text>
+  <rect class="box" x="450" y="40" width="290" height="76" rx="10"/>
+  <text class="t-b" x="464" y="63">size가 더 작다</text>
+  <text class="t-xs" x="464" y="83">옛 프로그램이 새 커널에서 도는 경우</text>
+  <text class="t-s t-ink" x="464" y="103">모자란 뒤쪽 필드를 0으로 채운다</text>
+  <rect class="box" x="450" y="128" width="290" height="54" rx="10"/>
+  <text class="t-b" x="464" y="151">size가 같다</text>
+  <text class="t-s t-ink" x="464" y="171">그대로 복사한다</text>
+  <rect class="box" x="450" y="194" width="290" height="96" rx="10"/>
+  <text class="t-b" x="464" y="217">size가 더 크다</text>
+  <text class="t-xs" x="464" y="237">새 프로그램이 옛 커널에서 도는 경우</text>
+  <text class="t-s t-ink" x="464" y="257">넘치는 바이트가 전부 0이면 통과,</text>
+  <text class="t-s t-ink" x="464" y="276">하나라도 0이 아니면 -E2BIG</text>
+
+  <text class="t-s" x="450" y="315">새 필드는 맨 뒤에만 붙인다.</text>
+  <text class="t-s" x="450" y="333">0은 예전과 같은 동작을 뜻해야 한다.</text>
+</svg></div><figcaption><b>그림 1-7</b><code>struct clone_args</code>는 두 번 뒤로 자랐습니다. 크기가 곧 버전입니다. 오른쪽은 <code>copy_struct_from_user()</code>가 크기 차이를 다루는 규칙입니다.</figcaption></figure>
+<p><code>flags</code>가 64비트가 되면서 <code>clone</code>에는 없는 플래그와 필드가 생겼습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>플래그·필드</th>
+<th>하는 일</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CLONE_PIDFD</code></td>
+<td>자식을 가리키는 파일 디스크립터(pidfd)를 돌려줍니다. PID는 재사용되지만 pidfd는 그 태스크만 가리킵니다. <code>clone</code>에서도 쓸 수 있습니다.</td>
+</tr>
+<tr>
+<td><code>set_tid</code></td>
+<td>자식의 PID를 지정합니다. 체크포인트에서 프로세스를 되살릴 때 씁니다. 권한이 필요합니다.</td>
+</tr>
+<tr>
+<td><code>CLONE_CLEAR_SIGHAND</code></td>
+<td>자식의 시그널 핸들러를 기본값으로 되돌립니다.</td>
+</tr>
+<tr>
+<td><code>CLONE_INTO_CGROUP</code></td>
+<td>자식을 <code>cgroup</code> 필드가 가리키는 cgroup에 처음부터 넣습니다. 만든 뒤 옮길 필요가 없습니다.</td>
+</tr>
+<tr>
+<td><code>CLONE_AUTOREAP</code></td>
+<td>자식이 끝나면 좀비로 남지 않고 스스로 거둬집니다. 부모가 <code>wait</code>를 부를 필요가 없습니다.</td>
+</tr>
+<tr>
+<td><code>CLONE_NNP</code></td>
+<td>자식에게 <code>no_new_privs</code>를 겁니다. <code>exec</code>로 권한이 늘어나지 않게 됩니다.</td>
+</tr>
+<tr>
+<td><code>CLONE_PIDFD_AUTOKILL</code></td>
+<td>돌려받은 pidfd가 닫히면 자식에게 <code>SIGKILL</code>을 보냅니다.</td>
+</tr>
+<tr>
+<td><code>CLONE_EMPTY_MNTNS</code></td>
+<td>루트 마운트 하나만 있는 새 마운트 네임스페이스에서 자식을 시작합니다.</td>
+</tr>
+</tbody>
+</table></div>
+<p>아래 넷은 v7.1에서 들어왔습니다. <code>copy_process()</code>의 첫머리에는 이 플래그들의 조합 규칙이 줄지어 있습니다. 예를 들어 <code>CLONE_PIDFD_AUTOKILL</code>은 <code>CLONE_PIDFD</code>와 <code>CLONE_AUTOREAP</code>를 함께 요구하고, <code>CLONE_NNP</code>가 없으면 <code>CAP_SYS_ADMIN</code>이 있어야 합니다. pidfd를 닫는 것만으로 자기보다 권한이 높아진 프로세스를 죽일 수 있으면 안 되기 때문입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>시스템 콜은 한번 내놓으면 고칠 수 없습니다. 유저 프로그램이 의존하기 때문입니다. <code>clone</code>은 인자가 모자랄 때마다 쓰지 않는 비트를 찾아 뜻을 덧씌웠고, 아키텍처마다 인자 순서가 달라지는 일까지 생겼습니다(<code>CONFIG_CLONE_BACKWARDS</code>가 세 가지입니다). <code>clone3</code>는 늘어날 것을 전제로 설계했습니다. 규칙은 세 가지입니다. 인자는 구조체로 받고 크기를 함께 받는다. 새 필드는 맨 뒤에만 붙인다. 값 0은 "그 필드가 없던 때와 같은 동작"을 뜻한다. 이 규칙을 지키면 옛 프로그램은 새 커널에서, 새 프로그램은 새 기능을 쓰지 않는 한 옛 커널에서 그대로 돕니다. <code>copy_struct_from_user()</code>가 이 규칙을 함수 하나로 구현합니다. 버전 번호를 따로 두지 않고 크기를 버전으로 쓴다는 점이 요령입니다. 시스템 콜 설계는 <a href="ch19.html">19장</a>에서 다시 다룹니다.</p>
+</div>
+</section>
+<section class="level2" id="limits">
+<h2><span class="sec-n">1.9</span>태스크 수의 한도<a aria-label="이 절의 링크" class="anchor" href="#limits">#</a></h2>
+<p>태스크는 메모리를 씁니다. x86-64에서는 커널 스택만 태스크마다 16KB이고 <code>task_struct</code>가 더해집니다. 스스로를 끝없이 복제하는 프로그램, 이른바 포크 폭탄 하나가 시스템을 멈추지 못하게 하려면 한도가 필요합니다. <code>copy_process()</code>는 세 겹으로 검사합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/fork.c#L2187" rel="noopener" target="_blank">kernel/fork.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/fork.c" data-line="2187" id="cb15"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb15-1">    retval <span class="op">=</span> <span class="op">-</span>EAGAIN<span class="op">;</span></span>
+<span id="cb15-2">    <span class="cf">if</span> <span class="op">(</span>is_rlimit_overlimit<span class="op">(</span>task_ucounts<span class="op">(</span>p<span class="op">),</span> UCOUNT_RLIMIT_NPROC<span class="op">,</span> rlimit<span class="op">(</span>RLIMIT_NPROC<span class="op">)))</span> <span class="op">{</span></span>
+<span id="cb15-3">        <span class="cf">if</span> <span class="op">(</span>p<span class="op">-&gt;</span>real_cred<span class="op">-&gt;</span>user <span class="op">!=</span> INIT_USER <span class="op">&amp;&amp;</span></span>
+<span id="cb15-4">            <span class="op">!</span>capable<span class="op">(</span>CAP_SYS_RESOURCE<span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="op">!</span>capable<span class="op">(</span>CAP_SYS_ADMIN<span class="op">))</span></span>
+<span id="cb15-5">            <span class="cf">goto</span> bad_fork_cleanup_count<span class="op">;</span></span>
+<span id="cb15-6">    <span class="op">}</span></span>
+<span id="cb15-7">    current<span class="op">-&gt;</span>flags <span class="op">&amp;=</span> <span class="op">~</span>PF_NPROC_EXCEEDED<span class="op">;</span></span>
+<span id="cb15-8"></span>
+<span id="cb15-9">    <span class="co">/*</span></span>
+<span id="cb15-10"><span class="co">     * If multiple threads are within copy_process(), then this check</span></span>
+<span id="cb15-11"><span class="co">     * triggers too late. This doesn't hurt, the check is only there</span></span>
+<span id="cb15-12"><span class="co">     * to stop root fork bombs.</span></span>
+<span id="cb15-13"><span class="co">     */</span></span>
+<span id="cb15-14">    retval <span class="op">=</span> <span class="op">-</span>EAGAIN<span class="op">;</span></span>
+<span id="cb15-15">    <span class="cf">if</span> <span class="op">(</span>data_race<span class="op">(</span>nr_threads <span class="op">&gt;=</span> max_threads<span class="op">))</span></span>
+<span id="cb15-16">        <span class="cf">goto</span> bad_fork_cleanup_count<span class="op">;</span></span></code></pre></div></div>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+</colgroup>
+<thead>
+<tr>
+<th>한도</th>
+<th>범위</th>
+<th>보는 곳</th>
+<th>넘으면</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RLIMIT_NPROC</code></td>
+<td>사용자별</td>
+<td><code>ulimit -u</code></td>
+<td><code>EAGAIN</code>. root와 <code>CAP_SYS_RESOURCE</code> 등은 면제</td>
+</tr>
+<tr>
+<td><code>max_threads</code></td>
+<td>시스템 전체</td>
+<td><code>/proc/sys/kernel/threads-max</code></td>
+<td><code>EAGAIN</code>. 면제 없음</td>
+</tr>
+<tr>
+<td><code>pids.max</code></td>
+<td>cgroup별</td>
+<td>cgroup의 <code>pids.max</code></td>
+<td><code>EAGAIN</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>max_threads</code>의 기본값은 부팅 때 <code>set_max_threads()</code>가 메모리 크기로 정합니다. 모든 태스크의 커널 스택을 합쳐도 메모리의 8분의 1을 넘지 않게 하는 값입니다. 주석이 밝히듯 이 검사는 락 없이 <code>nr_threads</code>를 읽으므로 여럿이 동시에 <code>fork</code>하면 한도를 조금 넘을 수 있습니다. root의 포크 폭탄을 막는 안전망이라 정확할 필요가 없다는 판단입니다. <code>data_race()</code>는 "이 경쟁은 알고 둔 것"이라고 검사 도구에 알리는 표시입니다(<a href="ch27.html">27장</a>).</p>
+<p>세 번째 한도는 위 코드가 아니라 <code>cgroup_can_fork()</code>에서 걸립니다. pids 컨트롤러가 cgroup에 속한 태스크 수를 세다가 <code>pids.max</code>를 넘으면 거절합니다. 컨테이너 하나가 호스트의 PID를 다 써 버리지 못하게 하는 장치입니다(<a href="ch22.html">22장</a>).</p>
+<p>PID 번호 자체에도 상한이 있습니다. <code>/proc/sys/kernel/pid_max</code>입니다. 커널의 기본값은 32768과 CPU 수 × 1024 가운데 큰 쪽이고, 64비트에서는 4194304까지 올릴 수 있습니다. 번호를 끝까지 쓰면 300부터 다시 돌며 빈 번호를 찾습니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>한도와 현재 값을 확인합니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ cat /proc/sys/kernel/threads-max
+126329
+$ cat /proc/sys/kernel/pid_max
+4194304
+$ ulimit -u
+63164
+$ cat /sys/fs/cgroup/user.slice/pids.max
+max
+$ grep processes /proc/stat
+processes 418233</code></pre></div>
+<p>값은 예시입니다. <code>/proc/stat</code>의 <code>processes</code>는 부팅 뒤 만들어진 태스크의 누계(<code>total_forks</code>)입니다.</p>
+<p>태스크가 만들어지는 순간은 추적점으로 봅니다. <code>bpftrace</code>가 있으면 한 줄입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># bpftrace -e 'tracepoint:sched:sched_process_fork {
+    printf("%s(%d) -&gt; %d\n", comm, pid, args.child_pid); }'
+bash(3051) -&gt; 41201
+make(41201) -&gt; 41202
+...
+
+# bpftrace -e 'tracepoint:task:task_newtask { @[args.clone_flags] = count(); }'</code></pre></div>
+<p>첫 번째는 <code>kernel_clone()</code> 안의 <code>trace_sched_process_fork()</code>에, 두 번째는 <code>copy_process()</code> 끝의 <code>trace_task_newtask()</code>에 걸립니다. 두 번째 명령은 플래그 조합별로 횟수를 세므로, 프로세스와 스레드가 어떤 비율로 만들어지는지 볼 수 있습니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.2 · 1999</dt>
+<dd>
+<code>CLONE_VFORK</code>. <code>vfork</code>가 "자식이 <code>mm</code>을 놓을 때까지 부모를 재운다"는 지금의 뜻을 갖습니다.
+</dd>
+<dt>2.4.0 · 2001</dt>
+<dd>
+<code>CLONE_THREAD</code>. 여러 태스크가 한 스레드 그룹을 이루어 PID 하나로 보이게 됩니다.
+</dd>
+<dt>5.2 · 2019</dt>
+<dd>
+<code>CLONE_PIDFD</code>. 태스크를 PID 대신 파일 디스크립터로 가리킬 수 있게 됩니다.
+</dd>
+<dt>5.3 · 2019</dt>
+<dd>
+<code>clone3</code>. 인자를 크기가 딸린 구조체로 받습니다.
+</dd>
+<dt>5.5 · 2020</dt>
+<dd>
+<code>set_tid</code>와 <code>CLONE_CLEAR_SIGHAND</code>.
+</dd>
+<dt>5.7 · 2020</dt>
+<dd>
+<code>CLONE_INTO_CGROUP</code>.
+</dd>
+<dt>5.10 · 2020</dt>
+<dd>
+<code>_do_fork()</code>가 <code>kernel_clone()</code>으로 이름을 바꿉니다.
+</dd>
+<dt>7.1 · 2026</dt>
+<dd>
+<code>CLONE_AUTOREAP</code>, <code>CLONE_NNP</code>, <code>CLONE_PIDFD_AUTOKILL</code>, <code>CLONE_EMPTY_MNTNS</code>.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li><code>fork</code>, <code>vfork</code>, <code>clone</code>, <code>clone3</code>와 커널 스레드 생성은 모두 <code>kernel_clone()</code>으로 모입니다. 차이는 <code>struct kernel_clone_args</code>에 담긴 플래그뿐입니다.</li>
+<li><code>kernel_clone()</code>은 <code>copy_process()</code>로 태스크를 만들고 <code>wake_up_new_task()</code>로 깨웁니다. 부모가 받는 반환값은 이 함수의 <code>return nr</code>입니다. 부모와 자식의 실행 순서는 정해져 있지 않습니다.</li>
+<li><code>copy_process()</code>는 부모의 <code>task_struct</code>를 복사한 뒤 자원별 <code>copy_*()</code>로 공유하거나 복사합니다. 실패할 수 있는 일을 모두 끝낸 뒤에야 <code>tasklist_lock</code>을 쥐고 태스크를 시스템에 연결합니다. 중간에 실패하면 <code>goto</code> 라벨을 따라 역순으로 되돌립니다.</li>
+<li>자식이 받는 0은 <code>copy_thread()</code>의 <code>childregs-&gt;ax = 0</code>입니다. 자식은 <code>ret_from_fork_asm</code>에서 첫 실행을 시작해 시스템 콜의 출구로 나갑니다.</li>
+<li><code>fork</code>는 페이지 테이블만 복사하고 쓸 수 있던 항목을 양쪽 모두 읽기 전용으로 바꿉니다. 실제 복사는 쓰기 폴트 때 페이지 단위로 일어납니다.</li>
+<li><code>vfork</code>는 주소 공간을 복사하지 않고, 자식이 <code>exec</code>나 <code>exit</code>로 <code>mm</code>을 놓을 때까지 부모를 completion으로 재웁니다.</li>
+<li><code>clone3</code>는 크기가 딸린 구조체로 인자를 받아, 옛 프로그램을 깨지 않고 필드와 플래그를 늘려 갑니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p><code>fork()</code>를 부른 프로그램에서 부모는 자식의 PID를, 자식은 0을 받습니다. 두 값은 각각 커널의 어느 코드가 어디에 적습니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>부모의 값은 <code>kernel_clone()</code>이 돌려준 <code>nr</code>입니다. 시스템 콜 진입 코드가 모든 시스템 콜에 대해 하듯이 그 값을 부모의 <code>pt_regs</code>의 <code>ax</code>에 적습니다(<code>regs-&gt;ax = x64_sys_call(...)</code>). 자식의 값은 <code>copy_thread()</code>가 적습니다. 부모의 <code>pt_regs</code>를 자식의 커널 스택 꼭대기에 복사한 뒤 <code>childregs-&gt;ax = 0</code>으로 고칩니다. 두 태스크 모두 유저 모드로 나갈 때 자기 <code>pt_regs</code>의 <code>ax</code>가 <code>rax</code> 레지스터에 실립니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>새로 만든 태스크는 <code>copy_process()</code>가 끝날 때까지 <code>TASK_NEW</code> 상태이고, 태스크 목록에는 함수의 맨 끝에서야 연결됩니다. 이 두 가지가 각각 막는 문제는 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>TASK_NEW</code>는 조립 중인 태스크가 <strong>실행되는</strong> 것을 막습니다. 이 상태의 태스크는 런큐에 오르지 않고 시그널 같은 외부 사건으로도 깨워지지 않습니다. 연결을 맨 끝으로 미루는 것은 조립 중인 태스크가 남에게 <strong>보이는</strong> 것을 막습니다. PID로 찾을 수 있는 태스크가 생성 도중 실패해 사라지면, 그 사이에 그 태스크를 본 쪽의 처리가 복잡해집니다. 실패할 수 있는 일을 모두 끝낸 뒤에 연결하면 한번 보인 태스크는 반드시 완성된 태스크입니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>8GB의 익명 메모리를 쓰는 프로세스가 <code>fork()</code>를 부른 뒤, 부모가 그 메모리 전체를 한 번씩 고쳐 씁니다. 자식은 아무것도 하지 않고 잠들어 있습니다. 물리 메모리 사용량은 어떻게 변하고, 왜 그렇습니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>fork</code> 직후에는 페이지 테이블만큼만 늘어납니다. 부모와 자식이 같은 물리 페이지를 읽기 전용으로 함께 가리키기 때문입니다. 부모가 페이지에 쓸 때마다 쓰기 폴트가 나고, 그 페이지는 자식도 가리키고 있으므로 새 페이지를 할당해 복사합니다. 전체를 다 고치면 8GB가 더 할당되어 합계가 약 16GB가 됩니다. 쓰기 시 복사는 쓰는 쪽이 부모든 자식이든 똑같이 일어납니다. 자식이 먼저 종료했다면 부모는 페이지를 혼자 쓰므로 복사 없이 쓰기 권한만 되살아납니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>vfork()</code>를 부른 부모는 언제 깨어납니까? 자식이 <code>execve()</code>에 실패하고 무한 루프에 빠지면 부모는 어떻게 됩니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>자식이 부모의 <code>mm</code>에서 손을 뗄 때 깨어납니다. <code>execve()</code>가 <code>exec_mmap()</code>에서 새 <code>mm</code>으로 갈아타거나 자식이 종료할 때 <code>mm_release()</code>가 불리고, 그 안의 <code>complete_vfork_done()</code>이 부모가 기다리는 completion을 완료시킵니다. <code>execve()</code>가 일찍 실패하면 <code>mm_release()</code>가 불리지 않으므로 부모는 계속 잠들어 있습니다. 자식이 루프를 돌면 부모는 깨어나지 못합니다. 다만 <code>wait_for_vfork_done()</code>은 <code>TASK_KILLABLE</code>로 기다리므로 부모를 <code>SIGKILL</code>로 죽일 수는 있습니다. 그래서 <code>vfork</code> 뒤의 자식은 <code>execve()</code>가 실패하면 곧바로 <code>_exit()</code>를 불러야 합니다.</p>
+</div></details></div></div>
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>태스크<small>task</small></dt>
+<dd>
+커널이 스케줄하는 실행 단위. 프로세스와 스레드 모두 <code>struct task_struct</code> 하나로 표현된다.
+</dd>
+<dt>kernel_clone</dt>
+<dd>
+태스크를 만드는 모든 길이 모이는 함수. <code>copy_process()</code>로 만들고 <code>wake_up_new_task()</code>로 깨운다.
+</dd>
+<dt>copy_process</dt>
+<dd>
+부모를 본떠 새 태스크를 조립하는 함수. 깨우지는 않는다.
+</dd>
+<dt>pt_regs</dt>
+<dd>
+유저 모드에서 커널로 들어올 때 유저 레지스터를 저장하는 틀. 커널 스택의 꼭대기에 놓인다.
+</dd>
+<dt>ret_from_fork</dt>
+<dd>
+새로 만들어진 태스크가 처음 스케줄될 때 실행을 시작하는 곳.
+</dd>
+<dt>TASK_NEW</dt>
+<dd>
+조립 중인 태스크의 상태. 런큐에 오를 수 없고 외부 사건으로 깨울 수 없다.
+</dd>
+<dt>쓰기 시 복사<small>copy-on-write</small></dt>
+<dd>
+페이지를 읽기 전용으로 공유해 두었다가, 쓰려는 순간에 그 페이지만 복사하는 기법.
+</dd>
+<dt>completion</dt>
+<dd>
+어떤 일이 끝났다는 신호 하나를 기다리는 커널의 동기화 도구. <code>vfork</code>에서 부모가 자식을 기다릴 때 쓴다.
+</dd>
+<dt>pidfd</dt>
+<dd>
+태스크를 가리키는 파일 디스크립터. PID와 달리 재사용으로 다른 태스크를 가리키게 되는 일이 없다.
+</dd>
+<dt>clone3</dt>
+<dd>
+인자를 크기가 딸린 구조체로 받는 태스크 생성 시스템 콜.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://man7.org/linux/man-pages/man2/clone.2.html" rel="noopener" target="_blank"><code>clone(2)</code></a>: <code>clone</code>과 <code>clone3</code>의 플래그와 각 플래그가 들어온 버전.</li>
+<li><a href="https://man7.org/linux/man-pages/man3/posix_spawn.3.html" rel="noopener" target="_blank"><code>posix_spawn(3)</code></a>: glibc가 <code>CLONE_VM | CLONE_VFORK</code>로 구현하는 방식.</li>
+<li><a href="https://docs.kernel.org/process/adding-syscalls.html" rel="noopener" target="_blank"><code>Documentation/process/adding-syscalls.rst</code></a>: 확장 가능한 시스템 콜을 설계하는 규칙.</li>
+<li><a href="https://docs.kernel.org/admin-guide/sysctl/kernel.html" rel="noopener" target="_blank"><code>Documentation/admin-guide/sysctl/kernel.rst</code></a>: <code>threads-max</code>, <code>pid_max</code>의 뜻.</li>
+<li><a href="https://docs.kernel.org/admin-guide/cgroup-v2.html" rel="noopener" target="_blank"><code>Documentation/admin-guide/cgroup-v2.rst</code></a>: pids 컨트롤러와 <code>pids.max</code>.</li>
+<li>LWN, <a href="https://lwn.net/Articles/1059673/" rel="noopener" target="_blank">As ye clone(), so shall ye AUTOREAP</a>: <code>CLONE_AUTOREAP</code>와 <code>CLONE_PIDFD_AUTOKILL</code>이 들어오기까지의 논의.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch00.html"><small>← 0장</small><b>커널이라는 프로그램</b></a><a class="next" href="ch02.html"><small>2장 →</small><b>task_struct와 스레드</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#returns-twice">한 번 부르고 두 번 돌아온다</a><a href="#kernel-clone">네 개의 시스템 콜, 하나의 함수</a><a href="#copy-process">copy_process(): 태스크를 조립하는 순서</a><a href="#first-run">자식의 첫 실행</a><a href="#who-first">부모와 자식, 누가 먼저 도는가</a><a href="#cow">쓰기 시 복사</a><a href="#vfork-exec">vfork와 exec</a><a href="#clone3">clone3와 늘어나는 플래그</a><a href="#limits">태스크 수의 한도</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

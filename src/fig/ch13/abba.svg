@@ -1,0 +1,37 @@
+<svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg">
+  <title>ABBA 교착: 태스크 1은 락 A를 쥐고 B를 기다리고, 태스크 2는 락 B를 쥐고 A를 기다려 기다림이 고리를 이룬다. 모든 경로가 같은 순서로 잡으면 고리가 생기지 않는다.</title>
+
+  <!-- 고리 -->
+  <rect class="box blue" x="30" y="96" width="110" height="44" rx="10"/>
+  <text class="t-b mid" x="85" y="123">태스크 1</text>
+  <rect class="box green" x="310" y="96" width="110" height="44" rx="10"/>
+  <text class="t-b mid" x="365" y="123">태스크 2</text>
+  <rect class="solid" x="180" y="24" width="90" height="38" rx="19"/>
+  <text class="t-b t-on mid" x="225" y="48">락 A</text>
+  <rect class="solid" x="180" y="174" width="90" height="38" rx="19"/>
+  <text class="t-b t-on mid" x="225" y="198">락 B</text>
+
+  <path class="ln blue" d="M85 96 V43 H174" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="94" y="36">① 쥐고 있다</text>
+  <path class="ln green" d="M365 140 V193 H276" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-green end" x="356" y="216">② 쥐고 있다</text>
+  <path class="ln red dash" d="M85 140 V193 H174" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="94" y="216">③ 기다린다</text>
+  <path class="ln red dash" d="M365 96 V43 H276" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red end" x="356" y="36">④ 기다린다</text>
+
+  <!-- 코드 -->
+  <rect class="box code" x="460" y="18" width="280" height="68" rx="8"/>
+  <text class="t-xs tc-blue" x="474" y="38">태스크 1이 지나는 경로</text>
+  <text class="t-code" x="474" y="58">spin_lock(&amp;A);</text>
+  <text class="t-code" x="474" y="76">spin_lock(&amp;B);</text>
+  <rect class="box code" x="460" y="96" width="280" height="68" rx="8"/>
+  <text class="t-xs tc-green" x="474" y="116">태스크 2가 지나는 경로</text>
+  <text class="t-code" x="474" y="136">spin_lock(&amp;B);</text>
+  <text class="t-code" x="474" y="154">spin_lock(&amp;A);</text>
+  <text class="t-s t-ink t-b" x="460" y="190">규칙: 순서를 하나로 정한다</text>
+  <text class="t-xs" x="460" y="210">모든 경로가 A 다음에 B를 잡으면</text>
+  <text class="t-xs" x="460" y="228">기다림이 고리를 이룰 수 없다</text>
+
+  <text class="t-s mid" x="380" y="254">두 경로가 실제로 동시에 실행되어야 걸린다. 그래서 테스트에서 잘 드러나지 않는다.</text>
+</svg>

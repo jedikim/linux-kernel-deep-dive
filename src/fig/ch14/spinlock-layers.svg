@@ -1,0 +1,42 @@
+<svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg">
+  <title>spin_lock()의 층: spinlock_t, raw_spinlock_t, do_raw_spin_lock(), arch_spinlock_t 순으로 내려가고, PREEMPT_RT에서는 맨 위 층에서 rt_spin_lock()으로 갈라진다</title>
+
+  <rect class="box blue" x="20" y="16" width="480" height="62" rx="10"/>
+  <text class="t-mono t-b" x="34" y="41">spin_lock(lock)</text>
+  <text class="t-code end" x="488" y="41">spinlock_t</text>
+  <text class="t-s" x="34" y="64">커널 코드 대부분이 쓰는 이름. 뜻은 빌드 설정이 정한다</text>
+
+  <path class="ln" d="M120 78 V96" marker-end="url(#ah)"/>
+  <text class="t-xs" x="132" y="93">일반 커널</text>
+
+  <rect class="box yellow" x="20" y="100" width="480" height="62" rx="10"/>
+  <text class="t-mono t-b" x="34" y="125">raw_spin_lock() → __raw_spin_lock()</text>
+  <text class="t-code end" x="488" y="125">raw_spinlock_t</text>
+  <text class="t-s" x="34" y="148">preempt_disable(), lockdep 기록. 어떤 설정에서도 도는 락</text>
+
+  <path class="ln" d="M120 162 V180" marker-end="url(#ah)"/>
+
+  <rect class="box gray" x="20" y="184" width="480" height="62" rx="10"/>
+  <text class="t-mono t-b" x="34" y="209">do_raw_spin_lock()</text>
+  <text class="t-s" x="34" y="232">디버그 빌드에서는 주인과 매직 값을 검사한다</text>
+
+  <path class="ln" d="M120 246 V264" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="20" y="268" width="480" height="62" rx="10"/>
+  <text class="t-mono t-b" x="34" y="293">arch_spin_lock() = queued_spin_lock()</text>
+  <text class="t-code end" x="488" y="293">arch_spinlock_t</text>
+  <text class="t-s" x="34" y="316">4바이트 락 워드에 대한 원자 연산. x86과 arm64는 qspinlock</text>
+
+  <!-- RT 갈래 -->
+  <path class="ln purple" d="M500 47 H635 V96" marker-end="url(#ah-purple)"/>
+  <text class="t-xs tc-purple" x="644" y="78">PREEMPT_RT</text>
+
+  <rect class="panel purple" x="530" y="100" width="210" height="146" rx="12"/>
+  <text class="t-mono t-b" x="546" y="127">rt_spin_lock()</text>
+  <text class="t-s" x="546" y="152">rt_mutex_base 위에 구현</text>
+  <text class="t-s" x="546" y="174">기다리는 쪽은 잠든다</text>
+  <text class="t-s" x="546" y="196">선점은 켜 두고</text>
+  <text class="t-s" x="546" y="218">migrate_disable()만 한다</text>
+
+  <text class="t-s mid" x="380" y="356">raw_spinlock_t는 PREEMPT_RT에서도 아래 세 층을 그대로 탄다</text>
+</svg>

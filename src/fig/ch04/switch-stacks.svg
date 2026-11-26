@@ -1,0 +1,69 @@
+<svg viewBox="0 0 760 396" xmlns="http://www.w3.org/2000/svg">
+  <title>x86-64의 __switch_to_asm: callee-saved 레지스터 여섯 개를 prev의 커널 스택에 넣고, 스택 포인터를 prev의 thread.sp에 저장한 뒤 next의 thread.sp를 읽어 오고, next의 스택에서 여섯 개를 꺼낸다.</title>
+
+  <!-- prev의 스택 -->
+  <text class="t-b" x="20" y="28">prev의 커널 스택</text>
+  <rect class="box blue" x="20" y="40" width="240" height="44" rx="6"/>
+  <text class="t-mono" x="32" y="60">pt_regs</text>
+  <text class="t-xs" x="32" y="76">커널에 들어올 때 저장한 유저 레지스터</text>
+  <rect class="box" x="20" y="84" width="240" height="48" rx="6"/>
+  <text class="t-s t-ink" x="32" y="104">함수 호출 프레임들</text>
+  <text class="t-code" x="32" y="122">… → context_switch()</text>
+  <rect class="box yellow" x="20" y="132" width="240" height="30" rx="6"/>
+  <text class="t-s t-ink" x="32" y="152">복귀 주소</text>
+  <text class="t-xs end" x="248" y="152">call이 넣었다</text>
+  <rect class="box warm" x="20" y="162" width="240" height="34" rx="6"/>
+  <text class="t-code mid" x="140" y="184">rbp rbx r12 r13 r14 r15</text>
+  <path class="ln thin muted" d="M140 196 V220" marker-start="url(#ah-muted)"/>
+  <rect class="box code" x="60" y="222" width="160" height="28" rx="6"/>
+  <text class="t-code mid" x="140" y="241">prev->thread.sp</text>
+
+  <!-- next의 스택 -->
+  <text class="t-b end" x="740" y="28">next의 커널 스택</text>
+  <rect class="box blue" x="500" y="40" width="240" height="44" rx="6"/>
+  <text class="t-mono" x="512" y="60">pt_regs</text>
+  <text class="t-xs" x="512" y="76">next가 커널에 들어올 때 저장한 것</text>
+  <rect class="box" x="500" y="84" width="240" height="48" rx="6"/>
+  <text class="t-s t-ink" x="512" y="104">함수 호출 프레임들</text>
+  <text class="t-code" x="512" y="122">… → context_switch()</text>
+  <rect class="box yellow" x="500" y="132" width="240" height="30" rx="6"/>
+  <text class="t-s t-ink" x="512" y="152">복귀 주소</text>
+  <text class="t-xs end" x="728" y="152">⑤가 여기로 돌아간다</text>
+  <rect class="box warm" x="500" y="162" width="240" height="34" rx="6"/>
+  <text class="t-code mid" x="620" y="184">rbp rbx r12 r13 r14 r15</text>
+  <path class="ln thin muted" d="M620 196 V220" marker-start="url(#ah-muted)"/>
+  <rect class="box code" x="540" y="222" width="160" height="28" rx="6"/>
+  <text class="t-code mid" x="620" y="241">next->thread.sp</text>
+
+  <!-- CPU -->
+  <rect class="box gray" x="310" y="150" width="140" height="58" rx="10"/>
+  <use href="#i-chip" x="320" y="163" width="32" height="32" class="ic gray"/>
+  <text class="t-b" x="360" y="174">CPU</text>
+  <text class="t-mono" x="360" y="194">%rsp</text>
+
+  <path class="ln warm" d="M310 179 H266" marker-end="url(#ah-warm)"/>
+  <text class="t-xs mid" x="286" y="170">① push</text>
+  <path class="ln" d="M340 208 V236 H226" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="280" y="254">② 저장</text>
+  <path class="ln green" d="M540 236 H420 V214" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="480" y="254">③ 읽어 옴</text>
+  <path class="ln warm" d="M500 179 H456" marker-end="url(#ah-warm)"/>
+  <text class="t-xs mid" x="476" y="170">④ pop</text>
+
+  <text class="t-xs mid" x="380" y="60">스택은 아래로 자란다.</text>
+  <text class="t-xs mid" x="380" y="78">thread.sp는 마지막에</text>
+  <text class="t-xs mid" x="380" y="96">넣은 r15를 가리킨다.</text>
+
+  <!-- 순서 -->
+  <path class="ln thin muted" d="M20 274 H740"/>
+  <text class="t-code" x="20" y="298">① pushq × 6</text>
+  <text class="t-s" x="250" y="298">callee-saved 레지스터를 prev의 스택에 넣는다</text>
+  <text class="t-code" x="20" y="320">② movq %rsp, prev->thread.sp</text>
+  <text class="t-s" x="250" y="320">prev의 스택 꼭대기 위치를 적어 둔다</text>
+  <text class="t-code t-b" x="20" y="342">③ movq next->thread.sp, %rsp</text>
+  <text class="t-s t-ink t-b" x="250" y="342">이 명령어를 경계로 CPU가 딛는 스택이 바뀐다</text>
+  <text class="t-code" x="20" y="364">④ popq × 6</text>
+  <text class="t-s" x="250" y="364">next가 예전에 CPU를 내줄 때 넣어 둔 값을 꺼낸다</text>
+  <text class="t-code" x="20" y="386">⑤ jmp __switch_to … ret</text>
+  <text class="t-s" x="250" y="386">next의 스택에 있는 복귀 주소로 돌아간다</text>
+</svg>

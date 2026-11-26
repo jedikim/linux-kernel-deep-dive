@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>패킷 하나의 여정 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="NIC 인터럽트에서 소켓까지, NAPI가 푼 문제">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="패킷 하나의 여정 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="NIC 인터럽트에서 소켓까지, NAPI가 푼 문제">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch12" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html" aria-current="page"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">3부 시간과 인터럽트 › <b>12장 패킷 하나의 여정</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-warm">
+<div class="ch-kicker"><span class="ch-no">12</span><span class="part">3부 · 시간과 인터럽트</span></div>
+<h1>패킷 하나의 여정</h1>
+<p class="ch-sub">NIC 인터럽트에서 소켓까지, NAPI가 푼 문제</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 55분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/drivers/net/ethernet/intel/e1000e/netdev.c" target="_blank" rel="noopener">drivers/net/ethernet/intel/e1000e/netdev.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/net/core/dev.c" target="_blank" rel="noopener">net/core/dev.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/net/gro.h" target="_blank" rel="noopener">include/net/gro.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/net/ipv4/ip_input.c" target="_blank" rel="noopener">net/ipv4/ip_input.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/net/ipv4/tcp_ipv4.c" target="_blank" rel="noopener">net/ipv4/tcp_ipv4.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/net/core/sock.c" target="_blank" rel="noopener">net/core/sock.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/drivers/net/virtio_net.c" target="_blank" rel="noopener">drivers/net/virtio_net.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/net/dropreason-core.h" target="_blank" rel="noopener">include/net/dropreason-core.h</a></div>
+</header><div class="lead">
+<p>10기가비트 링크는 초당 80만 개가 넘는 풀사이즈 프레임을 실어 나릅니다. 패킷마다 인터럽트를 한 번씩 받으면 CPU는 인터럽트에 들어갔다 나오는 일만 하다가 끝납니다. 반대로 인터럽트를 끄고 장치를 계속 들여다보면 패킷이 드물 때 CPU를 태웁니다. 리눅스의 수신 경로는 이 둘 사이를 부하에 따라 오갑니다. 이 장은 패킷 하나가 NIC에 도착해 <code>recv()</code>를 부른 프로그램의 버퍼에 닿을 때까지를 소스로 따라가며, <a href="ch11.html">11장</a>의 top half와 bottom half가 실제 서브시스템에서 어떻게 쓰이는지 봅니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>패킷 하나가 유저 버퍼에 닿기까지 어떤 실행 컨텍스트를 거치는가?</li>
+<li>NAPI는 인터럽트와 폴링을 어떤 조건으로 오가는가?</li>
+<li>softirq 한 번에 처리하는 패킷 수는 무엇으로 제한되는가?</li>
+<li>softirq와 <code>recv()</code>를 부른 태스크는 같은 소켓을 어떻게 나눠 쓰는가?</li>
+<li>RSS, RPS, XDP는 각각 수신 경로의 어느 지점에서 무엇을 바꾸는가?</li>
+<li>패킷이 버려졌을 때 어디서 왜 버려졌는지 어떻게 알아내는가?</li>
+</ul>
+</div>
+<section class="level2" id="overview">
+<h2><span class="sec-n">12.1</span>수신 경로 한눈에<a aria-label="이 절의 링크" class="anchor" href="#overview">#</a></h2>
+<p>TCP 세그먼트 하나를 받는 길을 먼저 전체로 봅니다. 드라이버는 인텔 기가비트 NIC용 e1000e를 씁니다. 수신 큐가 하나뿐이라 구조가 단순합니다. 큐가 여러 개인 최신 드라이버도 뼈대는 같습니다.</p>
+<figure class="fig" id="fig-rx-journey"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 486" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>패킷 하나가 NIC에서 유저 버퍼까지 가는 열한 단계와, 각 단계가 실행되는 컨텍스트: 하드웨어, hardirq, softirq, 프로세스 컨텍스트</title>
+
+  <rect class="panel gray" x="20" y="12" width="118" height="80" rx="10"/>
+  <text class="t-xs t-ink t-b mid" x="79" y="56">하드웨어</text>
+  <rect class="panel warm" x="20" y="92" width="118" height="40" rx="10"/>
+  <text class="t-xs t-ink t-b mid" x="79" y="116">hardirq</text>
+  <rect class="panel purple" x="20" y="132" width="118" height="280" rx="10"/>
+  <text class="t-xs t-ink t-b mid" x="79" y="276">softirq</text>
+  <rect class="panel blue" x="20" y="412" width="118" height="40" rx="10"/>
+  <text class="t-xs t-ink t-b mid" x="79" y="436">프로세스 컨텍스트</text>
+  <path class="ln thin muted" d="M168 26 V426"/>
+  <rect class="box gray" x="150" y="16" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="37">1</text>
+  <text class="t-s t-ink" x="188" y="37">NIC가 프레임을 받아 DMA로 RX 링 버퍼에 쓴다</text>
+  <rect class="box gray" x="150" y="56" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="77">2</text>
+  <text class="t-s t-ink" x="188" y="77">MSI-X 인터럽트를 건다</text>
+  <rect class="box warm" x="150" y="96" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="117">3</text>
+  <text class="t-s t-ink" x="188" y="117">장치 인터럽트를 막고 NAPI를 예약한다</text>
+  <text class="t-code" x="534" y="117">e1000_intr_msix_rx()</text>
+  <rect class="box purple" x="150" y="136" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="157">4</text>
+  <text class="t-s t-ink" x="188" y="157">NET_RX softirq가 폴링 목록을 돈다</text>
+  <text class="t-code" x="534" y="157">net_rx_action()</text>
+  <rect class="box purple" x="150" y="176" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="197">5</text>
+  <text class="t-s t-ink" x="188" y="197">드라이버 poll이 링에서 꺼내 skb를 만든다</text>
+  <text class="t-code" x="534" y="197">e1000e_poll()</text>
+  <rect class="box purple" x="150" y="216" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="237">6</text>
+  <text class="t-s t-ink" x="188" y="237">GRO가 같은 흐름의 세그먼트를 묶는다</text>
+  <text class="t-code" x="534" y="237">gro_receive_skb()</text>
+  <rect class="box purple" x="150" y="256" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="277">7</text>
+  <text class="t-s t-ink" x="188" y="277">프로토콜을 가른다 (탭, tc 훅)</text>
+  <text class="t-code" x="534" y="277">__netif_receive_skb_core()</text>
+  <rect class="box purple" x="150" y="296" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="317">8</text>
+  <text class="t-s t-ink" x="188" y="317">IP: 헤더 검사, 넷필터, 라우팅</text>
+  <text class="t-code" x="534" y="317">ip_list_rcv()</text>
+  <rect class="box purple" x="150" y="336" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="357">9</text>
+  <text class="t-s t-ink" x="188" y="357">TCP: 소켓을 찾아 수신 큐에 넣는다</text>
+  <text class="t-code" x="534" y="357">tcp_v4_rcv()</text>
+  <rect class="box purple" x="150" y="376" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="397">10</text>
+  <text class="t-s t-ink" x="188" y="397">잠든 읽는 쪽을 깨운다</text>
+  <text class="t-code" x="534" y="397">sock_def_readable()</text>
+  <rect class="box blue" x="150" y="416" width="370" height="32" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="168" y="437">11</text>
+  <text class="t-s t-ink" x="188" y="437">recv()가 수신 큐에서 유저 버퍼로 복사한다</text>
+  <text class="t-code" x="534" y="437">tcp_recvmsg()</text>
+  <text class="t-xs" x="534" y="37">장치 안에서 일어나는 일</text>
+  <text class="t-xs" x="534" y="57">커널 코드는 아직 돌지 않는다</text>
+
+  <text class="t-s mid" x="380" y="474">단계 4–10이 한 번의 softirq 실행 안에서 이어진다. 패킷 처리의 대부분이 여기서 일어난다.</text>
+</svg></div><figcaption><b>그림 12-1</b>패킷은 컨텍스트를 세 번 건넙니다. 장치에서 hardirq로, hardirq에서 softirq로, softirq에서 <code>recv()</code>를 부른 태스크로.</figcaption></figure>
+<p>눈여겨볼 점은 길이의 불균형입니다. hardirq에서 하는 일은 한 단계뿐이고, 프로토콜 처리는 전부 softirq에 있습니다. 프로세스 컨텍스트가 하는 일은 이미 소켓에 쌓인 데이터를 복사해 가는 것뿐입니다. 이 배치는 <a href="ch11.html">11장</a>의 원칙을 그대로 따른 것입니다. 인터럽트를 끈 채로는 최소한만 하고, 잠들 필요가 없는 무거운 일은 softirq에서 합니다.</p>
+</section>
+<section class="level2" id="rx-ring">
+<h2><span class="sec-n">12.2</span>RX 링과 인터럽트<a aria-label="이 절의 링크" class="anchor" href="#rx-ring">#</a></h2>
+<p>NIC는 받은 프레임을 스스로 메모리에 씁니다. 어디에 쓸지는 드라이버가 미리 알려 둡니다. 그 약속의 장소가 <strong>RX 링</strong>입니다. 디스크립터의 원형 배열이고, 디스크립터마다 버퍼 하나의 DMA 주소가 적혀 있습니다. e1000e의 기본 크기는 256칸입니다.</p>
+<figure class="fig" id="fig-rx-ring"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 272" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>RX 디스크립터 링의 세 구역: NIC가 패킷을 채운 디스크립터, 빈 버퍼가 달린 디스크립터, 버퍼를 다시 달아야 하는 디스크립터와 그 경계를 가리키는 세 포인터</title>
+
+  <text class="t-code mid" x="160" y="36">next_to_clean</text>
+  <text class="t-xs mid" x="160" y="54">드라이버가 읽을 자리</text>
+  <path class="ln thin purple" d="M160 62 V90" marker-end="url(#ah-purple)"/>
+  <text class="t-code mid" x="360" y="36">RDH</text>
+  <text class="t-xs mid" x="360" y="54">NIC가 쓸 자리</text>
+  <path class="ln thin " d="M360 62 V90" marker-end="url(#ah)"/>
+  <text class="t-code mid" x="600" y="36">next_to_use · RDT</text>
+  <text class="t-xs mid" x="600" y="54">새 버퍼를 달 자리</text>
+  <path class="ln thin purple" d="M600 62 V90" marker-end="url(#ah-purple)"/>
+  <rect class="ghost dash" x="60" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="80" y="148">0</text>
+  <rect class="ghost dash" x="100" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="120" y="148">1</text>
+  <rect class="box green" x="140" y="96" width="40" height="36"/>
+  <text class="t-code mid" x="160" y="119">DD</text>
+  <text class="t-xs tc-muted mid" x="160" y="148">2</text>
+  <rect class="box green" x="180" y="96" width="40" height="36"/>
+  <text class="t-code mid" x="200" y="119">DD</text>
+  <text class="t-xs tc-muted mid" x="200" y="148">3</text>
+  <rect class="box green" x="220" y="96" width="40" height="36"/>
+  <text class="t-code mid" x="240" y="119">DD</text>
+  <text class="t-xs tc-muted mid" x="240" y="148">4</text>
+  <rect class="box green" x="260" y="96" width="40" height="36"/>
+  <text class="t-code mid" x="280" y="119">DD</text>
+  <text class="t-xs tc-muted mid" x="280" y="148">5</text>
+  <rect class="box green" x="300" y="96" width="40" height="36"/>
+  <text class="t-code mid" x="320" y="119">DD</text>
+  <text class="t-xs tc-muted mid" x="320" y="148">6</text>
+  <rect class="box gray" x="340" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="360" y="148">7</text>
+  <rect class="box gray" x="380" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="400" y="148">8</text>
+  <rect class="box gray" x="420" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="440" y="148">9</text>
+  <rect class="box gray" x="460" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="480" y="148">10</text>
+  <rect class="box gray" x="500" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="520" y="148">11</text>
+  <rect class="box gray" x="540" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="560" y="148">12</text>
+  <rect class="ghost dash" x="580" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="600" y="148">13</text>
+  <rect class="ghost dash" x="620" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="640" y="148">14</text>
+  <rect class="ghost dash" x="660" y="96" width="40" height="36"/>
+  <text class="t-xs tc-muted mid" x="680" y="148">15</text>
+  <path class="ln thin green" d="M144 160 V166 H336 V160"/>
+  <text class="t-s t-ink t-b mid" x="240" y="186">패킷이 든 버퍼</text>
+  <text class="t-xs mid" x="240" y="204">poll이 꺼내 skb로 올린다</text>
+  <path class="ln thin muted" d="M344 160 V166 H576 V160"/>
+  <text class="t-s t-ink t-b mid" x="460" y="186">빈 버퍼, NIC가 차지</text>
+  <text class="t-xs mid" x="460" y="204">다음 패킷이 DMA로 들어온다</text>
+  <path class="ln thin muted" d="M584 160 V166 H696 V160"/>
+  <text class="t-s t-ink t-b mid" x="640" y="186">버퍼 없음</text>
+  <text class="t-xs mid" x="640" y="204">드라이버가 채운다</text>
+  <path class="ln thin muted" d="M64 160 V166 H136 V160"/>
+  <text class="t-s t-ink t-b mid" x="100" y="186">버퍼 없음</text>
+  <path class="ln thin muted dash" d="M700 114 H726 V232 H34 V114 H54" marker-end="url(#ah-muted)"/>
+  <text class="t-xs mid" x="380" y="252">링이므로 15 다음은 0이다. 세 포인터가 같은 방향으로 돌며 서로를 쫓는다.</text>
+</svg></div><figcaption><b>그림 12-2</b>RX 링의 한 순간. NIC는 RDH 자리에 패킷을 쓰고 DD(Descriptor Done) 비트를 세웁니다. 드라이버는 <code>next_to_clean</code>부터 DD가 선 칸을 거둬 갑니다.</figcaption></figure>
+<p>분업은 이렇습니다. 드라이버는 버퍼를 할당해 디스크립터에 주소를 적고 꼬리 레지스터(RDT)를 전진시켜 "여기까지 써도 된다"고 알립니다. NIC는 프레임이 오면 다음 디스크립터의 버퍼에 DMA로 쓰고, 길이와 상태를 디스크립터에 되적고, 인터럽트를 겁니다. 이때까지 CPU는 아무 일도 하지 않았습니다. 드라이버가 버퍼를 대는 속도보다 패킷이 빨리 오면 빈 버퍼가 바닥나고, NIC는 그 뒤의 프레임을 버립니다. <code>ethtool -S</code>의 <code>rx_no_buffer_count</code>와 <code>rx_missed_errors</code>가 이 상황을 셉니다.</p>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"인터럽트 핸들러가 패킷을 NIC에서 메모리로 옮긴다." 오래된 그림에 자주 나오는 설명이지만, 지금의 NIC에서는 인터럽트가 걸린 시점에 패킷이 이미 메인 메모리에 있습니다. NIC가 DMA로 직접 썼기 때문입니다. 핸들러가 할 일은 데이터를 옮기는 것이 아니라 "링에 볼 것이 생겼다"는 사실을 전하는 것입니다.</p>
+</div>
+<p>인터럽트를 받는 핸들러는 짧습니다. MSI-X를 쓸 때의 수신 핸들러 전체입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/drivers/net/ethernet/intel/e1000e/netdev.c#L1953" rel="noopener" target="_blank">drivers/net/ethernet/intel/e1000e/netdev.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="drivers/net/ethernet/intel/e1000e/netdev.c" data-line="1953" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="dt">static</span> irqreturn_t e1000_intr_msix_rx<span class="op">(</span><span class="dt">int</span> __always_unused irq<span class="op">,</span> <span class="dt">void</span> <span class="op">*</span>data<span class="op">)</span></span>
+<span id="cb1-2"><span class="op">{</span></span>
+<span id="cb1-3">    <span class="kw">struct</span> net_device <span class="op">*</span>netdev <span class="op">=</span> data<span class="op">;</span></span>
+<span id="cb1-4">    <span class="kw">struct</span> e1000_adapter <span class="op">*</span>adapter <span class="op">=</span> netdev_priv<span class="op">(</span>netdev<span class="op">);</span></span>
+<span id="cb1-5">    <span class="kw">struct</span> e1000_ring <span class="op">*</span>rx_ring <span class="op">=</span> adapter<span class="op">-&gt;</span>rx_ring<span class="op">;</span></span>
+<span id="cb1-6"></span>
+<span id="cb1-7">    <span class="co">/* Write the ITR value calculated at the end of the</span></span>
+<span id="cb1-8"><span class="co">     * previous interrupt.</span></span>
+<span id="cb1-9"><span class="co">     */</span></span>
+<span id="cb1-10">    <span class="cf">if</span> <span class="op">(</span>rx_ring<span class="op">-&gt;</span>set_itr<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb1-11">        u32 itr <span class="op">=</span> rx_ring<span class="op">-&gt;</span>itr_val <span class="op">?</span></span>
+<span id="cb1-12">              <span class="dv">1000000000</span> <span class="op">/</span> <span class="op">(</span>rx_ring<span class="op">-&gt;</span>itr_val <span class="op">*</span> <span class="dv">256</span><span class="op">)</span> <span class="op">:</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-13"></span>
+<span id="cb1-14">        writel<span class="op">(</span>itr<span class="op">,</span> rx_ring<span class="op">-&gt;</span>itr_register<span class="op">);</span></span>
+<span id="cb1-15">        rx_ring<span class="op">-&gt;</span>set_itr <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-16">    <span class="op">}</span></span>
+<span id="cb1-17"></span>
+<span id="cb1-18">    <span class="cf">if</span> <span class="op">(</span>napi_schedule_prep<span class="op">(&amp;</span>adapter<span class="op">-&gt;</span>napi<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb1-19">        adapter<span class="op">-&gt;</span>total_rx_bytes <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-20">        adapter<span class="op">-&gt;</span>total_rx_packets <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb1-21">        __napi_schedule_irqoff<span class="op">(&amp;</span>adapter<span class="op">-&gt;</span>napi<span class="op">);</span></span>
+<span id="cb1-22">    <span class="op">}</span></span>
+<span id="cb1-23">    <span class="cf">return</span> IRQ_HANDLED<span class="op">;</span></span>
+<span id="cb1-24"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li>링을 건드리지 않습니다. 패킷이 몇 개 왔는지조차 보지 않습니다.</li>
+<li>ITR 레지스터에 쓰는 값은 <strong>인터럽트 병합</strong>(interrupt coalescing) 설정입니다. NIC가 인터럽트를 걸기 전에 얼마나 기다릴지를 정합니다. 기다리는 동안 온 패킷은 인터럽트 하나로 묶입니다. <code>ethtool -C</code>로 조절하는 값이 이것입니다.</li>
+<li><code>napi_schedule_prep()</code>이 참이면 <code>__napi_schedule_irqoff()</code>를 부릅니다. 뒷일을 softirq에 맡기는 자리입니다.</li>
+</ul>
+<p><code>__napi_schedule_irqoff()</code>의 끝은 이렇습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/net/core/dev.c#L5070" rel="noopener" target="_blank">net/core/dev.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="net/core/dev.c" data-line="5070" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1">use_local_napi<span class="op">:</span></span>
+<span id="cb2-2">    DEBUG_NET_WARN_ON_ONCE<span class="op">(!</span>list_empty<span class="op">(&amp;</span>napi<span class="op">-&gt;</span>poll_list<span class="op">));</span></span>
+<span id="cb2-3">    list_add_tail<span class="op">(&amp;</span>napi<span class="op">-&gt;</span>poll_list<span class="op">,</span> <span class="op">&amp;</span>sd<span class="op">-&gt;</span>poll_list<span class="op">);</span></span>
+<span id="cb2-4">    WRITE_ONCE<span class="op">(</span>napi<span class="op">-&gt;</span>list_owner<span class="op">,</span> smp_processor_id<span class="op">());</span></span>
+<span id="cb2-5">    <span class="co">/* If not called from net_rx_action()</span></span>
+<span id="cb2-6"><span class="co">     * we have to raise NET_RX_SOFTIRQ.</span></span>
+<span id="cb2-7"><span class="co">     */</span></span>
+<span id="cb2-8">    <span class="cf">if</span> <span class="op">(!</span>sd<span class="op">-&gt;</span>in_net_rx_action<span class="op">)</span></span>
+<span id="cb2-9">        raise_softirq_irqoff<span class="op">(</span>NET_RX_SOFTIRQ<span class="op">);</span></span></code></pre></div></div>
+<p><code>sd</code>는 이 CPU의 <code>softnet_data</code>입니다. 네트워크 스택이 CPU마다 하나씩 두는 구조체로, 폴링할 NAPI 인스턴스의 목록 <code>poll_list</code>가 여기 있습니다. softirq는 비트 하나로 예약되므로 "무엇을 할지"는 이렇게 CPU별 목록에 따로 걸어 둡니다. 이 장치의 인터럽트는 e1000e가 MSI-X를 설정할 때 켜 둔 자동 마스크 기능으로 이미 막혀 있습니다. 폴링이 끝날 때까지 이 큐는 인터럽트를 걸지 않습니다.</p>
+</section>
+<section class="level2" id="napi">
+<h2><span class="sec-n">12.3</span>NAPI: 인터럽트와 폴링 사이<a aria-label="이 절의 링크" class="anchor" href="#napi">#</a></h2>
+<p><strong>NAPI</strong>는 방금 본 "인터럽트를 막고 폴링을 예약한다"는 약속에 붙은 이름입니다. 2.4 시절의 "New API"에서 온 이름이고 지금은 약자로서의 뜻이 없습니다.</p>
+<p>NAPI 이전의 드라이버는 패킷마다 인터럽트를 받아 핸들러에서 패킷을 꺼냈습니다. 부하가 낮을 때는 문제가 없습니다. 부하가 오르면 인터럽트가 softirq보다 우선하므로, CPU는 패킷을 링에서 꺼내 큐에 쌓는 일만 하고 쌓인 패킷을 처리할 시간을 얻지 못합니다. 큐가 넘쳐 패킷을 버리는데, 버릴 패킷을 꺼내느라 바쁜 상태입니다. 들어오는 양이 늘수록 처리량이 0에 가까워지는 이 현상을 <strong>수신 라이브록</strong>(receive livelock)이라고 합니다.</p>
+<figure class="fig" id="fig-napi-modes"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>NAPI의 두 상태와 전이: 패킷이 오면 인터럽트 모드에서 폴링 모드로 넘어가고, poll이 budget보다 적게 처리하면 인터럽트 모드로 돌아간다</title>
+
+  <text class="t-s mid" x="380" y="26">패킷 도착 → hardirq 핸들러가 장치 인터럽트를 막고 napi_schedule()</text>
+  <path class="ln warm" d="M160 70 V40 H600 V64" marker-end="url(#ah-warm)"/>
+
+  <rect class="box warm" x="30" y="70" width="260" height="108" rx="12"/>
+  <text class="t-l mid" x="160" y="96">인터럽트 모드</text>
+  <text class="t-s mid" x="160" y="120">장치 인터럽트 켜짐</text>
+  <text class="t-code mid" x="160" y="142">NAPI_STATE_SCHED = 0</text>
+  <text class="t-s mid" x="160" y="164">패킷이 오면 IRQ가 CPU를 끊는다</text>
+
+  <rect class="box purple" x="470" y="70" width="260" height="108" rx="12"/>
+  <text class="t-l mid" x="600" y="96">폴링 모드</text>
+  <text class="t-s mid" x="600" y="120">장치 인터럽트 꺼짐</text>
+  <text class="t-code mid" x="600" y="142">NAPI_STATE_SCHED = 1</text>
+  <text class="t-s mid" x="600" y="164">softirq가 poll()로 링을 훑는다</text>
+
+  <path class="ln purple" d="M470 100 H436 V148 H464" marker-end="url(#ah-purple)"/>
+  <text class="t-xs tc-purple end" x="426" y="118">budget을 다 썼다</text>
+  <text class="t-xs tc-purple end" x="426" y="136">→ 다시 poll()</text>
+
+  <path class="ln green" d="M600 178 V208 H160 V184" marker-end="url(#ah-green)"/>
+  <text class="t-s mid" x="380" y="230">poll()이 budget보다 적게 처리했다 → napi_complete_done() 뒤 장치 인터럽트를 다시 켠다</text>
+
+  <path class="ln thin muted" d="M30 262 H730" marker-end="url(#ah-muted)"/>
+  <text class="t-s t-ink t-b" x="30" y="284">부하가 낮을 때</text>
+  <text class="t-xs" x="30" y="302">패킷마다 인터럽트 한 번. 지연이 짧다</text>
+  <text class="t-s t-ink t-b end" x="730" y="284">부하가 높을 때</text>
+  <text class="t-xs end" x="730" y="302">인터럽트 없이 묶어서 처리. 처리량이 높다</text>
+</svg></div><figcaption><b>그림 12-3</b>NAPI 인스턴스 하나의 상태. 패킷이 드물면 왼쪽에 머물고, 몰려오면 오른쪽에 머뭅니다. 전환을 정하는 것은 타이머가 아니라 "이번 poll에서 링을 다 비웠는가"입니다.</figcaption></figure>
+<p>폴링 모드에서는 인터럽트가 오지 않습니다. softirq가 여유 있을 때 링을 훑고, 처리 속도가 따라가지 못하면 패킷은 NIC의 링에서 버려집니다. CPU를 한 사이클도 쓰지 않고 버려지므로 과부하에서도 처리량이 유지됩니다.</p>
+<p><code>NET_RX_SOFTIRQ</code>의 핸들러가 폴링 목록을 돕니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/net/core/dev.c#L8011" rel="noopener" target="_blank">net/core/dev.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="net/core/dev.c" data-line="8011" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><span class="dt">static</span> __latent_entropy <span class="dt">void</span> net_rx_action<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb3-2"><span class="op">{</span></span>
+<span id="cb3-3">    <span class="kw">struct</span> softnet_data <span class="op">*</span>sd <span class="op">=</span> this_cpu_ptr<span class="op">(&amp;</span>softnet_data<span class="op">);</span></span>
+<span id="cb3-4">    <span class="dt">unsigned</span> <span class="dt">long</span> time_limit <span class="op">=</span> jiffies <span class="op">+</span></span>
+<span id="cb3-5">        usecs_to_jiffies<span class="op">(</span>READ_ONCE<span class="op">(</span>net_hotdata<span class="op">.</span>netdev_budget_usecs<span class="op">));</span></span>
+<span id="cb3-6">    <span class="kw">struct</span> bpf_net_context __bpf_net_ctx<span class="op">,</span> <span class="op">*</span>bpf_net_ctx<span class="op">;</span></span>
+<span id="cb3-7">    <span class="dt">int</span> budget <span class="op">=</span> READ_ONCE<span class="op">(</span>net_hotdata<span class="op">.</span>netdev_budget<span class="op">);</span></span>
+<span id="cb3-8">    LIST_HEAD<span class="op">(</span>list<span class="op">);</span></span>
+<span id="cb3-9">    LIST_HEAD<span class="op">(</span>repoll<span class="op">);</span></span>
+<span id="cb3-10">    <span class="co">/* ... */</span></span>
+<span id="cb3-11">    <span class="cf">for</span> <span class="op">(;;)</span> <span class="op">{</span></span>
+<span id="cb3-12">        <span class="kw">struct</span> napi_struct <span class="op">*</span>n<span class="op">;</span></span>
+<span id="cb3-13">        <span class="co">/* ... */</span></span>
+<span id="cb3-14">        n <span class="op">=</span> list_first_entry<span class="op">(&amp;</span>list<span class="op">,</span> <span class="kw">struct</span> napi_struct<span class="op">,</span> poll_list<span class="op">);</span></span>
+<span id="cb3-15">        budget <span class="op">-=</span> napi_poll<span class="op">(</span>n<span class="op">,</span> <span class="op">&amp;</span>repoll<span class="op">);</span></span>
+<span id="cb3-16"></span>
+<span id="cb3-17">        <span class="co">/* If softirq window is exhausted then punt.</span></span>
+<span id="cb3-18"><span class="co">         * Allow this to run for 2 jiffies since which will allow</span></span>
+<span id="cb3-19"><span class="co">         * an average latency of 1.5/HZ.</span></span>
+<span id="cb3-20"><span class="co">         */</span></span>
+<span id="cb3-21">        <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>budget <span class="op">&lt;=</span> <span class="dv">0</span> <span class="op">||</span></span>
+<span id="cb3-22">                 time_after_eq<span class="op">(</span>jiffies<span class="op">,</span> time_limit<span class="op">)))</span> <span class="op">{</span></span>
+<span id="cb3-23">            <span class="co">/* Pairs with READ_ONCE() in softnet_seq_show() */</span></span>
+<span id="cb3-24">            WRITE_ONCE<span class="op">(</span>sd<span class="op">-&gt;</span>time_squeeze<span class="op">,</span> sd<span class="op">-&gt;</span>time_squeeze <span class="op">+</span> <span class="dv">1</span><span class="op">);</span></span>
+<span id="cb3-25">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb3-26">        <span class="op">}</span></span>
+<span id="cb3-27">    <span class="op">}</span></span>
+<span id="cb3-28"></span>
+<span id="cb3-29">    local_irq_disable<span class="op">();</span></span>
+<span id="cb3-30"></span>
+<span id="cb3-31">    list_splice_tail_init<span class="op">(&amp;</span>sd<span class="op">-&gt;</span>poll_list<span class="op">,</span> <span class="op">&amp;</span>list<span class="op">);</span></span>
+<span id="cb3-32">    list_splice_tail<span class="op">(&amp;</span>repoll<span class="op">,</span> <span class="op">&amp;</span>list<span class="op">);</span></span>
+<span id="cb3-33">    list_splice<span class="op">(&amp;</span>list<span class="op">,</span> <span class="op">&amp;</span>sd<span class="op">-&gt;</span>poll_list<span class="op">);</span></span>
+<span id="cb3-34">    <span class="cf">if</span> <span class="op">(!</span>list_empty<span class="op">(&amp;</span>sd<span class="op">-&gt;</span>poll_list<span class="op">))</span></span>
+<span id="cb3-35">        __raise_softirq_irqoff<span class="op">(</span>NET_RX_SOFTIRQ<span class="op">);</span></span>
+<span id="cb3-36">    <span class="co">/* ... */</span></span>
+<span id="cb3-37"><span class="op">}</span></span></code></pre></div></div>
+<p><code>napi_poll()</code>은 드라이버의 <code>poll()</code>을 부릅니다. e1000e의 것입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/drivers/net/ethernet/intel/e1000e/netdev.c#L2675" rel="noopener" target="_blank">drivers/net/ethernet/intel/e1000e/netdev.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="drivers/net/ethernet/intel/e1000e/netdev.c" data-line="2675" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="dt">static</span> <span class="dt">int</span> e1000e_poll<span class="op">(</span><span class="kw">struct</span> napi_struct <span class="op">*</span>napi<span class="op">,</span> <span class="dt">int</span> budget<span class="op">)</span></span>
+<span id="cb4-2"><span class="op">{</span></span>
+<span id="cb4-3">    <span class="co">/* ... */</span></span>
+<span id="cb4-4">    <span class="cf">if</span> <span class="op">(!</span>adapter<span class="op">-&gt;</span>msix_entries <span class="op">||</span></span>
+<span id="cb4-5">        <span class="op">(</span>adapter<span class="op">-&gt;</span>rx_ring<span class="op">-&gt;</span>ims_val <span class="op">&amp;</span> adapter<span class="op">-&gt;</span>tx_ring<span class="op">-&gt;</span>ims_val<span class="op">))</span></span>
+<span id="cb4-6">        tx_cleaned <span class="op">=</span> e1000_clean_tx_irq<span class="op">(</span>adapter<span class="op">-&gt;</span>tx_ring<span class="op">);</span></span>
+<span id="cb4-7"></span>
+<span id="cb4-8">    adapter<span class="op">-&gt;</span>clean_rx<span class="op">(</span>adapter<span class="op">-&gt;</span>rx_ring<span class="op">,</span> <span class="op">&amp;</span>work_done<span class="op">,</span> budget<span class="op">);</span></span>
+<span id="cb4-9"></span>
+<span id="cb4-10">    <span class="cf">if</span> <span class="op">(!</span>tx_cleaned <span class="op">||</span> work_done <span class="op">==</span> budget<span class="op">)</span></span>
+<span id="cb4-11">        <span class="cf">return</span> budget<span class="op">;</span></span>
+<span id="cb4-12"></span>
+<span id="cb4-13">    <span class="co">/* Exit the polling mode, but don't re-enable interrupts if stack might</span></span>
+<span id="cb4-14"><span class="co">     * poll us due to busy-polling</span></span>
+<span id="cb4-15"><span class="co">     */</span></span>
+<span id="cb4-16">    <span class="cf">if</span> <span class="op">(</span>likely<span class="op">(</span>napi_complete_done<span class="op">(</span>napi<span class="op">,</span> work_done<span class="op">)))</span> <span class="op">{</span></span>
+<span id="cb4-17">        <span class="cf">if</span> <span class="op">(</span>adapter<span class="op">-&gt;</span>itr_setting <span class="op">&amp;</span> <span class="dv">3</span><span class="op">)</span></span>
+<span id="cb4-18">            e1000_set_itr<span class="op">(</span>adapter<span class="op">);</span></span>
+<span id="cb4-19">        <span class="cf">if</span> <span class="op">(!</span>test_bit<span class="op">(</span>__E1000_DOWN<span class="op">,</span> <span class="op">&amp;</span>adapter<span class="op">-&gt;</span>state<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb4-20">            <span class="cf">if</span> <span class="op">(</span>adapter<span class="op">-&gt;</span>msix_entries<span class="op">)</span></span>
+<span id="cb4-21">                ew32<span class="op">(</span>IMS<span class="op">,</span> adapter<span class="op">-&gt;</span>rx_ring<span class="op">-&gt;</span>ims_val<span class="op">);</span></span>
+<span id="cb4-22">            <span class="cf">else</span></span>
+<span id="cb4-23">                e1000_irq_enable<span class="op">(</span>adapter<span class="op">);</span></span>
+<span id="cb4-24">        <span class="op">}</span></span>
+<span id="cb4-25">    <span class="op">}</span></span>
+<span id="cb4-26"></span>
+<span id="cb4-27">    <span class="cf">return</span> work_done<span class="op">;</span></span>
+<span id="cb4-28"><span class="op">}</span></span></code></pre></div></div>
+<p>두 코드에 한도가 세 겹으로 있습니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>한도</th>
+<th>v7.3 기본값</th>
+<th>넘으면</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>poll()</code> 한 번의 <code>budget</code></td>
+<td>64 (<code>NAPI_POLL_WEIGHT</code>)</td>
+<td><code>budget</code>을 그대로 돌려주고 폴링 모드에 남는다</td>
+</tr>
+<tr>
+<td>softirq 한 번의 패킷 수</td>
+<td>300 (<code>netdev_budget</code>)</td>
+<td><code>time_squeeze</code>를 올리고 softirq를 다시 예약한다</td>
+</tr>
+<tr>
+<td>softirq 한 번의 시간</td>
+<td>2틱 (<code>netdev_budget_usecs</code>)</td>
+<td>위와 같다</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>e1000e_poll()</code>의 갈림길이 그림 12-3의 두 화살표입니다. <code>work_done == budget</code>이면 링에 패킷이 더 있다는 뜻이므로 <code>budget</code>을 돌려주고, <code>net_rx_action()</code>이 이 인스턴스를 목록 끝에 다시 겁니다. 그보다 적게 처리했으면 링이 비었다는 뜻입니다. <code>napi_complete_done()</code>으로 폴링을 끝내고 <code>IMS</code> 레지스터에 써서 장치 인터럽트를 다시 켭니다.</p>
+<p><code>net_rx_action()</code>이 한도를 넘겨 빠져나오면 <code>NET_RX_SOFTIRQ</code>를 다시 세웁니다. 그 뒤는 <a href="ch11.html">11장</a>에서 본 <code>handle_softirqs()</code>의 몫입니다. 2ms와 재시작 10회 안에서는 다시 불리고, 그것도 넘으면 <code>ksoftirqd</code>로 넘어갑니다. 네트워크의 한도 위에 softirq 공통의 한도가 한 겹 더 있는 셈입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>NAPI는 타이머도 부하 측정도 없이 적응합니다. 규칙은 하나입니다. "일을 다 끝냈으면 인터럽트를 켜고, 못 끝냈으면 끄고 계속한다." 부하가 낮으면 poll은 매번 링을 비우므로 패킷마다 인터럽트를 받고, 부하가 높으면 poll이 budget을 채우므로 인터럽트 없이 돕니다. 모드를 고르는 정책을 따로 두지 않고, 일이 남았는지라는 사실 하나가 모드를 정하게 한 것입니다. 인터럽트는 지연이 짧고 폴링은 처리량이 높다는 두 성질을 부하에 맞춰 섞는 이 구조는, 스핀하다가 잠드는 뮤텍스(<a href="ch14.html">14장</a>)나 블록 계층의 폴링 I/O에도 되풀이됩니다.</p>
+</div>
+<p><code>napi_schedule_prep()</code>도 한 번 봐 둘 만합니다. 이 함수는 <code>napi-&gt;state</code>의 <code>NAPI_STATE_SCHED</code> 비트를 <code>try_cmpxchg()</code>로 세우고, 이미 서 있었으면 거짓을 돌려줍니다. 비트를 세운 쪽이 이 NAPI 인스턴스의 소유자가 되고, <code>napi_complete_done()</code>이 비트를 내릴 때까지 다른 누구도 <code>poll()</code>을 부르지 못합니다. 그래서 <code>poll()</code>은 링을 만질 때 락을 잡지 않습니다. 같은 softirq가 여러 CPU에서 동시에 돌 수 있어도, 큐 하나는 한 번에 한 CPU만 폴링합니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료의 수신 경로는 <code>do_IRQ()</code> → 드라이버 핸들러 → <code>netif_rx()</code> → CPU별 backlog 큐 → <code>do_softirq()</code> → <code>net_rx_action()</code> → <code>netif_receive_skb()</code>입니다. 핸들러가 패킷마다 skb를 만들어 <code>netif_rx()</code>로 큐에 넣는 구조입니다. v7.3의 물리 NIC 드라이버는 핸들러에서 패킷을 건드리지 않습니다. <code>netif_rx()</code>와 backlog 큐는 남아 있지만 쓰임이 달라졌습니다. <code>softnet_data</code> 안의 <code>backlog</code>라는 가짜 NAPI 인스턴스가 그 큐를 폴링하고, 루프백 같은 가상 장치와 뒤에 나올 RPS가 이것을 씁니다. <code>do_softirq()</code>와 패킷마다 부르던 <code>netif_receive_skb()</code>가 무엇으로 바뀌었는지는 11장과 다음 절에 있습니다.</p>
+</div>
+</section>
+<section class="level2" id="skb-gro">
+<h2><span class="sec-n">12.4</span>skb와 GRO<a aria-label="이 절의 링크" class="anchor" href="#skb-gro">#</a></h2>
+<p><code>adapter-&gt;clean_rx</code>가 가리키는 함수가 링에서 패킷을 꺼냅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/drivers/net/ethernet/intel/e1000e/netdev.c#L954" rel="noopener" target="_blank">drivers/net/ethernet/intel/e1000e/netdev.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="drivers/net/ethernet/intel/e1000e/netdev.c" data-line="954" id="cb5"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb5-1">    <span class="cf">while</span> <span class="op">(</span>staterr <span class="op">&amp;</span> E1000_RXD_STAT_DD<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb5-2">        <span class="kw">struct</span> sk_buff <span class="op">*</span>skb<span class="op">;</span></span>
+<span id="cb5-3"></span>
+<span id="cb5-4">        <span class="cf">if</span> <span class="op">(*</span>work_done <span class="op">&gt;=</span> work_to_do<span class="op">)</span></span>
+<span id="cb5-5">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb5-6">        <span class="op">(*</span>work_done<span class="op">)++;</span></span>
+<span id="cb5-7">        dma_rmb<span class="op">();</span>  <span class="co">/* read descriptor and rx_buffer_info after status DD */</span></span>
+<span id="cb5-8"></span>
+<span id="cb5-9">        skb <span class="op">=</span> buffer_info<span class="op">-&gt;</span>skb<span class="op">;</span></span>
+<span id="cb5-10">        buffer_info<span class="op">-&gt;</span>skb <span class="op">=</span> NULL<span class="op">;</span></span>
+<span id="cb5-11">        <span class="co">/* ... */</span></span>
+<span id="cb5-12">        dma_unmap_single<span class="op">(&amp;</span>pdev<span class="op">-&gt;</span>dev<span class="op">,</span> buffer_info<span class="op">-&gt;</span>dma<span class="op">,</span></span>
+<span id="cb5-13">                 adapter<span class="op">-&gt;</span>rx_buffer_len<span class="op">,</span> DMA_FROM_DEVICE<span class="op">);</span></span>
+<span id="cb5-14">        buffer_info<span class="op">-&gt;</span>dma <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb5-15"></span>
+<span id="cb5-16">        length <span class="op">=</span> le16_to_cpu<span class="op">(</span>rx_desc<span class="op">-&gt;</span>wb<span class="op">.</span>upper<span class="op">.</span>length<span class="op">);</span></span>
+<span id="cb5-17">        <span class="co">/* ... */</span></span>
+<span id="cb5-18">        skb_put<span class="op">(</span>skb<span class="op">,</span> length<span class="op">);</span></span>
+<span id="cb5-19"></span>
+<span id="cb5-20">        <span class="co">/* Receive Checksum Offload */</span></span>
+<span id="cb5-21">        e1000_rx_checksum<span class="op">(</span>adapter<span class="op">,</span> staterr<span class="op">,</span> skb<span class="op">);</span></span>
+<span id="cb5-22"></span>
+<span id="cb5-23">        e1000_rx_hash<span class="op">(</span>netdev<span class="op">,</span> rx_desc<span class="op">-&gt;</span>wb<span class="op">.</span>lower<span class="op">.</span>hi_dword<span class="op">.</span>rss<span class="op">,</span> skb<span class="op">);</span></span>
+<span id="cb5-24"></span>
+<span id="cb5-25">        e1000_receive_skb<span class="op">(</span>adapter<span class="op">,</span> netdev<span class="op">,</span> skb<span class="op">,</span> staterr<span class="op">,</span></span>
+<span id="cb5-26">                  rx_desc<span class="op">-&gt;</span>wb<span class="op">.</span>upper<span class="op">.</span>vlan<span class="op">);</span></span>
+<span id="cb5-27">        <span class="co">/* ... */</span></span>
+<span id="cb5-28">    <span class="op">}</span></span></code></pre></div></div>
+<p>DD 비트가 선 디스크립터를 <code>work_to_do</code>(budget)개까지 돕니다. <code>dma_rmb()</code>는 DD를 읽은 뒤에 나머지 필드를 읽도록 순서를 강제하는 메모리 배리어입니다(<a href="ch13.html">13장</a>). NIC가 이미 체크섬을 검증했고 흐름 해시도 계산해 두었으므로, 드라이버는 그 결과를 skb에 옮겨 적기만 합니다.</p>
+<p><strong><code>sk_buff</code></strong>(줄여서 skb)는 패킷 하나를 나타내는 구조체입니다. 패킷 데이터를 품지 않고 가리킵니다.</p>
+<figure class="fig" id="fig-skb-layout"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 296" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>sk_buff의 구조: 메타데이터 구조체의 head, data, tail, end 포인터가 선형 버퍼의 경계를 가리키고, 버퍼 끝의 skb_shared_info가 page 조각들을 가리킨다</title>
+
+  <text class="t-xs mid" x="300" y="30">headroom</text>
+  <text class="t-xs mid" x="450" y="30">선형 데이터 (skb_headlen)</text>
+  <text class="t-xs mid" x="590" y="30">tailroom</text>
+  <text class="t-code mid" x="680" y="30">skb_shared_info</text>
+
+  <rect class="ghost dash" x="260" y="40" width="80" height="40"/>
+  <rect class="box blue" x="340" y="40" width="50" height="40"/>
+  <text class="t-s t-ink mid" x="365" y="65">Eth</text>
+  <rect class="box blue" x="390" y="40" width="50" height="40"/>
+  <text class="t-s t-ink mid" x="415" y="65">IP</text>
+  <rect class="box blue" x="440" y="40" width="50" height="40"/>
+  <text class="t-s t-ink mid" x="465" y="65">TCP</text>
+  <rect class="box blue" x="490" y="40" width="70" height="40"/>
+  <text class="t-s t-ink mid" x="525" y="65">payload</text>
+  <rect class="ghost dash" x="560" y="40" width="60" height="40"/>
+  <rect class="box purple" x="620" y="40" width="120" height="40"/>
+  <text class="t-code mid" x="680" y="65">frags[]</text>
+
+  <text class="t-mono t-b" x="20" y="80">struct sk_buff</text>
+  <rect class="box" x="20" y="92" width="180" height="108" rx="8"/>
+  <text class="t-code" x="34" y="114">head</text>
+  <text class="t-code" x="34" y="138">data</text>
+  <text class="t-code" x="34" y="162">tail</text>
+  <text class="t-code" x="34" y="186">end</text>
+  <text class="t-xs" x="20" y="220">그 밖에 len, data_len, dev, sk,</text>
+  <text class="t-xs" x="20" y="238">protocol, cb[48] 같은 메타데이터</text>
+
+  <path class="ln thin" d="M74 110 H260 V86" marker-end="url(#ah)"/>
+  <path class="ln thin blue" d="M74 134 H340 V86" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M74 158 H560 V86" marker-end="url(#ah-blue)"/>
+  <path class="ln thin" d="M74 182 H620 V86" marker-end="url(#ah)"/>
+
+  <path class="ln thin purple" d="M690 80 V124" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="640" y="130" width="46" height="36" rx="4"/>
+  <text class="t-xs t-ink mid" x="663" y="152">page</text>
+  <rect class="box purple" x="694" y="130" width="46" height="36" rx="4"/>
+  <text class="t-xs t-ink mid" x="717" y="152">page</text>
+  <text class="t-xs mid" x="690" y="188">(page, offset, len)</text>
+
+  <text class="t-code" x="260" y="226">skb_put()</text>
+  <text class="t-xs" x="350" y="226">tail을 뒤로 민다. 데이터를 뒤에 붙인다</text>
+  <text class="t-code" x="260" y="248">skb_pull()</text>
+  <text class="t-xs" x="350" y="248">data를 뒤로 민다. 수신 길에서 헤더를 한 겹 벗긴다</text>
+  <text class="t-code" x="260" y="270">skb_push()</text>
+  <text class="t-xs" x="350" y="270">data를 앞으로 당긴다. 송신 길에서 headroom에 헤더를 붙인다</text>
+</svg></div><figcaption><b>그림 12-4</b>skb는 메타데이터이고 데이터는 따로 있습니다. 헤더를 붙이고 떼는 일은 복사가 아니라 포인터 이동입니다.</figcaption></figure>
+<p>포인터 넷이 버퍼 하나의 경계를 가리킵니다. 수신 길에서 계층을 하나 오를 때마다 <code>data</code>가 헤더 길이만큼 뒤로 갑니다. 이더넷 헤더를 지나면 IP 헤더가, IP를 지나면 TCP 헤더가 <code>data</code> 자리에 옵니다. 버퍼 끝에는 <code>skb_shared_info</code>가 붙어 있고, 선형 버퍼에 다 담지 못한 데이터는 그 안의 <code>frags[]</code>가 page 조각으로 가리킵니다.</p>
+<p>e1000e는 skb를 미리 만들어 링에 걸어 두는 옛 방식을 씁니다. 요즘 드라이버는 page를 링에 걸어 두고 패킷이 온 뒤에 skb를 만들며, page는 <strong>page_pool</strong>이라는 큐별 재활용 풀에서 받습니다. 패킷마다 page를 할당하고 DMA 매핑하는 비용을 없애기 위해서입니다.</p>
+<section class="level3" id="묶어서-올리기">
+<h3>묶어서 올리기</h3>
+<p><code>e1000_receive_skb()</code>는 skb를 <code>napi_gro_receive()</code>에 넘깁니다. <strong>GRO</strong>(generic receive offload)는 같은 흐름의 연속된 세그먼트를 skb 하나로 합칩니다.</p>
+<figure class="fig" id="fig-gro-merge"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 262" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>GRO: 한 번의 poll에서 올라온 여섯 개의 TCP 세그먼트가 흐름별로 두 개의 큰 skb로 묶여 프로토콜 스택을 두 번만 오른다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="30">poll 한 번에 올라온 skb</text>
+  <rect class="box blue" x="30" y="46" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="62">A · seq 1000</text>
+  <rect class="box blue" x="30" y="76" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="92">A · seq 2448</text>
+  <rect class="box green" x="30" y="106" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="122">B · seq 500</text>
+  <rect class="box blue" x="30" y="136" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="152">A · seq 3896</text>
+  <rect class="box green" x="30" y="166" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="182">B · seq 1948</text>
+  <rect class="box blue" x="30" y="196" width="110" height="24" rx="5"/>
+  <text class="t-xs t-ink mid" x="85" y="212">A · seq 5344</text>
+  <path class="ln" d="M148 133 H256" marker-end="url(#ah)"/>
+
+  <rect class="panel" x="262" y="40" width="268" height="200" rx="12"/>
+  <text class="t-code t-b" x="276" y="62">gro_receive_skb()</text>
+  <text class="t-xs" x="276" y="86">흐름 A: skb 하나, 데이터 5792바이트</text>
+  <rect class="box blue" x="276" y="94" width="44" height="28"/>
+  <text class="t-xs t-ink mid" x="298" y="112">헤더</text>
+  <rect class="box blue" x="320" y="94" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="343" y="112">1448</text>
+  <rect class="box blue" x="366" y="94" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="389" y="112">1448</text>
+  <rect class="box blue" x="412" y="94" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="435" y="112">1448</text>
+  <rect class="box blue" x="458" y="94" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="481" y="112">1448</text>
+  <text class="t-xs" x="276" y="158">흐름 B: skb 하나, 데이터 2896바이트</text>
+  <rect class="box green" x="276" y="166" width="44" height="28"/>
+  <text class="t-xs t-ink mid" x="298" y="184">헤더</text>
+  <rect class="box green" x="320" y="166" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="343" y="184">1448</text>
+  <rect class="box green" x="366" y="166" width="46" height="28"/>
+  <text class="t-xs t-ink mid" x="389" y="184">1448</text>
+  <text class="t-xs" x="276" y="224">흐름이 같고 순서가 이어지면 뒤에 붙인다</text>
+
+  <path class="ln blue" d="M504 108 H548 V124 H564" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M412 180 H548 V156 H564" marker-end="url(#ah-green)"/>
+  <rect class="box purple" x="570" y="80" width="170" height="120" rx="12"/>
+  <text class="t-b mid" x="655" y="106">프로토콜 스택</text>
+  <text class="t-s t-ink mid" x="655" y="132">IP · TCP를 2번 오른다</text>
+  <text class="t-xs mid" x="655" y="156">묶지 않으면 6번</text>
+  <text class="t-xs mid" x="655" y="178">소켓 조회, 락, 큐 삽입도 2번</text>
+</svg></div><figcaption><b>그림 12-5</b>1448바이트 세그먼트 여섯 개가 skb 둘이 됩니다. 프로토콜 스택에게는 큰 패킷 두 개가 온 것으로 보입니다.</figcaption></figure>
+<p>TCP 처리 비용의 대부분은 바이트 수가 아니라 패킷 수에 비례합니다. 헤더 해석, 소켓 조회, 락, 큐 삽입은 패킷마다 한 번씩입니다. GRO는 이 횟수를 줄입니다. 합칠 수 없는 패킷과 합치기를 마친 패킷은 한 개씩 올라가지 않고 목록에 모입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/net/gro.h#L537" rel="noopener" target="_blank">include/net/gro.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/net/gro.h" data-line="537" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">void</span> gro_normal_one<span class="op">(</span><span class="kw">struct</span> gro_node <span class="op">*</span>gro<span class="op">,</span> <span class="kw">struct</span> sk_buff <span class="op">*</span>skb<span class="op">,</span></span>
+<span id="cb6-2">                  <span class="dt">int</span> segs<span class="op">)</span></span>
+<span id="cb6-3"><span class="op">{</span></span>
+<span id="cb6-4">    list_add_tail<span class="op">(&amp;</span>skb<span class="op">-&gt;</span>list<span class="op">,</span> <span class="op">&amp;</span>gro<span class="op">-&gt;</span>rx_list<span class="op">);</span></span>
+<span id="cb6-5">    gro<span class="op">-&gt;</span>rx_count <span class="op">+=</span> segs<span class="op">;</span></span>
+<span id="cb6-6">    <span class="cf">if</span> <span class="op">(</span>gro<span class="op">-&gt;</span>rx_count <span class="op">&gt;=</span> READ_ONCE<span class="op">(</span>net_hotdata<span class="op">.</span>gro_normal_batch<span class="op">))</span></span>
+<span id="cb6-7">        gro_normal_list<span class="op">(</span>gro<span class="op">);</span></span>
+<span id="cb6-8"><span class="op">}</span></span></code></pre></div></div>
+<p><code>gro_normal_batch</code>(기본 8)만큼 모이거나 poll이 끝나면 <code>netif_receive_skb_list_internal()</code>이 목록째 위로 넘깁니다. IP 계층도 목록을 받는 <code>ip_list_rcv()</code>를 갖고 있습니다. 한 패킷이 함수 열 개를 차례로 지나는 대신 패킷 여덟 개가 함수 하나를 지나고 다음 함수로 갑니다. 명령어 캐시가 식지 않고, 간접 호출의 횟수가 줄어듭니다.</p>
+</section>
+</section>
+<section class="level2" id="stack">
+<h2><span class="sec-n">12.5</span>IP와 TCP를 오르다<a aria-label="이 절의 링크" class="anchor" href="#stack">#</a></h2>
+<p>목록의 skb는 하나씩 <code>__netif_receive_skb_core()</code>를 지납니다. 이 함수는 <code>tcpdump</code> 같은 패킷 탭에 사본을 주고, tc 훅을 실행하고, <code>skb-&gt;protocol</code>을 보고 프로토콜 핸들러를 고릅니다. IPv4라면 <code>ip_rcv()</code>(목록이면 <code>ip_list_rcv()</code>)입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/net/ipv4/ip_input.c#L603" rel="noopener" target="_blank">net/ipv4/ip_input.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="net/ipv4/ip_input.c" data-line="603" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="dt">int</span> ip_rcv<span class="op">(</span><span class="kw">struct</span> sk_buff <span class="op">*</span>skb<span class="op">,</span> <span class="kw">struct</span> net_device <span class="op">*</span>dev<span class="op">,</span> <span class="kw">struct</span> packet_type <span class="op">*</span>pt<span class="op">,</span></span>
+<span id="cb7-2">       <span class="kw">struct</span> net_device <span class="op">*</span>orig_dev<span class="op">)</span></span>
+<span id="cb7-3"><span class="op">{</span></span>
+<span id="cb7-4">    <span class="kw">struct</span> net <span class="op">*</span>net <span class="op">=</span> dev_net<span class="op">(</span>dev<span class="op">);</span></span>
+<span id="cb7-5"></span>
+<span id="cb7-6">    skb <span class="op">=</span> ip_rcv_core<span class="op">(</span>skb<span class="op">,</span> net<span class="op">);</span></span>
+<span id="cb7-7">    <span class="cf">if</span> <span class="op">(</span>skb <span class="op">==</span> NULL<span class="op">)</span></span>
+<span id="cb7-8">        <span class="cf">return</span> NET_RX_DROP<span class="op">;</span></span>
+<span id="cb7-9"></span>
+<span id="cb7-10">    <span class="cf">return</span> NF_HOOK<span class="op">(</span>NFPROTO_IPV4<span class="op">,</span> NF_INET_PRE_ROUTING<span class="op">,</span></span>
+<span id="cb7-11">               net<span class="op">,</span> NULL<span class="op">,</span> skb<span class="op">,</span> dev<span class="op">,</span> NULL<span class="op">,</span></span>
+<span id="cb7-12">               ip_rcv_finish<span class="op">);</span></span>
+<span id="cb7-13"><span class="op">}</span></span></code></pre></div></div>
+<p><code>ip_rcv_core()</code>가 헤더 길이, 버전, 체크섬을 검사합니다. <code>NF_HOOK()</code>은 이 책에서 자주 볼 모양입니다. 넷필터 훅을 실행하고, 훅이 패킷을 통과시키면 마지막 인자의 함수를 이어서 부릅니다. <code>ip_rcv_finish()</code>는 라우팅 테이블을 찾아 이 패킷이 로컬로 가는지 다른 곳으로 전달되는지 정합니다. 로컬이면 <code>ip_local_deliver()</code>가 <code>NF_INET_LOCAL_IN</code> 훅을 거쳐 IP 헤더의 프로토콜 번호에 맞는 핸들러를 부릅니다. TCP면 <code>tcp_v4_rcv()</code>입니다.</p>
+</section>
+<section class="level2" id="socket">
+<h2><span class="sec-n">12.6</span>소켓: softirq와 태스크가 만나는 곳<a aria-label="이 절의 링크" class="anchor" href="#socket">#</a></h2>
+<p><code>tcp_v4_rcv()</code>는 주소와 포트 네 개로 해시 테이블에서 소켓을 찾습니다. 찾은 뒤가 이 장에서 가장 미묘한 자리입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/net/ipv4/tcp_ipv4.c#L2242" rel="noopener" target="_blank">net/ipv4/tcp_ipv4.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="net/ipv4/tcp_ipv4.c" data-line="2242" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1">    sk_incoming_cpu_update<span class="op">(</span>sk<span class="op">);</span></span>
+<span id="cb8-2"></span>
+<span id="cb8-3">    bh_lock_sock_nested<span class="op">(</span>sk<span class="op">);</span></span>
+<span id="cb8-4">    tcp_segs_in<span class="op">(</span>tcp_sk<span class="op">(</span>sk<span class="op">),</span> skb<span class="op">);</span></span>
+<span id="cb8-5">    ret <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb8-6">    <span class="cf">if</span> <span class="op">(!</span>sock_owned_by_user<span class="op">(</span>sk<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb8-7">        ret <span class="op">=</span> tcp_v4_do_rcv<span class="op">(</span>sk<span class="op">,</span> skb<span class="op">);</span></span>
+<span id="cb8-8">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb8-9">        drop_reason <span class="op">=</span> tcp_add_backlog<span class="op">(</span>sk<span class="op">,</span> skb<span class="op">);</span></span>
+<span id="cb8-10">        <span class="cf">if</span> <span class="op">(</span>drop_reason<span class="op">)</span></span>
+<span id="cb8-11">            <span class="cf">goto</span> discard_and_relse<span class="op">;</span></span>
+<span id="cb8-12">    <span class="op">}</span></span>
+<span id="cb8-13">    bh_unlock_sock<span class="op">(</span>sk<span class="op">);</span></span></code></pre></div></div>
+<p>소켓은 두 컨텍스트가 만집니다. 패킷을 넣는 softirq와, <code>recv()</code>나 <code>send()</code>를 부른 태스크입니다. 태스크는 유저 메모리로 복사하다가 페이지 폴트로 잠들 수 있으므로 스핀락을 쥔 채 일할 수 없습니다. 그렇다고 softirq가 뮤텍스를 기다리며 잠들 수도 없습니다. 소켓 락은 이 문제를 두 층으로 풉니다.</p>
+<figure class="fig" id="fig-socket-handoff"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 306" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>소켓에서 softirq와 프로세스 컨텍스트가 만나는 방식: 태스크가 소켓을 쥐고 있지 않으면 softirq가 수신 큐에 바로 넣고, 쥐고 있으면 backlog에 넣어 두었다가 태스크가 release_sock()에서 처리한다</title>
+
+  <!-- softirq -->
+  <rect class="panel purple" x="20" y="16" width="236" height="250" rx="14"/>
+  <text class="t-b tc-purple" x="34" y="42">softirq</text>
+  <rect class="box" x="34" y="54" width="208" height="32" rx="8"/>
+  <text class="t-code mid" x="138" y="75">tcp_v4_rcv()</text>
+  <path class="ln" d="M138 86 V100" marker-end="url(#ah)"/>
+  <rect class="box" x="34" y="104" width="208" height="44"/>
+  <text class="t-s t-ink t-b mid" x="138" y="123">태스크가 소켓을 쥐고 있나</text>
+  <text class="t-code mid" x="138" y="140">sock_owned_by_user()</text>
+  <rect class="box" x="34" y="148" width="208" height="28"/>
+  <text class="t-s t-ink t-b" x="44" y="167">아니오</text>
+  <text class="t-code" x="96" y="167">tcp_v4_do_rcv()</text>
+  <rect class="box" x="34" y="176" width="208" height="28"/>
+  <text class="t-s t-ink t-b" x="44" y="195">예</text>
+  <text class="t-code" x="96" y="195">tcp_add_backlog()</text>
+  <text class="t-xs" x="34" y="228">큐에 넣은 뒤 sk_data_ready()로</text>
+  <text class="t-xs" x="34" y="246">잠든 읽는 쪽을 깨운다</text>
+
+  <!-- sock -->
+  <rect class="box gray" x="300" y="54" width="170" height="162" rx="12"/>
+  <text class="t-mono t-b" x="314" y="78">struct sock</text>
+  <rect class="box" x="314" y="92" width="142" height="34" rx="6"/>
+  <text class="t-code mid" x="385" y="114">sk_receive_queue</text>
+  <rect class="box" x="314" y="162" width="142" height="34" rx="6"/>
+  <text class="t-code mid" x="385" y="184">sk_backlog</text>
+  <path class="ln thin blue" d="M420 162 V132" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue end" x="412" y="150">나중에 옮긴다</text>
+
+  <path class="ln purple" d="M242 162 H276 V109 H308" marker-end="url(#ah-purple)"/>
+  <path class="ln purple" d="M242 190 H288 V179 H308" marker-end="url(#ah-purple)"/>
+
+  <!-- 프로세스 컨텍스트 -->
+  <rect class="panel blue" x="510" y="16" width="230" height="250" rx="14"/>
+  <text class="t-b tc-blue" x="524" y="42">프로세스 컨텍스트</text>
+  <text class="t-code" x="524" y="62">tcp_recvmsg()</text>
+  <rect class="box" x="524" y="74" width="202" height="30" rx="8"/>
+  <text class="t-code" x="536" y="94">lock_sock()</text>
+  <text class="t-xs end" x="716" y="94">소켓을 쥔다</text>
+  <rect class="box" x="524" y="112" width="202" height="30" rx="8"/>
+  <text class="t-code" x="536" y="132">tcp_recvmsg_locked()</text>
+  <text class="t-xs end" x="716" y="132">복사</text>
+  <rect class="box" x="524" y="150" width="202" height="48" rx="8"/>
+  <text class="t-code" x="536" y="170">release_sock()</text>
+  <text class="t-xs" x="536" y="188">backlog를 처리하고 놓는다</text>
+  <text class="t-xs" x="524" y="228">읽을 것이 없으면 sk_wait_data()로</text>
+  <text class="t-xs" x="524" y="246">잠들고, softirq가 깨운다</text>
+
+  <path class="ln blue" d="M456 109 H490 V127 H518" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M524 179 H462" marker-end="url(#ah-blue)"/>
+
+  <text class="t-s mid" x="380" y="290">태스크가 소켓을 쥔 동안 도착한 세그먼트는 backlog에서 기다린다. 두 컨텍스트가 소켓을 동시에 고치지 않는다.</text>
+</svg></div><figcaption><b>그림 12-6</b>소켓 락의 두 층. 스핀락은 큐를 고치는 짧은 순간만 쥐고, "태스크가 쓰는 중"이라는 표시는 플래그로 남깁니다.</figcaption></figure>
+<ul>
+<li><code>bh_lock_sock()</code>은 소켓 안의 스핀락 <code>sk_lock.slock</code>입니다. 짧게만 쥡니다.</li>
+<li><code>sk_lock.owned</code>는 "태스크가 이 소켓을 쓰는 중"이라는 플래그입니다. 태스크는 <code>lock_sock()</code>에서 스핀락을 잡고 이 플래그를 세운 뒤 스핀락을 풉니다. 그 뒤로는 잠들어도 됩니다.</li>
+</ul>
+<p>softirq는 스핀락을 잡고 플래그를 봅니다. 꺼져 있으면 <code>tcp_v4_do_rcv()</code>로 TCP 처리를 끝까지 합니다. 순서 번호를 확인하고, 데이터를 <code>sk_receive_queue</code>에 넣고, ACK를 준비하고, <code>sk_data_ready()</code>로 잠든 읽는 쪽을 깨웁니다. 플래그가 켜져 있으면 TCP 상태를 건드리지 않고 <code>sk_backlog</code>에 skb를 걸어 두고 떠납니다. 미뤄 둔 일은 태스크가 소켓을 놓을 때 처리합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/net/core/sock.c#L3864" rel="noopener" target="_blank">net/core/sock.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="net/core/sock.c" data-line="3864" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="dt">void</span> release_sock<span class="op">(</span><span class="kw">struct</span> sock <span class="op">*</span>sk<span class="op">)</span></span>
+<span id="cb9-2"><span class="op">{</span></span>
+<span id="cb9-3">    spin_lock_bh<span class="op">(&amp;</span>sk<span class="op">-&gt;</span>sk_lock<span class="op">.</span>slock<span class="op">);</span></span>
+<span id="cb9-4"></span>
+<span id="cb9-5">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>sk<span class="op">-&gt;</span>sk_backlog<span class="op">.</span>tail<span class="op">))</span></span>
+<span id="cb9-6">        __release_sock<span class="op">(</span>sk<span class="op">);</span></span>
+<span id="cb9-7"></span>
+<span id="cb9-8">    <span class="cf">if</span> <span class="op">(</span>sk<span class="op">-&gt;</span>sk_prot<span class="op">-&gt;</span>release_cb<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb9-9">        <span class="cf">if</span> <span class="op">(!</span>tcp_release_cb_cond<span class="op">(</span>sk<span class="op">))</span></span>
+<span id="cb9-10">            sk<span class="op">-&gt;</span>sk_prot<span class="op">-&gt;</span>release_cb<span class="op">(</span>sk<span class="op">);</span></span>
+<span id="cb9-11">    <span class="op">}</span></span>
+<span id="cb9-12">    sock_release_ownership<span class="op">(</span>sk<span class="op">);</span></span>
+<span id="cb9-13">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>waitqueue_active<span class="op">(&amp;</span>sk<span class="op">-&gt;</span>sk_lock<span class="op">.</span>wq<span class="op">)))</span></span>
+<span id="cb9-14">        wake_up<span class="op">(&amp;</span>sk<span class="op">-&gt;</span>sk_lock<span class="op">.</span>wq<span class="op">);</span></span>
+<span id="cb9-15"></span>
+<span id="cb9-16">    spin_unlock_bh<span class="op">(&amp;</span>sk<span class="op">-&gt;</span>sk_lock<span class="op">.</span>slock<span class="op">);</span></span>
+<span id="cb9-17"><span class="op">}</span></span></code></pre></div></div>
+<p><code>__release_sock()</code>이 backlog의 skb마다 <code>tcp_v4_do_rcv()</code>를 부릅니다. softirq가 하려던 일을 태스크가 자기 시간으로 대신하는 것입니다. 급한 쪽(softirq)은 기다리지 않고, 느긋한 쪽(태스크)이 밀린 일을 떠맡습니다. <code>spin_lock_bh()</code>가 쓰인 이유는 <a href="ch13.html">13장</a>의 주제입니다. 태스크가 이 스핀락을 쥔 채 같은 CPU에서 softirq가 끼어들어 같은 락을 잡으려 하면 교착이기 때문입니다.</p>
+<p>여정의 마지막은 <code>tcp_recvmsg()</code>입니다. <code>lock_sock()</code>으로 소켓을 쥐고, <code>sk_receive_queue</code>의 skb에서 유저 버퍼로 복사하고, 읽을 것이 없으면 <code>sk_wait_data()</code>로 잠들고, <code>release_sock()</code>으로 놓습니다. 패킷이 NIC에 도착한 뒤 처음으로 데이터가 복사되는 자리입니다.</p>
+</section>
+<section class="level2" id="scaling">
+<h2><span class="sec-n">12.7</span>여러 CPU로 펼치기<a aria-label="이 절의 링크" class="anchor" href="#scaling">#</a></h2>
+<p>지금까지의 길은 CPU 하나에서 일어났습니다. 링이 하나면 NAPI도 하나이고, 한 번에 한 CPU만 그것을 폴링합니다. 코어가 수십 개여도 수신 처리량은 코어 하나에 묶입니다.</p>
+<figure class="fig" id="fig-rss-rps"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 282" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>RSS와 RPS의 비교: RSS는 NIC가 해시로 수신 큐를 골라 큐마다 다른 CPU에 인터럽트를 걸고, RPS는 한 CPU가 받은 패킷을 커널이 해시로 다른 CPU의 backlog에 나눠 준다</title>
+
+  <rect class="panel" x="20" y="16" width="352" height="250" rx="14"/>
+  <text class="t-b" x="34" y="42">RSS</text>
+  <text class="t-xs" x="74" y="42">NIC가 해시로 큐를 고른다</text>
+  <rect class="box gray" x="34" y="62" width="104" height="154" rx="10"/>
+  <use href="#i-nic" x="68" y="72" width="36" height="36" class="ic gray"/>
+  <text class="t-s t-ink t-b mid" x="86" y="134">NIC</text>
+  <text class="t-xs mid" x="86" y="158">4-튜플 해시</text>
+  <text class="t-xs mid" x="86" y="178">간접 테이블</text>
+  <text class="t-xs tc-warm mid" x="256" y="56">큐마다 MSI-X</text>
+  <path class="ln thin muted" d="M138 139 L158 76"/>
+  <rect class="box gray" x="158" y="62" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="190" y="80">rx-0</text>
+  <path class="ln warm" d="M222 76 H286" marker-end="url(#ah-warm)"/>
+  <rect class="box purple" x="292" y="62" width="66" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="325" y="81">CPU 0</text>
+  <path class="ln thin muted" d="M138 139 L158 118"/>
+  <rect class="box gray" x="158" y="104" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="190" y="122">rx-1</text>
+  <path class="ln warm" d="M222 118 H286" marker-end="url(#ah-warm)"/>
+  <rect class="box purple" x="292" y="104" width="66" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="325" y="123">CPU 1</text>
+  <path class="ln thin muted" d="M138 139 L158 160"/>
+  <rect class="box gray" x="158" y="146" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="190" y="164">rx-2</text>
+  <path class="ln warm" d="M222 160 H286" marker-end="url(#ah-warm)"/>
+  <rect class="box purple" x="292" y="146" width="66" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="325" y="165">CPU 2</text>
+  <path class="ln thin muted" d="M138 139 L158 202"/>
+  <rect class="box gray" x="158" y="188" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="190" y="206">rx-3</text>
+  <path class="ln warm" d="M222 202 H286" marker-end="url(#ah-warm)"/>
+  <rect class="box purple" x="292" y="188" width="66" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="325" y="207">CPU 3</text>
+  <text class="t-xs" x="34" y="240">인터럽트부터 TCP까지 큐를 맡은 CPU가 한다</text>
+  <text class="t-xs" x="34" y="258">큐 수는 ethtool -L, 테이블은 ethtool -X</text>
+  <rect class="panel" x="388" y="16" width="352" height="250" rx="14"/>
+  <text class="t-b" x="402" y="42">RPS</text>
+  <text class="t-xs" x="442" y="42">커널이 해시로 CPU를 고른다</text>
+  <rect class="box gray" x="402" y="125" width="60" height="28" rx="6"/>
+  <text class="t-code mid" x="432" y="143">rx-0</text>
+  <path class="ln warm" d="M462 139 H494" marker-end="url(#ah-warm)"/>
+  <rect class="box purple" x="500" y="113" width="96" height="52" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="548" y="134">CPU 0</text>
+  <text class="t-xs mid" x="548" y="153">poll · GRO</text>
+  <text class="t-code end" x="646" y="56">get_rps_cpu()</text>
+  <path class="ln thin purple dash" d="M596 139 L648 76" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="654" y="62" width="72" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="81">CPU 0</text>
+  <path class="ln thin purple dash" d="M596 139 L648 118" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="654" y="104" width="72" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="123">CPU 1</text>
+  <path class="ln thin purple dash" d="M596 139 L648 160" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="654" y="146" width="72" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="165">CPU 2</text>
+  <path class="ln thin purple dash" d="M596 139 L648 202" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="654" y="188" width="72" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="207">CPU 3</text>
+  <text class="t-xs" x="402" y="240">그 뒤는 대상 CPU의 backlog에 넣고 IPI로 깨운다</text>
+  <text class="t-xs" x="402" y="258">큐가 하나뿐인 NIC에서도 쓸 수 있다 (rps_cpus)</text>
+</svg></div><figcaption><b>그림 12-7</b>펼치는 지점이 다릅니다. RSS는 인터럽트 이전에, RPS는 드라이버의 poll 이후에 나눕니다.</figcaption></figure>
+<p><strong>RSS</strong>(receive side scaling)는 NIC가 합니다. 수신 큐를 여러 개 두고, 패킷의 주소와 포트를 해시한 값으로 간접 테이블을 찾아 큐를 고릅니다. 큐마다 MSI-X 벡터와 NAPI 인스턴스가 따로 있고, 벡터의 친화성(<a href="ch10.html">10장</a>)이 큐를 CPU에 잇습니다. 같은 연결의 패킷은 해시가 같으므로 늘 같은 큐, 같은 CPU로 갑니다. 연결 안에서 순서가 뒤바뀌지 않고, 그 연결의 소켓이 한 CPU의 캐시에 머뭅니다.</p>
+<p><strong>RPS</strong>(receive packet steering)는 같은 일을 커널이 소프트웨어로 합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/net/core/dev.c#L6516" rel="noopener" target="_blank">net/core/dev.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="net/core/dev.c" data-line="6516" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="pp">#ifdef CONFIG_RPS</span></span>
+<span id="cb10-2">    <span class="cf">if</span> <span class="op">(</span>static_branch_unlikely<span class="op">(&amp;</span>rps_needed<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb10-3">        list_for_each_entry_safe<span class="op">(</span>skb<span class="op">,</span> next<span class="op">,</span> head<span class="op">,</span> list<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-4">            <span class="kw">struct</span> rps_dev_flow voidflow<span class="op">,</span> <span class="op">*</span>rflow <span class="op">=</span> <span class="op">&amp;</span>voidflow<span class="op">;</span></span>
+<span id="cb10-5">            <span class="dt">int</span> cpu <span class="op">=</span> get_rps_cpu<span class="op">(</span>skb<span class="op">-&gt;</span>dev<span class="op">,</span> skb<span class="op">,</span> <span class="op">&amp;</span>rflow<span class="op">);</span></span>
+<span id="cb10-6"></span>
+<span id="cb10-7">            <span class="cf">if</span> <span class="op">(</span>cpu <span class="op">&gt;=</span> <span class="dv">0</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb10-8">                <span class="co">/* Will be handled, remove from list */</span></span>
+<span id="cb10-9">                skb_list_del_init<span class="op">(</span>skb<span class="op">);</span></span>
+<span id="cb10-10">                enqueue_to_backlog<span class="op">(</span>skb<span class="op">,</span> cpu<span class="op">,</span> <span class="op">&amp;</span>rflow<span class="op">-&gt;</span>last_qtail<span class="op">);</span></span>
+<span id="cb10-11">            <span class="op">}</span></span>
+<span id="cb10-12">        <span class="op">}</span></span>
+<span id="cb10-13">    <span class="op">}</span></span>
+<span id="cb10-14"><span class="pp">#endif</span></span></code></pre></div></div>
+<p>GRO를 마친 목록이 프로토콜 스택으로 들어가기 직전입니다. <code>get_rps_cpu()</code>가 흐름 해시로 대상 CPU를 고르면, skb를 그 CPU의 <code>softnet_data</code>에 있는 backlog 큐에 넣고 IPI로 깨웁니다. 앞 절에서 말한 backlog NAPI가 여기서 쓰입니다. <strong>RFS</strong>(receive flow steering)는 한 걸음 더 가서, 해시가 아니라 "이 흐름을 <code>recv()</code>하는 태스크가 마지막으로 돈 CPU"를 고릅니다. 송신 쪽에는 CPU마다 쓸 송신 큐를 정하는 <strong>XPS</strong>가 있습니다.</p>
+<p>네 기법의 목표는 같습니다. 한 흐름의 일을 한 CPU에 모으고, 서로 다른 흐름을 서로 다른 CPU로 흩습니다. 한 CPU에 모으면 락 경합과 캐시 라인 이동이 줄고, 흩으면 코어를 다 씁니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>수신 큐와 인터럽트가 CPU에 어떻게 걸려 있는지 봅니다. 인터페이스 이름은 <code>ip -br link</code>로 확인해 바꿔 넣습니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ ethtool -l eth0                # 큐(채널) 수
+$ ethtool -c eth0                # 인터럽트 병합 설정 (rx-usecs 등)
+$ grep eth0 /proc/interrupts     # 큐별 IRQ가 어느 CPU에서 몇 번 났는지
+$ cat /sys/class/net/eth0/queues/rx-0/rps_cpus
+$ ethtool -S eth0 | grep -iE 'miss|drop|no_buffer'</code></pre></div>
+<p>softirq 쪽 통계는 <code>/proc/net/softnet_stat</code>입니다. 한 줄이 CPU 하나이고 값은 16진수입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ cat /proc/net/softnet_stat
+0002a5f1 00000000 0000001c 00000000 ...
+0000c3d2 00000000 00000000 00000000 ...</code></pre></div>
+<p>첫째 열은 그 CPU가 처리한 패킷 수, 둘째 열은 backlog 큐가 차서 버린 수, 셋째 열이 <code>time_squeeze</code>입니다. 셋째 열이 꾸준히 늘면 <code>net_rx_action()</code>이 한도에 걸려 일을 남기고 나온다는 뜻입니다. <code>sysctl net.core.netdev_budget</code>을 올리기 전에, 한 CPU에 큐가 몰려 있지 않은지부터 봅니다.</p>
+<p>패킷이 어느 태스크의 문맥에서 처리되는지도 볼 수 있습니다. <code>ksoftirqd</code>가 많이 나오면 인터럽트 복귀 길에서 다 처리하지 못하고 있다는 뜻입니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># bpftrace -e 'tracepoint:net:netif_receive_skb { @[comm] = count(); }'</code></pre></div>
+</div>
+</section>
+<section class="level2" id="xdp">
+<h2><span class="sec-n">12.8</span>더 아래로, 더 한꺼번에<a aria-label="이 절의 링크" class="anchor" href="#xdp">#</a></h2>
+<p>skb를 만들고 스택을 오르는 비용조차 아까운 경우가 있습니다. DDoS 패킷을 버리는 방화벽은 패킷의 첫 수십 바이트만 보면 되고, 로드 밸런서는 헤더를 고쳐 다시 내보내면 됩니다.</p>
+<figure class="fig" id="fig-hooks"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>수신 경로에서 패킷을 가로챌 수 있는 자리: 드라이버의 XDP, 프로토콜 분기 지점의 generic XDP와 패킷 탭과 tc ingress, IP의 넷필터 PRE_ROUTING과 LOCAL_IN, TCP의 소켓 필터</title>
+
+  <path class="ln thin muted" d="M36 28 V340" marker-end="url(#ah-muted)"/>
+  <text class="t-xs" x="50" y="38">위에서 버릴수록</text>
+  <text class="t-xs" x="50" y="56">치른 비용이 적다</text>
+  <text class="t-xs" x="50" y="322">아래로 갈수록</text>
+  <text class="t-xs" x="50" y="340">아는 것이 많다</text>
+  <rect class="box purple" x="190" y="16" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="35">드라이버 poll</text>
+  <text class="t-xs" x="204" y="52">RX 링의 버퍼를 그대로 본다</text>
+  <path class="ln green" d="M470 38 H438" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="470" y="16" width="270" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="484" y="35">XDP</text>
+  <text class="t-xs" x="484" y="52">skb를 만들기 전에 BPF 프로그램 실행</text>
+  <path class="ln thin" d="M310 60 V72"/>
+  <rect class="box purple" x="190" y="72" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="91">skb 할당, GRO</text>
+  <text class="t-code" x="204" y="108">gro_receive_skb()</text>
+  <path class="ln thin" d="M310 116 V128"/>
+  <rect class="box purple" x="190" y="128" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="147">프로토콜 분기</text>
+  <text class="t-code" x="204" y="164">__netif_receive_skb_core()</text>
+  <path class="ln green" d="M470 150 H438" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="470" y="128" width="270" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="484" y="147">generic XDP · 패킷 탭 · tc ingress</text>
+  <text class="t-xs" x="484" y="164">tcpdump가 보는 곳. tc BPF가 붙는 곳</text>
+  <path class="ln thin" d="M310 172 V184"/>
+  <rect class="box purple" x="190" y="184" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="203">IP 수신</text>
+  <text class="t-code" x="204" y="220">ip_rcv()</text>
+  <path class="ln warm" d="M470 206 H438" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="470" y="184" width="270" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="484" y="203">넷필터 PRE_ROUTING</text>
+  <text class="t-xs" x="484" y="220">연결 추적, 목적지 NAT</text>
+  <path class="ln thin" d="M310 228 V240"/>
+  <rect class="box purple" x="190" y="240" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="259">로컬 전달</text>
+  <text class="t-code" x="204" y="276">ip_local_deliver()</text>
+  <path class="ln warm" d="M470 262 H438" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="470" y="240" width="270" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="484" y="259">넷필터 LOCAL_IN</text>
+  <text class="t-xs" x="484" y="276">방화벽의 INPUT 규칙</text>
+  <path class="ln thin" d="M310 284 V296"/>
+  <rect class="box purple" x="190" y="296" width="240" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="204" y="315">TCP</text>
+  <text class="t-code" x="204" y="332">tcp_v4_rcv()</text>
+  <path class="ln blue" d="M470 318 H438" marker-end="url(#ah-blue)"/>
+  <rect class="box blue" x="470" y="296" width="270" height="44" rx="8"/>
+  <text class="t-s t-ink t-b" x="484" y="315">소켓 필터</text>
+  <text class="t-xs" x="484" y="332">소켓에 붙인 BPF 필터</text>
+  <text class="t-s mid" x="380" y="358">왼쪽은 패킷이 지나는 길, 오른쪽은 그 길에 끼어들 수 있는 훅이다</text>
+</svg></div><figcaption><b>그림 12-8</b>수신 경로의 훅. 같은 "버린다"는 결정도 위에서 내릴수록 쌉니다.</figcaption></figure>
+<p><strong>XDP</strong>(express data path)는 그림의 맨 위, 드라이버의 poll 안에서 BPF 프로그램을 실행합니다. skb가 아직 없고, 프로그램은 링의 버퍼를 가리키는 <code>xdp_buff</code>만 받습니다. virtio_net 드라이버가 프로그램의 판정을 처리하는 코드입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/drivers/net/virtio_net.c#L1694" rel="noopener" target="_blank">drivers/net/virtio_net.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="drivers/net/virtio_net.c" data-line="1694" id="cb14"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb14-1">    act <span class="op">=</span> bpf_prog_run_xdp<span class="op">(</span>xdp_prog<span class="op">,</span> xdp<span class="op">);</span></span>
+<span id="cb14-2">    u64_stats_inc<span class="op">(&amp;</span>stats<span class="op">-&gt;</span>xdp_packets<span class="op">);</span></span>
+<span id="cb14-3"></span>
+<span id="cb14-4">    <span class="cf">switch</span> <span class="op">(</span>act<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb14-5">    <span class="cf">case</span> XDP_PASS<span class="op">:</span></span>
+<span id="cb14-6">        <span class="cf">return</span> act<span class="op">;</span></span>
+<span id="cb14-7"></span>
+<span id="cb14-8">    <span class="cf">case</span> XDP_TX<span class="op">:</span></span>
+<span id="cb14-9">        u64_stats_inc<span class="op">(&amp;</span>stats<span class="op">-&gt;</span>xdp_tx<span class="op">);</span></span>
+<span id="cb14-10">        xdpf <span class="op">=</span> xdp_convert_buff_to_frame<span class="op">(</span>xdp<span class="op">);</span></span>
+<span id="cb14-11">        <span class="co">/* ... */</span></span>
+<span id="cb14-12">        err <span class="op">=</span> virtnet_xdp_xmit<span class="op">(</span>dev<span class="op">,</span> <span class="dv">1</span><span class="op">,</span> <span class="op">&amp;</span>xdpf<span class="op">,</span> <span class="dv">0</span><span class="op">);</span></span>
+<span id="cb14-13">        <span class="co">/* ... */</span></span>
+<span id="cb14-14">        <span class="op">*</span>xdp_xmit <span class="op">|=</span> VIRTIO_XDP_TX<span class="op">;</span></span>
+<span id="cb14-15">        <span class="cf">return</span> act<span class="op">;</span></span>
+<span id="cb14-16"></span>
+<span id="cb14-17">    <span class="cf">case</span> XDP_REDIRECT<span class="op">:</span></span>
+<span id="cb14-18">        u64_stats_inc<span class="op">(&amp;</span>stats<span class="op">-&gt;</span>xdp_redirects<span class="op">);</span></span>
+<span id="cb14-19">        err <span class="op">=</span> xdp_do_redirect<span class="op">(</span>dev<span class="op">,</span> xdp<span class="op">,</span> xdp_prog<span class="op">);</span></span>
+<span id="cb14-20">        <span class="cf">if</span> <span class="op">(</span>err<span class="op">)</span></span>
+<span id="cb14-21">            <span class="cf">return</span> XDP_DROP<span class="op">;</span></span>
+<span id="cb14-22"></span>
+<span id="cb14-23">        <span class="op">*</span>xdp_xmit <span class="op">|=</span> VIRTIO_XDP_REDIR<span class="op">;</span></span>
+<span id="cb14-24">        <span class="cf">return</span> act<span class="op">;</span></span>
+<span id="cb14-25"></span>
+<span id="cb14-26">    <span class="cf">default</span><span class="op">:</span></span>
+<span id="cb14-27">        bpf_warn_invalid_xdp_action<span class="op">(</span>dev<span class="op">,</span> xdp_prog<span class="op">,</span> act<span class="op">);</span></span>
+<span id="cb14-28">        fallthrough<span class="op">;</span></span>
+<span id="cb14-29">    <span class="cf">case</span> XDP_ABORTED<span class="op">:</span></span>
+<span id="cb14-30">        trace_xdp_exception<span class="op">(</span>dev<span class="op">,</span> xdp_prog<span class="op">,</span> act<span class="op">);</span></span>
+<span id="cb14-31">        fallthrough<span class="op">;</span></span>
+<span id="cb14-32">    <span class="cf">case</span> XDP_DROP<span class="op">:</span></span>
+<span id="cb14-33">        <span class="cf">return</span> XDP_DROP<span class="op">;</span></span>
+<span id="cb14-34">    <span class="op">}</span></span></code></pre></div></div>
+<p>판정은 다섯 가지입니다. <code>XDP_DROP</code>은 버퍼를 풀에 돌려주고 끝냅니다. <code>XDP_PASS</code>는 평소처럼 skb를 만들어 올립니다. <code>XDP_TX</code>는 받은 NIC로 되쏩니다. <code>XDP_REDIRECT</code>는 다른 NIC, 다른 CPU, 또는 유저 공간의 <strong>AF_XDP</strong> 소켓으로 보냅니다. <code>XDP_ABORTED</code>는 프로그램 오류입니다. BPF 프로그램이 어떻게 검증되고 실행되는지는 <a href="ch24.html">24장</a>에서 다룹니다.</p>
+<p>그림의 셋째 단에 있는 tc 훅에도 BPF 프로그램을 붙일 수 있습니다. skb가 만들어진 뒤라 XDP보다 비싸지만, GRO로 합쳐진 패킷을 보고 skb의 메타데이터를 모두 쓸 수 있습니다. 컨테이너 네트워킹 도구들이 이 훅을 많이 씁니다.</p>
+<p>수신 경로의 다른 개선들도 방향이 같습니다. 건너뛸 수 있는 단계를 건너뛰고, 한 번 깨어났을 때 많이 처리합니다.</p>
+<ul>
+<li><strong>busy polling</strong>: <code>recv()</code>나 <code>epoll_wait()</code>를 부른 태스크가 인터럽트를 기다리지 않고 직접 NAPI poll을 돌립니다. CPU를 써서 지연을 줄입니다.</li>
+<li><strong>스레드 NAPI</strong>: poll을 softirq 대신 <code>napi/장치-ID</code> 커널 스레드에서 돌립니다. 스케줄러가 우선순위와 CPU를 정할 수 있게 됩니다. softirq를 스레드로 옮기는 11장의 흐름과 같은 맥락입니다.</li>
+<li><strong>IRQ 유예와 중단</strong>: 링을 비운 뒤에도 인터럽트를 바로 켜지 않고 타이머로 한 번 더 폴링하거나(<code>napi_defer_hard_irqs</code>, <code>gro_flush_timeout</code>), 애플리케이션이 <code>epoll_wait()</code>로 데이터를 계속 가져가는 동안 인터럽트를 아예 꺼 둡니다(<code>irq-suspend-timeout</code>). 이 값들은 NAPI 인스턴스마다 netlink로 설정합니다.</li>
+<li><strong>io_uring 제로카피 수신</strong>: NIC가 헤더와 페이로드를 나눠 받게 하고, 페이로드를 유저 메모리에 직접 받습니다. 헤더는 평소처럼 커널 TCP 스택이 처리합니다. 마지막 단계의 복사가 사라집니다.</li>
+</ul>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>이 장에 나온 기법을 세 가지 발상으로 묶을 수 있습니다. 첫째, <strong>적응</strong>입니다. NAPI는 부하에 따라 인터럽트와 폴링을 오갑니다. 둘째, <strong>묶음</strong>입니다. 인터럽트 병합은 인터럽트를, budget은 softirq 실행을, GRO는 패킷을, 목록 수신은 함수 호출을 묶습니다. 고정 비용이 있는 일은 한 번에 여러 개를 하면 싸집니다. 셋째, <strong>일찍 결정하기</strong>입니다. XDP는 버릴 패킷을 skb를 만들기 전에 버립니다. 세 발상 모두 지연 시간을 조금 내주고 처리량을 얻는 거래이고, 그래서 전부 끄거나 조절하는 손잡이가 달려 있습니다. 성능 기능을 넣을 때 "언제 손해인가"를 함께 적고 끌 방법을 주는 것은 커널 네트워크 코드의 일관된 습관입니다.</p>
+</div>
+</section>
+<section class="level2" id="tx-drops">
+<h2><span class="sec-n">12.9</span>송신 경로와 드롭 추적<a aria-label="이 절의 링크" class="anchor" href="#tx-drops">#</a></h2>
+<p>송신은 수신을 거꾸로 걷습니다. 대부분 <code>send()</code>를 부른 태스크의 문맥에서 일어납니다.</p>
+<ol type="1">
+<li><code>tcp_sendmsg()</code>가 유저 데이터를 skb에 복사해 소켓의 송신 큐에 넣습니다.</li>
+<li><code>tcp_write_xmit()</code>이 혼잡 윈도가 허락하는 만큼 꺼내 TCP 헤더를 붙이고 <code>ip_queue_xmit()</code>으로 넘깁니다.</li>
+<li>IP 계층이 경로를 찾고 헤더를 붙이고 넷필터 훅을 거칩니다.</li>
+<li><code>__dev_queue_xmit()</code>이 장치의 <strong>qdisc</strong>(큐잉 규율)에 넣습니다. 여기서 순서와 속도가 정해집니다.</li>
+<li><code>dev_hard_start_xmit()</code>이 드라이버의 <code>ndo_start_xmit()</code>을 부릅니다. 드라이버는 TX 링에 디스크립터를 채우고 NIC에 알립니다.</li>
+<li>NIC가 보내고 나면 인터럽트를 걸고, NAPI poll이 보낸 skb를 해제합니다. 앞의 <code>e1000e_poll()</code>에서 <code>e1000_clean_tx_irq()</code>를 부르던 자리입니다.</li>
+</ol>
+<p>수신의 GRO에 대응하는 것이 <strong>TSO/GSO</strong>입니다. TCP는 MSS보다 훨씬 큰 skb 하나를 내려보내고, 쪼개는 일은 NIC(TSO)나 드라이버 직전의 커널 코드(GSO)가 합니다. 스택을 내려가는 횟수가 줄어듭니다. <strong>BQL</strong>(byte queue limits)은 TX 링에 쌓아 둘 바이트 수에 상한을 둡니다. 링이 깊으면 패킷이 qdisc가 아니라 링에서 기다리게 되고, qdisc의 우선순위와 공정성 정책이 힘을 잃기 때문입니다.</p>
+<section class="level3" id="버려진-패킷-찾기">
+<h3>버려진 패킷 찾기</h3>
+<p>여정의 모든 단계에서 패킷이 버려질 수 있습니다. 링이 차서, 체크섬이 틀려서, 넷필터 규칙에 걸려서, 소켓이 없어서, 수신 버퍼가 차서입니다. 예전에는 버리는 코드가 모두 <code>kfree_skb()</code>를 불러서 어디서 왜 버렸는지 알기 어려웠습니다. 지금은 이유를 함께 넘깁니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/net/dropreason-core.h#L138" rel="noopener" target="_blank">include/net/dropreason-core.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/net/dropreason-core.h" data-line="138" id="cb15"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb15-1"><span class="kw">enum</span> skb_drop_reason <span class="op">{</span></span>
+<span id="cb15-2">    <span class="co">/**</span></span>
+<span id="cb15-3"><span class="co">     * </span><span class="an">@SKB_NOT_DROPPED_YET:</span><span class="co"> skb is not dropped yet (used for no-drop case)</span></span>
+<span id="cb15-4"><span class="co">     */</span></span>
+<span id="cb15-5">    SKB_NOT_DROPPED_YET <span class="op">=</span> <span class="dv">0</span><span class="op">,</span></span>
+<span id="cb15-6">    <span class="co">/** </span><span class="an">@SKB_CONSUMED:</span><span class="co"> packet has been consumed */</span></span>
+<span id="cb15-7">    SKB_CONSUMED<span class="op">,</span></span>
+<span id="cb15-8">    <span class="co">/** </span><span class="an">@SKB_DROP_REASON_NOT_SPECIFIED:</span><span class="co"> drop reason is not specified */</span></span>
+<span id="cb15-9">    SKB_DROP_REASON_NOT_SPECIFIED<span class="op">,</span></span>
+<span id="cb15-10">    <span class="co">/**</span></span>
+<span id="cb15-11"><span class="co">     * </span><span class="an">@SKB_DROP_REASON_NO_SOCKET:</span><span class="co"> no valid socket that can be used.</span></span>
+<span id="cb15-12"><span class="co">     * Reason could be one of three cases:</span></span>
+<span id="cb15-13"><span class="co">     * 1) no established/listening socket found during lookup process</span></span>
+<span id="cb15-14"><span class="co">     * 2) no valid request socket during 3WHS process</span></span>
+<span id="cb15-15"><span class="co">     * 3) no valid child socket during 3WHS process</span></span>
+<span id="cb15-16"><span class="co">     */</span></span>
+<span id="cb15-17">    SKB_DROP_REASON_NO_SOCKET<span class="op">,</span></span></code></pre></div></div>
+<p>v7.3에는 이런 이유가 120개쯤 정의되어 있습니다. <code>kfree_skb_reason(skb, reason)</code>은 skb를 해제하면서 <code>skb:kfree_skb</code> 추적점에 이유와 호출 위치를 남깁니다. 정상적으로 처리를 마친 skb는 <code>consume_skb()</code>로 해제해 이 추적점에 나타나지 않게 합니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>버려지는 패킷을 이유별로 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># perf record -e skb:kfree_skb -a -- sleep 10
+# perf script | head
+  ... skb:kfree_skb: skbaddr=... rx_sk=... protocol=2048 location=tcp_v4_rcv+0x... reason: NO_SOCKET</code></pre></div>
+<p><code>location</code>은 버린 함수, <code>reason</code>은 위 열거형에서 접두사를 뗀 이름입니다. 닫힌 포트로 온 SYN은 <code>NO_SOCKET</code>, 수신 버퍼가 찬 UDP 소켓은 <code>SOCKET_RCVBUFF</code>로 나옵니다. <code>dropwatch -l kas</code>도 같은 추적점을 씁니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.4.20 · 2002</dt>
+<dd>
+NAPI("New API")가 2.5 개발판에 이어 2.4에도 들어옵니다. 과부하에서 인터럽트를 끄고 폴링하는 구조입니다.
+</dd>
+<dt>2.6.29 · 2009</dt>
+<dd>
+GRO. 프로토콜에 묶이지 않는 수신 병합 틀입니다.
+</dd>
+<dt>2.6.35 · 2010</dt>
+<dd>
+RPS와 RFS. 2.6.38에 XPS가 따라옵니다.
+</dd>
+<dt>3.3 · 2012</dt>
+<dd>
+BQL(byte queue limits).
+</dd>
+<dt>3.11 · 2013</dt>
+<dd>
+소켓별 busy polling.
+</dd>
+<dt>4.8 · 2016</dt>
+<dd>
+XDP. 4.18(2018)에 AF_XDP 소켓이 더해집니다.
+</dd>
+<dt>5.12 · 2021</dt>
+<dd>
+스레드 NAPI.
+</dd>
+<dt>5.17 · 2022</dt>
+<dd>
+<code>kfree_skb_reason()</code>과 드롭 이유.
+</dd>
+<dt>6.13 · 2025</dt>
+<dd>
+IRQ 중단(<code>irq-suspend-timeout</code>). 애플리케이션이 바쁜 동안 장치 인터럽트를 꺼 둡니다.
+</dd>
+<dt>6.15 · 2025</dt>
+<dd>
+io_uring 제로카피 수신.
+</dd>
+</dl>
+</div>
+</section>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>NIC는 DMA로 RX 링의 버퍼에 패킷을 쓰고 인터럽트를 겁니다. hardirq 핸들러는 패킷을 건드리지 않고 NAPI를 예약합니다.</li>
+<li>NAPI는 poll이 링을 다 비웠으면 인터럽트를 켜고, budget을 채웠으면 끈 채 계속 폴링합니다. 부하에 따라 두 모드를 저절로 오갑니다.</li>
+<li>softirq 한 번의 수신 처리는 poll당 64개, 전체 300개, 2틱으로 제한되고, 넘으면 <code>time_squeeze</code>가 오릅니다.</li>
+<li>skb는 패킷 데이터를 가리키는 메타데이터입니다. GRO와 목록 수신은 패킷을 묶어 스택을 오르는 횟수를 줄입니다.</li>
+<li>소켓은 스핀락과 소유 플래그의 두 층으로 보호됩니다. 태스크가 소켓을 쥔 동안 온 세그먼트는 backlog에 쌓였다가 <code>release_sock()</code>에서 처리됩니다.</li>
+<li>RSS는 NIC에서, RPS는 커널에서 흐름을 CPU로 나눕니다. 한 흐름은 한 CPU에 모읍니다.</li>
+<li>XDP는 skb를 만들기 전에 드라이버 안에서 BPF 프로그램으로 패킷의 운명을 정합니다.</li>
+<li>패킷을 버리는 코드는 이유를 남기고, <code>skb:kfree_skb</code> 추적점으로 볼 수 있습니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p>패킷이 1초에 100개 오는 서버와 100만 개 오는 서버에서, e1000e의 수신 큐 하나가 1초에 받는 하드웨어 인터럽트 수는 대략 어떻게 다릅니까? 100만 개 쪽이 100만 번이 아닌 이유는 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>100개 쪽은 인터럽트 병합이 없다면 약 100번입니다. 패킷이 올 때마다 인터럽트가 걸리고, poll이 링을 비운 뒤 <code>napi_complete_done()</code>으로 인터럽트를 다시 켜기 때문입니다. 100만 개 쪽은 훨씬 적습니다. 첫 인터럽트 뒤로 장치 인터럽트는 막혀 있고, poll이 매번 budget을 채워 <code>budget</code>을 돌려주므로 NAPI는 폴링 모드에 머뭅니다. 링이 비는 순간에만 인터럽트가 다시 켜집니다. 부하가 높을수록 패킷당 인터럽트 수는 0에 가까워집니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>/proc/net/softnet_stat</code>의 셋째 열이 CPU 0에서만 빠르게 늘고 있습니다. 무슨 일이 일어나고 있고, 무엇을 확인해야 합니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>셋째 열은 <code>time_squeeze</code>입니다. <code>net_rx_action()</code>이 <code>netdev_budget</code>(300개)이나 <code>netdev_budget_usecs</code>(2틱)에 걸려 폴링 목록에 일을 남긴 채 빠져나온 횟수입니다. CPU 0에만 몰려 있다면 수신 처리가 CPU 0에 집중되어 있다는 뜻입니다. <code>/proc/interrupts</code>에서 NIC의 큐별 IRQ가 어느 CPU로 가는지, <code>ethtool -l</code>로 큐가 몇 개인지 봅니다. 큐가 하나뿐이면 RPS로, 여러 개인데 친화성이 한 CPU에 몰려 있으면 IRQ 친화성을 펴서 해결합니다. budget을 올리는 것은 그다음입니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>tcp_v4_rcv()</code>가 <code>sock_owned_by_user()</code>가 참일 때 세그먼트를 바로 처리하지 않고 backlog에 넣는 이유는 무엇입니까? 스핀락만으로 소켓을 보호하면 안 됩니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>소켓을 쓰는 태스크는 유저 버퍼로 복사하는 도중에 페이지 폴트로 잠들 수 있습니다. 스핀락을 쥔 채로는 잠들 수 없으므로, 태스크는 소켓을 오래 쥐는 동안 스핀락을 쥐고 있을 수 없습니다. 그래서 스핀락은 <code>owned</code> 플래그를 세우고 내릴 때와 큐를 고칠 때만 짧게 쥡니다. softirq는 잠들 수 없으므로 태스크가 소켓을 놓기를 기다릴 수도 없습니다. 남는 방법은 일을 backlog에 맡겨 두고 떠나는 것이고, 태스크가 <code>release_sock()</code>에서 그 일을 대신합니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>같은 TCP 연결의 패킷을 여러 CPU에 고르게 나눠 처리하면 더 빠를 것 같습니다. RSS와 RPS가 그렇게 하지 않고 흐름 단위로 CPU를 고정하는 이유는 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>첫째, 순서입니다. 한 연결의 세그먼트가 여러 CPU에서 병렬로 스택을 오르면 TCP에 도착하는 순서가 뒤섞이고, TCP는 이것을 손실로 오해해 재전송과 혼잡 제어를 일으킵니다. 둘째, 락과 캐시입니다. 소켓 하나는 어차피 한 번에 한 CPU만 고칠 수 있으므로 여러 CPU가 달려들면 소켓 락에서 줄을 서고, 소켓 구조체의 캐시 라인이 CPU 사이를 오갑니다. 흐름을 해시로 한 CPU에 고정하면 둘 다 피하고, 흐름이 많으면 CPU 전체가 고르게 쓰입니다.</p>
+</div></details></div></div>
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>RX 링<small>RX ring</small></dt>
+<dd>
+NIC와 드라이버가 수신 버퍼의 주소와 상태를 주고받는 디스크립터의 원형 배열.
+</dd>
+<dt>NAPI</dt>
+<dd>
+인터럽트를 받으면 장치 인터럽트를 막고 softirq에서 폴링하다가, 링이 비면 인터럽트로 돌아가는 수신 처리 방식.
+</dd>
+<dt>budget</dt>
+<dd>
+poll 한 번이나 softirq 한 번에 처리할 수 있는 패킷 수의 상한.
+</dd>
+<dt>수신 라이브록<small>receive livelock</small></dt>
+<dd>
+패킷마다 걸리는 인터럽트를 처리하느라 정작 패킷을 처리할 시간이 없어 처리량이 무너지는 현상.
+</dd>
+<dt>softnet_data</dt>
+<dd>
+CPU마다 하나씩 있는 네트워크 스택의 상태. 폴링 목록과 backlog 큐가 들어 있다.
+</dd>
+<dt>sk_buff</dt>
+<dd>
+패킷 하나의 메타데이터와 데이터 버퍼의 경계 포인터를 담은 구조체. skb라고 줄여 부른다.
+</dd>
+<dt>GRO<small>generic receive offload</small></dt>
+<dd>
+같은 흐름의 연속된 수신 세그먼트를 큰 skb 하나로 합치는 기능.
+</dd>
+<dt>소켓 backlog</dt>
+<dd>
+태스크가 소켓을 쥐고 있는 동안 softirq가 처리를 미뤄 둔 skb의 목록.
+</dd>
+<dt>RSS<small>receive side scaling</small></dt>
+<dd>
+NIC가 패킷의 흐름 해시로 수신 큐를 골라 여러 CPU로 나누는 기능.
+</dd>
+<dt>RPS<small>receive packet steering</small></dt>
+<dd>
+커널이 흐름 해시로 대상 CPU를 골라 그 CPU의 backlog로 넘기는 기능.
+</dd>
+<dt>XDP<small>express data path</small></dt>
+<dd>
+드라이버가 skb를 만들기 전에 BPF 프로그램을 실행해 패킷을 버리거나 돌려보내는 훅.
+</dd>
+<dt>드롭 이유<small>drop reason</small></dt>
+<dd>
+skb를 버릴 때 함께 기록하는 열거형 값. <code>skb:kfree_skb</code> 추적점에 나타난다.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/networking/napi.html" rel="noopener" target="_blank"><code>Documentation/networking/napi.rst</code></a>: 드라이버 API, busy polling, IRQ 유예와 중단, 스레드 NAPI.</li>
+<li><a href="https://docs.kernel.org/networking/scaling.html" rel="noopener" target="_blank"><code>Documentation/networking/scaling.rst</code></a>: RSS, RPS, RFS, XPS의 원리와 설정.</li>
+<li><a href="https://docs.kernel.org/networking/skbuff.html" rel="noopener" target="_blank"><code>Documentation/networking/skbuff.rst</code></a>: <code>sk_buff</code>의 구조와 공유 규칙.</li>
+<li><a href="https://docs.kernel.org/networking/page_pool.html" rel="noopener" target="_blank"><code>Documentation/networking/page_pool.rst</code></a>: 수신 버퍼 재활용 풀.</li>
+<li><a href="https://docs.kernel.org/networking/af_xdp.html" rel="noopener" target="_blank"><code>Documentation/networking/af_xdp.rst</code></a>: AF_XDP 소켓.</li>
+<li><a href="https://docs.kernel.org/networking/iou-zcrx.html" rel="noopener" target="_blank"><code>Documentation/networking/iou-zcrx.rst</code></a>: io_uring 제로카피 수신.</li>
+<li>LWN, <a href="https://lwn.net/Articles/885729/" rel="noopener" target="_blank">Better visibility into packet-dropping decisions</a>: 드롭 이유가 들어온 배경.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch11.html"><small>← 11장</small><b>Top half와 Bottom half</b></a><a class="next" href="ch13.html"><small>13장 →</small><b>경쟁 조건과 실행 컨텍스트</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#overview">수신 경로 한눈에</a><a href="#rx-ring">RX 링과 인터럽트</a><a href="#napi">NAPI: 인터럽트와 폴링 사이</a><a href="#skb-gro">skb와 GRO</a><a href="#stack">IP와 TCP를 오르다</a><a href="#socket">소켓: softirq와 태스크가 만나는 곳</a><a href="#scaling">여러 CPU로 펼치기</a><a href="#xdp">더 아래로, 더 한꺼번에</a><a href="#tx-drops">송신 경로와 드롭 추적</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

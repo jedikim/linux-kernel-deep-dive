@@ -1,0 +1,48 @@
+<svg viewBox="0 0 760 378" xmlns="http://www.w3.org/2000/svg">
+  <title>sched_ext의 안전장치: BPF 스케줄러가 올라가 있다가 실행 중 오류, 워치독이 발견한 정체, SysRq-S 가운데 하나가 일어나면 scx_root_disable이 모든 태스크의 스케줄링 클래스를 되돌려 fair 클래스가 다시 스케줄한다.</title>
+
+  <!-- 상태 -->
+  <rect class="box gray" x="20" y="24" width="150" height="56" rx="12"/>
+  <text class="t-b mid" x="95" y="48">fair 클래스</text>
+  <text class="t-xs mid" x="95" y="66">커널 기본 스케줄러</text>
+
+  <rect class="box green" x="280" y="24" width="200" height="56" rx="12"/>
+  <text class="t-b mid" x="380" y="48">ext 클래스</text>
+  <text class="t-xs mid" x="380" y="66">BPF 스케줄러가 정한다</text>
+
+  <path class="ln green" d="M170 52 H276" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="224" y="44">struct_ops 등록</text>
+
+  <!-- 내려가는 이유 -->
+  <path class="ln red" d="M330 80 V100 H133 V118" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M380 80 V118" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M430 80 V100 H627 V118" marker-end="url(#ah-red)"/>
+
+  <rect class="box red" x="20" y="122" width="226" height="68" rx="10"/>
+  <text class="t-s t-ink t-b" x="34" y="144">① 실행 중 오류</text>
+  <text class="t-xs" x="34" y="162">kfunc에 잘못된 인자,</text>
+  <text class="t-xs" x="34" y="178">scx_bpf_error() 호출</text>
+  <rect class="box red" x="266" y="122" width="228" height="68" rx="10"/>
+  <text class="t-s t-ink t-b" x="280" y="144">② 워치독</text>
+  <text class="t-xs" x="280" y="162">실행 가능한 태스크가 제한 시간</text>
+  <text class="t-xs" x="280" y="178">안에 CPU를 받지 못했다</text>
+  <rect class="box red" x="514" y="122" width="226" height="68" rx="10"/>
+  <text class="t-s t-ink t-b" x="528" y="144">③ 사람의 개입</text>
+  <text class="t-xs" x="528" y="162">SysRq-S, 또는 스케줄러를</text>
+  <text class="t-xs" x="528" y="178">올린 프로그램의 종료</text>
+
+  <!-- 되돌리기 -->
+  <path class="ln" d="M133 190 V214" marker-end="url(#ah)"/>
+  <path class="ln" d="M380 190 V214" marker-end="url(#ah)"/>
+  <path class="ln" d="M627 190 V214" marker-end="url(#ah)"/>
+  <rect class="box yellow" x="20" y="218" width="720" height="40" rx="10"/>
+  <text class="t-mono t-b" x="34" y="243">scx_root_disable()</text>
+  <text class="t-s" x="200" y="243">모든 태스크의 sched_class를 원래 클래스로 되돌린다</text>
+
+  <path class="ln" d="M380 258 V282" marker-end="url(#ah)"/>
+  <rect class="box gray" x="250" y="286" width="260" height="50" rx="12"/>
+  <text class="t-b mid" x="380" y="308">fair 클래스</text>
+  <text class="t-xs mid" x="380" y="326">태스크는 계속 실행된다</text>
+
+  <text class="t-s mid" x="380" y="362">검증기는 메모리 안전을, 워치독은 진행을, SysRq는 마지막 수단을 맡는다</text>
+</svg>

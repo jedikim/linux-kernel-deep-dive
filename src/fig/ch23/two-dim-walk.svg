@@ -1,0 +1,66 @@
+<svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg">
+  <title>2차원 페이지 워크: 게스트 페이지 테이블의 네 단계와 마지막 데이터 주소마다 EPT 네 단계를 따라가야 하므로, TLB 미스 한 번에 최대 24번 메모리를 읽는다.</title>
+
+  <text class="t-s t-ink t-b" x="20" y="30">바꿔야 할 GPA</text>
+  <text class="t-s t-ink t-b mid" x="376" y="30">EPT를 따라가 HPA를 얻는다</text>
+  <text class="t-s t-ink t-b mid" x="664" y="30">그 HPA에서 읽는 것</text>
+  <text class="t-xs mid" x="232" y="50">EPT 4단계</text>
+  <text class="t-xs mid" x="328" y="50">EPT 3단계</text>
+  <text class="t-xs mid" x="424" y="50">EPT 2단계</text>
+  <text class="t-xs mid" x="520" y="50">EPT 1단계</text>
+
+  <!-- 행 0 -->
+  <text class="t-s t-ink" x="20" y="82">게스트 CR3</text>
+  <rect class="box yellow" x="188" y="58" width="88" height="36" rx="6"/><text class="t-mono mid" x="232" y="81">1</text>
+  <rect class="box yellow" x="284" y="58" width="88" height="36" rx="6"/><text class="t-mono mid" x="328" y="81">2</text>
+  <rect class="box yellow" x="380" y="58" width="88" height="36" rx="6"/><text class="t-mono mid" x="424" y="81">3</text>
+  <rect class="box yellow" x="476" y="58" width="88" height="36" rx="6"/><text class="t-mono mid" x="520" y="81">4</text>
+  <rect class="box blue" x="588" y="58" width="152" height="36" rx="6"/><text class="t-s t-ink" x="598" y="81">게스트 4단계</text><text class="t-mono end" x="730" y="81">5</text>
+
+  <!-- 행 1 -->
+  <text class="t-s t-ink" x="20" y="130">4단계 엔트리의 값</text>
+  <rect class="box yellow" x="188" y="106" width="88" height="36" rx="6"/><text class="t-mono mid" x="232" y="129">6</text>
+  <rect class="box yellow" x="284" y="106" width="88" height="36" rx="6"/><text class="t-mono mid" x="328" y="129">7</text>
+  <rect class="box yellow" x="380" y="106" width="88" height="36" rx="6"/><text class="t-mono mid" x="424" y="129">8</text>
+  <rect class="box yellow" x="476" y="106" width="88" height="36" rx="6"/><text class="t-mono mid" x="520" y="129">9</text>
+  <rect class="box blue" x="588" y="106" width="152" height="36" rx="6"/><text class="t-s t-ink" x="598" y="129">게스트 3단계</text><text class="t-mono end" x="730" y="129">10</text>
+
+  <!-- 행 2 -->
+  <text class="t-s t-ink" x="20" y="178">3단계 엔트리의 값</text>
+  <rect class="box yellow" x="188" y="154" width="88" height="36" rx="6"/><text class="t-mono mid" x="232" y="177">11</text>
+  <rect class="box yellow" x="284" y="154" width="88" height="36" rx="6"/><text class="t-mono mid" x="328" y="177">12</text>
+  <rect class="box yellow" x="380" y="154" width="88" height="36" rx="6"/><text class="t-mono mid" x="424" y="177">13</text>
+  <rect class="box yellow" x="476" y="154" width="88" height="36" rx="6"/><text class="t-mono mid" x="520" y="177">14</text>
+  <rect class="box blue" x="588" y="154" width="152" height="36" rx="6"/><text class="t-s t-ink" x="598" y="177">게스트 2단계</text><text class="t-mono end" x="730" y="177">15</text>
+
+  <!-- 행 3 -->
+  <text class="t-s t-ink" x="20" y="226">2단계 엔트리의 값</text>
+  <rect class="box yellow" x="188" y="202" width="88" height="36" rx="6"/><text class="t-mono mid" x="232" y="225">16</text>
+  <rect class="box yellow" x="284" y="202" width="88" height="36" rx="6"/><text class="t-mono mid" x="328" y="225">17</text>
+  <rect class="box yellow" x="380" y="202" width="88" height="36" rx="6"/><text class="t-mono mid" x="424" y="225">18</text>
+  <rect class="box yellow" x="476" y="202" width="88" height="36" rx="6"/><text class="t-mono mid" x="520" y="225">19</text>
+  <rect class="box blue" x="588" y="202" width="152" height="36" rx="6"/><text class="t-s t-ink" x="598" y="225">게스트 1단계</text><text class="t-mono end" x="730" y="225">20</text>
+
+  <!-- 행 4 -->
+  <text class="t-s t-ink" x="20" y="274">1단계 엔트리의 값</text>
+  <rect class="box yellow" x="188" y="250" width="88" height="36" rx="6"/><text class="t-mono mid" x="232" y="273">21</text>
+  <rect class="box yellow" x="284" y="250" width="88" height="36" rx="6"/><text class="t-mono mid" x="328" y="273">22</text>
+  <rect class="box yellow" x="380" y="250" width="88" height="36" rx="6"/><text class="t-mono mid" x="424" y="273">23</text>
+  <rect class="box yellow" x="476" y="250" width="88" height="36" rx="6"/><text class="t-mono mid" x="520" y="273">24</text>
+  <rect class="box green" x="588" y="250" width="152" height="36" rx="6"/><text class="t-s t-ink t-b mid" x="664" y="273">데이터 페이지</text>
+
+  <!-- 행을 잇는 흐름 -->
+  <path class="ln thin" d="M564 76 H584" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M564 124 H584" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M564 172 H584" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M564 220 H584" marker-end="url(#ah)"/>
+  <path class="ln thin green" d="M564 268 H584" marker-end="url(#ah-green)"/>
+
+  <path class="ln thin muted" d="M20 304 H740"/>
+  <rect class="box yellow" x="20" y="320" width="14" height="14" rx="3"/>
+  <text class="t-s" x="42" y="332">호스트가 관리하는 EPT 읽기 20번</text>
+  <rect class="box blue" x="290" y="320" width="14" height="14" rx="3"/>
+  <text class="t-s" x="312" y="332">게스트 페이지 테이블 읽기 4번</text>
+  <text class="t-s t-ink t-b end" x="740" y="332">합계 24번 · 가상화 없이는 4번</text>
+  <text class="t-s" x="20" y="358">게스트 테이블의 엔트리에는 다음 단계의 GPA가 적혀 있어서, 한 단계 내려갈 때마다 EPT를 처음부터 따라간다</text>
+</svg>

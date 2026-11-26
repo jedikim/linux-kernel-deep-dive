@@ -1,0 +1,45 @@
+<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg">
+  <title>소스 고고학의 경로: 소스의 한 줄에서 git blame으로 커밋을, 커밋의 Link 태그로 메일 스레드를, 거기서 LWN 기사를 찾아간다</title>
+
+  <text class="t-code mid" x="184" y="24">git blame</text>
+  <text class="t-code mid" x="380" y="24">Link:</text>
+  <text class="t-xs mid" x="576" y="24">제목으로 검색</text>
+
+  <rect class="box code" x="20" y="36" width="132" height="64" rx="10"/>
+  <text class="t-b mid" x="86" y="62">소스의 한 줄</text>
+  <text class="t-code mid" x="86" y="84">core.c:5782</text>
+  <path class="ln" d="M152 68 H212" marker-end="url(#ah)"/>
+
+  <rect class="box blue" x="216" y="36" width="132" height="64" rx="10"/>
+  <text class="t-b mid" x="282" y="62">커밋</text>
+  <text class="t-xs mid" x="282" y="84">본문에 "왜"가 있다</text>
+  <path class="ln" d="M348 68 H408" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="412" y="36" width="132" height="64" rx="10"/>
+  <text class="t-b mid" x="478" y="62">메일 스레드</text>
+  <text class="t-code mid" x="478" y="84">lore.kernel.org</text>
+  <path class="ln" d="M544 68 H604" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="608" y="36" width="132" height="64" rx="10"/>
+  <text class="t-b mid" x="674" y="62">LWN 기사</text>
+  <text class="t-xs mid" x="674" y="84">논의의 요약과 배경</text>
+
+  <!-- 곁가지 -->
+  <path class="ln thin muted" d="M262 100 V126 H130 V146" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M302 100 V126 H360 V146" marker-end="url(#ah-muted)"/>
+  <path class="ln thin muted" d="M478 100 V126 H630 V146" marker-end="url(#ah-muted)"/>
+
+  <rect class="ghost" x="20" y="150" width="220" height="52" rx="8"/>
+  <text class="t-code" x="32" y="171">git describe --contains</text>
+  <text class="t-xs" x="32" y="190">처음 들어간 릴리스</text>
+
+  <rect class="ghost" x="254" y="150" width="212" height="52" rx="8"/>
+  <text class="t-code" x="266" y="171">Fixes: · git log -S</text>
+  <text class="t-xs" x="266" y="190">앞뒤로 이어지는 커밋</text>
+
+  <rect class="ghost" x="520" y="150" width="220" height="52" rx="8"/>
+  <text class="t-xs t-ink" x="532" y="171">패치의 이전 버전(v1, v2 …)</text>
+  <text class="t-xs" x="532" y="190">리뷰어의 반대와 작성자의 답</text>
+
+  <text class="t-s mid" x="380" y="234">이 길이 이어져 있는 것은 커밋마다 남기는 본문과 태그 덕분이다</text>
+</svg>

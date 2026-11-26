@@ -1,0 +1,60 @@
+<svg viewBox="0 0 760 362" xmlns="http://www.w3.org/2000/svg">
+  <title>버디 할당자의 쪼개기와 합치기: order 3 블록을 세 번 반으로 쪼개 order 0 페이지 하나를 내주고, 해제하면 버디가 비어 있는 동안 다시 합쳐 order 3으로 돌아간다</title>
+
+  <text class="t-xs end" x="240" y="28">PFN</text>
+  <text class="t-code mid tc-muted" x="280" y="28">0</text>
+  <text class="t-code mid tc-muted" x="340" y="28">1</text>
+  <text class="t-code mid tc-muted" x="400" y="28">2</text>
+  <text class="t-code mid tc-muted" x="460" y="28">3</text>
+  <text class="t-code mid tc-muted" x="520" y="28">4</text>
+  <text class="t-code mid tc-muted" x="580" y="28">5</text>
+  <text class="t-code mid tc-muted" x="640" y="28">6</text>
+  <text class="t-code mid tc-muted" x="700" y="28">7</text>
+
+  <!-- A -->
+  <text class="t-s t-ink t-b" x="20" y="60">order 3 블록 하나만 비어 있다</text>
+  <rect class="box green" x="250" y="40" width="480" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="490" y="60">order 3</text>
+
+  <!-- B -->
+  <text class="t-s t-ink t-b" x="20" y="108">① 반으로 쪼갠다</text>
+  <rect class="box" x="250" y="88" width="240" height="30" rx="4"/>
+  <text class="t-s mid" x="370" y="108">더 쪼갤 쪽</text>
+  <rect class="box green" x="490" y="88" width="240" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="610" y="108">order 2 목록으로</text>
+
+  <!-- C -->
+  <text class="t-s t-ink t-b" x="20" y="156">② 앞쪽을 다시 쪼갠다</text>
+  <rect class="box" x="250" y="136" width="120" height="30" rx="4"/>
+  <text class="t-s mid" x="310" y="156">더 쪼갤 쪽</text>
+  <rect class="box green" x="370" y="136" width="120" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="430" y="156">order 1 목록으로</text>
+  <rect class="box green" x="490" y="136" width="240" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="610" y="156">order 2</text>
+
+  <!-- D -->
+  <text class="t-s t-ink t-b" x="20" y="204">③ 한 번 더 쪼개 PFN 0을 내준다</text>
+  <rect class="solid blue" x="250" y="184" width="60" height="30" rx="4"/>
+  <text class="t-s t-on t-b mid" x="280" y="204">할당</text>
+  <rect class="box green" x="310" y="184" width="60" height="30" rx="4"/>
+  <text class="t-xs t-ink mid" x="340" y="203">order 0</text>
+  <rect class="box green" x="370" y="184" width="120" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="430" y="204">order 1</text>
+  <rect class="box green" x="490" y="184" width="240" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="610" y="204">order 2</text>
+
+  <path class="ln thin muted dash" d="M20 236 H740"/>
+
+  <!-- E -->
+  <text class="t-s t-ink t-b" x="20" y="272">PFN 0을 해제하면</text>
+  <text class="t-xs" x="20" y="290">버디가 비어 있는 동안 합친다</text>
+  <rect class="box green" x="250" y="256" width="480" height="30" rx="4"/>
+  <text class="t-s t-ink mid" x="490" y="276">다시 order 3 블록 하나</text>
+
+  <text class="t-code" x="250" y="314">0 ^ (1 &lt;&lt; 0) = 1</text>
+  <text class="t-xs" x="400" y="314">PFN 1이 비어 있다 → 합쳐서 order 1</text>
+  <text class="t-code" x="250" y="331">0 ^ (1 &lt;&lt; 1) = 2</text>
+  <text class="t-xs" x="400" y="331">PFN 2–3이 비어 있다 → 합쳐서 order 2</text>
+  <text class="t-code" x="250" y="348">0 ^ (1 &lt;&lt; 2) = 4</text>
+  <text class="t-xs" x="400" y="348">PFN 4–7이 비어 있다 → 합쳐서 order 3</text>
+</svg>

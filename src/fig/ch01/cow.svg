@@ -1,0 +1,67 @@
+<svg viewBox="0 0 760 290" xmlns="http://www.w3.org/2000/svg">
+  <title>쓰기 시 복사: fork() 직후에는 부모와 자식의 페이지 테이블 항목이 같은 물리 페이지를 읽기 전용으로 가리킨다. 자식이 페이지 B에 쓰면 폴트가 나고, 새 페이지 B′에 복사한 뒤 자식의 항목만 그쪽을 가리키게 된다.</title>
+
+  <!-- 왼쪽: fork 직후 -->
+  <rect class="panel" x="20" y="16" width="350" height="230" rx="14"/>
+  <text class="t-b" x="34" y="42">fork() 직후</text>
+  <text class="t-xs" x="34" y="60">페이지 테이블만 복사한다. 물리 페이지는 그대로다</text>
+
+  <text class="t-xs mid" x="84" y="84">부모의 PTE</text>
+  <text class="t-xs mid" x="195" y="84">물리 페이지</text>
+  <text class="t-xs mid" x="306" y="84">자식의 PTE</text>
+
+  <rect class="box blue" x="34" y="92" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="84" y="112">A · 읽기만</text>
+  <rect class="box gray" x="155" y="92" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="195" y="112">페이지 A</text>
+  <rect class="box green" x="256" y="92" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="306" y="112">A · 읽기만</text>
+  <path class="ln thin blue" d="M134 107 H150" marker-end="url(#ah-blue)"/>
+  <path class="ln thin green" d="M256 107 H240" marker-end="url(#ah-green)"/>
+
+  <rect class="box blue" x="34" y="134" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="84" y="154">B · 읽기만</text>
+  <rect class="box gray" x="155" y="134" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="195" y="154">페이지 B</text>
+  <rect class="box green" x="256" y="134" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="306" y="154">B · 읽기만</text>
+  <path class="ln thin blue" d="M134 149 H150" marker-end="url(#ah-blue)"/>
+  <path class="ln thin green" d="M256 149 H240" marker-end="url(#ah-green)"/>
+
+  <text class="t-xs mid" x="195" y="200">쓰기 가능하던 항목을 부모 쪽까지</text>
+  <text class="t-xs mid" x="195" y="218">읽기 전용으로 바꿔 둔다</text>
+
+  <!-- 오른쪽: 자식이 쓴 뒤 -->
+  <rect class="panel" x="390" y="16" width="350" height="230" rx="14"/>
+  <text class="t-b" x="404" y="42">자식이 B에 쓴 뒤</text>
+  <text class="t-xs" x="404" y="60">페이지 폴트 → 새 페이지에 복사 → 자식 항목만 교체</text>
+
+  <text class="t-xs mid" x="454" y="84">부모의 PTE</text>
+  <text class="t-xs mid" x="565" y="84">물리 페이지</text>
+  <text class="t-xs mid" x="676" y="84">자식의 PTE</text>
+
+  <rect class="box blue" x="404" y="92" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="454" y="112">A · 읽기만</text>
+  <rect class="box gray" x="525" y="92" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="565" y="112">페이지 A</text>
+  <rect class="box green" x="626" y="92" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="676" y="112">A · 읽기만</text>
+  <path class="ln thin blue" d="M504 107 H520" marker-end="url(#ah-blue)"/>
+  <path class="ln thin green" d="M626 107 H610" marker-end="url(#ah-green)"/>
+
+  <rect class="box blue" x="404" y="134" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="454" y="154">B · 읽기만</text>
+  <rect class="box gray" x="525" y="134" width="80" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="565" y="154">페이지 B</text>
+  <path class="ln thin blue" d="M504 149 H520" marker-end="url(#ah-blue)"/>
+
+  <rect class="box green" x="626" y="134" width="100" height="30" rx="6"/>
+  <text class="t-s t-ink t-b mid" x="676" y="154">B′ · 읽고 쓰기</text>
+  <rect class="solid green" x="525" y="176" width="80" height="30" rx="6"/>
+  <text class="t-s t-on t-b mid" x="565" y="196">페이지 B′</text>
+  <path class="ln thin green" d="M676 164 V191 H610" marker-end="url(#ah-green)"/>
+
+  <text class="t-xs" x="404" y="230">부모의 B는 부모가 쓸 때까지 읽기 전용으로 남는다</text>
+
+  <text class="t-s mid" x="380" y="272">복사는 쓰는 쪽이 페이지 폴트를 낼 때, 쓴 페이지 하나에 대해서만 일어난다</text>
+</svg>

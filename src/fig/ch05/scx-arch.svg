@@ -1,0 +1,55 @@
+<svg viewBox="0 0 760 352" xmlns="http://www.w3.org/2000/svg">
+  <title>sched_ext의 구조: 커널의 ext 클래스가 sched_ext_ops 콜백으로 BPF 스케줄러를 부르고, BPF 스케줄러는 태스크를 DSQ에 넣는다. CPU는 자기 로컬 DSQ에서만 태스크를 꺼낸다. 문제가 생기면 모든 태스크가 fair 클래스로 돌아간다.</title>
+
+  <!-- 커널 -->
+  <rect class="panel yellow" x="20" y="14" width="330" height="248" rx="14"/>
+  <text class="t-b" x="36" y="38">커널</text>
+  <text class="t-code end" x="334" y="38">kernel/sched/ext/</text>
+
+  <rect class="box" x="36" y="50" width="298" height="40" rx="8"/>
+  <text class="t-s t-ink" x="48" y="75">① 태스크가 실행 가능해진다</text>
+
+  <rect class="box teal" x="36" y="104" width="298" height="40" rx="8"/>
+  <text class="t-mono t-b" x="48" y="129">ext_sched_class</text>
+  <text class="t-xs end" x="322" y="129">뼈대와 BPF 사이의 중개</text>
+
+  <text class="t-xs" x="36" y="170">CPU별 로컬 DSQ. CPU는 여기서만 꺼내 실행한다</text>
+  <rect class="box green" x="36" y="180" width="92" height="40" rx="8"/>
+  <text class="t-s t-ink mid" x="82" y="205">CPU 0</text>
+  <rect class="box green" x="139" y="180" width="92" height="40" rx="8"/>
+  <text class="t-s t-ink mid" x="185" y="205">CPU 1</text>
+  <rect class="box green" x="242" y="180" width="92" height="40" rx="8"/>
+  <text class="t-s t-ink mid" x="288" y="205">CPU 2</text>
+  <text class="t-xs" x="36" y="244">③ CPU가 할 일을 찾는다</text>
+
+  <!-- BPF -->
+  <rect class="panel teal" x="410" y="14" width="330" height="248" rx="14"/>
+  <text class="t-b" x="426" y="38">BPF 스케줄러</text>
+  <text class="t-code end" x="724" y="38">struct sched_ext_ops</text>
+
+  <rect class="box" x="426" y="50" width="298" height="40" rx="8"/>
+  <text class="t-code t-b" x="438" y="75">ops.enqueue()</text>
+  <text class="t-xs end" x="712" y="75">② 어느 DSQ에 넣을지 정한다</text>
+
+  <rect class="box purple" x="426" y="104" width="298" height="62" rx="8"/>
+  <text class="t-s t-ink t-b" x="438" y="128">사용자 DSQ, BPF 맵</text>
+  <text class="t-xs" x="438" y="148">정책이 사는 곳. FIFO로도, 가상 시간</text>
+  <text class="t-xs" x="438" y="162">순서의 우선순위 큐로도 쓴다</text>
+
+  <rect class="box" x="426" y="180" width="298" height="40" rx="8"/>
+  <text class="t-code t-b" x="438" y="205">ops.dispatch()</text>
+  <text class="t-xs end" x="712" y="205">④ 로컬 DSQ로 옮긴다</text>
+
+  <!-- 화살표 -->
+  <path class="ln teal" d="M334 70 H422" marker-end="url(#ah-teal)"/>
+  <path class="ln" d="M575 90 V100" marker-end="url(#ah)"/>
+  <path class="ln" d="M575 166 V176" marker-end="url(#ah)"/>
+  <path class="ln teal" d="M334 192 H422" marker-end="url(#ah-teal)"/>
+  <path class="ln green" d="M426 208 H338" marker-end="url(#ah-green)"/>
+
+  <!-- 안전장치 -->
+  <rect class="box red" x="20" y="278" width="720" height="60" rx="12"/>
+  <use href="#i-shield" x="34" y="290" width="36" height="36" class="ic red"/>
+  <text class="t-b" x="82" y="302">안전장치</text>
+  <text class="t-s" x="82" y="324">BPF 스케줄러의 오류, 오래 돌지 못한 태스크, SysRq-S → 스케줄러를 떼고 모두 fair 클래스로 되돌린다</text>
+</svg>

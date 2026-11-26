@@ -1,0 +1,49 @@
+<svg viewBox="0 0 760 296" xmlns="http://www.w3.org/2000/svg">
+  <title>sk_buff의 구조: 메타데이터 구조체의 head, data, tail, end 포인터가 선형 버퍼의 경계를 가리키고, 버퍼 끝의 skb_shared_info가 page 조각들을 가리킨다</title>
+
+  <text class="t-xs mid" x="300" y="30">headroom</text>
+  <text class="t-xs mid" x="450" y="30">선형 데이터 (skb_headlen)</text>
+  <text class="t-xs mid" x="590" y="30">tailroom</text>
+  <text class="t-code mid" x="680" y="30">skb_shared_info</text>
+
+  <rect class="ghost dash" x="260" y="40" width="80" height="40"/>
+  <rect class="box blue" x="340" y="40" width="50" height="40"/>
+  <text class="t-s t-ink mid" x="365" y="65">Eth</text>
+  <rect class="box blue" x="390" y="40" width="50" height="40"/>
+  <text class="t-s t-ink mid" x="415" y="65">IP</text>
+  <rect class="box blue" x="440" y="40" width="50" height="40"/>
+  <text class="t-s t-ink mid" x="465" y="65">TCP</text>
+  <rect class="box blue" x="490" y="40" width="70" height="40"/>
+  <text class="t-s t-ink mid" x="525" y="65">payload</text>
+  <rect class="ghost dash" x="560" y="40" width="60" height="40"/>
+  <rect class="box purple" x="620" y="40" width="120" height="40"/>
+  <text class="t-code mid" x="680" y="65">frags[]</text>
+
+  <text class="t-mono t-b" x="20" y="80">struct sk_buff</text>
+  <rect class="box" x="20" y="92" width="180" height="108" rx="8"/>
+  <text class="t-code" x="34" y="114">head</text>
+  <text class="t-code" x="34" y="138">data</text>
+  <text class="t-code" x="34" y="162">tail</text>
+  <text class="t-code" x="34" y="186">end</text>
+  <text class="t-xs" x="20" y="220">그 밖에 len, data_len, dev, sk,</text>
+  <text class="t-xs" x="20" y="238">protocol, cb[48] 같은 메타데이터</text>
+
+  <path class="ln thin" d="M74 110 H260 V86" marker-end="url(#ah)"/>
+  <path class="ln thin blue" d="M74 134 H340 V86" marker-end="url(#ah-blue)"/>
+  <path class="ln thin blue" d="M74 158 H560 V86" marker-end="url(#ah-blue)"/>
+  <path class="ln thin" d="M74 182 H620 V86" marker-end="url(#ah)"/>
+
+  <path class="ln thin purple" d="M690 80 V124" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="640" y="130" width="46" height="36" rx="4"/>
+  <text class="t-xs t-ink mid" x="663" y="152">page</text>
+  <rect class="box purple" x="694" y="130" width="46" height="36" rx="4"/>
+  <text class="t-xs t-ink mid" x="717" y="152">page</text>
+  <text class="t-xs mid" x="690" y="188">(page, offset, len)</text>
+
+  <text class="t-code" x="260" y="226">skb_put()</text>
+  <text class="t-xs" x="350" y="226">tail을 뒤로 민다. 데이터를 뒤에 붙인다</text>
+  <text class="t-code" x="260" y="248">skb_pull()</text>
+  <text class="t-xs" x="350" y="248">data를 뒤로 민다. 수신 길에서 헤더를 한 겹 벗긴다</text>
+  <text class="t-code" x="260" y="270">skb_push()</text>
+  <text class="t-xs" x="350" y="270">data를 앞으로 당긴다. 송신 길에서 headroom에 헤더를 붙인다</text>
+</svg>

@@ -1,0 +1,70 @@
+<svg viewBox="0 0 760 404" xmlns="http://www.w3.org/2000/svg">
+  <title>APIC 구조: CPU마다 Local APIC이 있고, 핀 인터럽트는 IO-APIC이 리다이렉션 테이블에 따라 메시지로 바꿔 보내며, MSI 장치는 메시지를 직접 보낸다. CPU끼리는 IPI를 주고받는다</title>
+
+  <!-- CPU와 Local APIC -->
+  <rect class="box blue" x="30" y="16" width="160" height="88" rx="10"/>
+  <text class="t-b" x="42" y="38">CPU 0</text>
+  <rect class="box warm" x="42" y="48" width="136" height="44" rx="6"/>
+  <text class="t-s t-ink t-b mid" x="110" y="66">Local APIC</text>
+  <text class="t-xs mid" x="110" y="84">ID 0 · 타이머</text>
+
+  <rect class="box blue" x="210" y="16" width="160" height="88" rx="10"/>
+  <text class="t-b" x="222" y="38">CPU 1</text>
+  <rect class="box warm" x="222" y="48" width="136" height="44" rx="6"/>
+  <text class="t-s t-ink t-b mid" x="290" y="66">Local APIC</text>
+  <text class="t-xs mid" x="290" y="84">ID 1 · 타이머</text>
+
+  <rect class="box blue" x="390" y="16" width="160" height="88" rx="10"/>
+  <text class="t-b" x="402" y="38">CPU 2</text>
+  <rect class="box warm" x="402" y="48" width="136" height="44" rx="6"/>
+  <text class="t-s t-ink t-b mid" x="470" y="66">Local APIC</text>
+  <text class="t-xs mid" x="470" y="84">ID 2 · 타이머</text>
+
+  <rect class="box blue" x="570" y="16" width="160" height="88" rx="10"/>
+  <text class="t-b" x="582" y="38">CPU 3</text>
+  <rect class="box warm" x="582" y="48" width="136" height="44" rx="6"/>
+  <text class="t-s t-ink t-b mid" x="650" y="66">Local APIC</text>
+  <text class="t-xs mid" x="650" y="84">ID 3 · 타이머</text>
+
+  <path class="ln thin" d="M70 104 V150 M250 104 V150 M430 104 V150 M610 104 V150"/>
+
+  <!-- IPI -->
+  <path class="ln purple" d="M120 104 V130 H490 V109" marker-end="url(#ah-purple)"/>
+  <text class="t-xs tc-purple mid" x="340" y="124">IPI (재스케줄, 함수 호출)</text>
+
+  <!-- 버스 -->
+  <rect class="panel" x="30" y="150" width="700" height="34" rx="8"/>
+  <text class="t-s t-ink mid" x="380" y="172">인터럽트 메시지: 벡터 번호 + 목적지 APIC ID</text>
+
+  <!-- 핀 장치와 IO-APIC -->
+  <rect class="box gray" x="30" y="226" width="96" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="78" y="246">키보드</text>
+  <rect class="box gray" x="30" y="270" width="96" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="78" y="290">직렬 포트</text>
+  <rect class="box gray" x="30" y="314" width="96" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="78" y="334">ACPI</text>
+  <path class="ln thin" d="M126 241 H160 M126 285 H160 M126 329 H160"/>
+
+  <rect class="box warm" x="160" y="212" width="250" height="146" rx="10"/>
+  <text class="t-b" x="174" y="236">IO-APIC</text>
+  <text class="t-xs end" x="398" y="236">리다이렉션 테이블</text>
+  <text class="t-code" x="174" y="262">핀 1 → 벡터 0x31, APIC 0</text>
+  <text class="t-code" x="174" y="284">핀 4 → 벡터 0x34, APIC 3</text>
+  <text class="t-code" x="174" y="306">핀 9 → 벡터 0x39, APIC 1</text>
+  <text class="t-xs" x="174" y="332">핀마다 트리거·극성·마스크도 적는다</text>
+  <path class="ln warm" d="M285 212 V189" marker-end="url(#ah-warm)"/>
+
+  <!-- MSI 장치 -->
+  <rect class="box gray" x="440" y="226" width="140" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="510" y="249">NVMe SSD</text>
+  <text class="t-xs mid" x="510" y="268">MSI-X</text>
+  <rect class="box gray" x="590" y="226" width="140" height="56" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="660" y="249">네트워크 카드</text>
+  <text class="t-xs mid" x="660" y="268">MSI-X</text>
+  <path class="ln green" d="M510 226 V189" marker-end="url(#ah-green)"/>
+  <path class="ln green" d="M660 226 V189" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-green" x="440" y="306">핀도 IO-APIC도 거치지 않는다.</text>
+  <text class="t-xs tc-green" x="440" y="324">정해진 주소에 쓰는 것이 곧 메시지다.</text>
+
+  <text class="t-s mid" x="380" y="386">메시지를 받은 Local APIC이 자기 CPU에 인터럽트를 건다. 커널은 처리를 마치고 그 Local APIC에 EOI를 쓴다.</text>
+</svg>

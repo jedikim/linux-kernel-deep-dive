@@ -1,0 +1,52 @@
+<svg viewBox="0 0 760 284" xmlns="http://www.w3.org/2000/svg">
+  <title>syzbot의 순환: 프로그램 생성, VM에서 실행, 커버리지 확인을 되풀이하다가 충돌이 나면 재현기 최소화, 이등분, 보고, 수정, 확인으로 이어진다</title>
+
+  <!-- 위쪽 고리 -->
+  <path class="ln blue" d="M630 44 V26 H130 V40" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue mid" x="380" y="18">새 코드에 닿은 프로그램은 보관했다가 조금 바꿔 다시 쓴다</text>
+
+  <rect class="box blue" x="40" y="44" width="180" height="56" rx="10"/>
+  <text class="t-b" x="54" y="68">① 프로그램 생성</text>
+  <text class="t-xs" x="54" y="88">시스템 콜 기술에서 조립</text>
+  <path class="ln" d="M220 72 H286" marker-end="url(#ah)"/>
+
+  <rect class="box blue" x="290" y="44" width="180" height="56" rx="10"/>
+  <text class="t-b" x="304" y="68">② VM에서 실행</text>
+  <text class="t-xs" x="304" y="88">KASAN·lockdep을 켠 커널</text>
+  <path class="ln" d="M470 72 H536" marker-end="url(#ah)"/>
+
+  <rect class="box blue" x="540" y="44" width="180" height="56" rx="10"/>
+  <text class="t-b" x="554" y="68">③ 커버리지 확인</text>
+  <text class="t-xs" x="554" y="88">KCOV: 어느 코드를 지났나</text>
+
+  <!-- 충돌 -->
+  <path class="ln red" d="M380 100 V140 H88 V172" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="100" y="133">검사기가 잘못을 보고하면</text>
+
+  <!-- 아래쪽 줄 -->
+  <rect class="box yellow" x="20" y="176" width="136" height="56" rx="10"/>
+  <text class="t-s t-ink t-b" x="32" y="199">④ 재현기 최소화</text>
+  <text class="t-xs" x="32" y="219">작은 C 프로그램으로</text>
+  <path class="ln thin" d="M156 204 H163" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="166" y="176" width="136" height="56" rx="10"/>
+  <text class="t-s t-ink t-b" x="178" y="199">⑤ 이등분</text>
+  <text class="t-xs" x="178" y="219">원인 커밋 찾기</text>
+  <path class="ln thin" d="M302 204 H309" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="312" y="176" width="136" height="56" rx="10"/>
+  <text class="t-s t-ink t-b" x="324" y="199">⑥ 메일로 보고</text>
+  <text class="t-xs" x="324" y="219">로그, 설정, 재현기</text>
+  <path class="ln thin" d="M448 204 H455" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="458" y="176" width="136" height="56" rx="10"/>
+  <text class="t-s t-ink t-b" x="470" y="199">⑦ 사람이 수정</text>
+  <text class="t-xs" x="470" y="219">Reported-by 태그</text>
+  <path class="ln thin" d="M594 204 H601" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="604" y="176" width="136" height="56" rx="10"/>
+  <text class="t-s t-ink t-b" x="616" y="199">⑧ 확인하고 닫음</text>
+  <text class="t-xs" x="616" y="219">모든 트리에 닿으면</text>
+
+  <text class="t-s mid" x="380" y="264">기계는 찾고, 줄이고, 원인을 가리킨다. 이해하고 고치는 일은 사람이 한다.</text>
+</svg>

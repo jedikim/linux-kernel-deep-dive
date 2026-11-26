@@ -1,0 +1,63 @@
+<svg viewBox="0 0 760 282" xmlns="http://www.w3.org/2000/svg">
+  <title>RSS와 RPS의 비교: RSS는 NIC가 해시로 수신 큐를 골라 큐마다 다른 CPU에 인터럽트를 걸고, RPS는 한 CPU가 받은 패킷을 커널이 해시로 다른 CPU의 backlog에 나눠 준다</title>
+
+  <rect class="panel" x="20" y="16" width="352" height="250" rx="14"/>
+  <text class="t-b" x="34" y="42">RSS</text>
+  <text class="t-xs" x="74" y="42">NIC가 해시로 큐를 고른다</text>
+  <rect class="box gray" x="34" y="62" width="104" height="154" rx="10"/>
+  <use href="#i-nic" x="68" y="72" width="36" height="36" class="ic gray"/>
+  <text class="t-s t-ink t-b mid" x="86" y="134">NIC</text>
+  <text class="t-xs mid" x="86" y="158">4-튜플 해시</text>
+  <text class="t-xs mid" x="86" y="178">간접 테이블</text>
+  <text class="t-xs tc-warm mid" x="256" y="56">큐마다 MSI-X</text>
+  <path class="ln thin muted" d="M138 139 L158 76"/>
+  <rect class="box gray" x="158" y="62" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="190" y="80">rx-0</text>
+  <path class="ln warm" d="M222 76 H286" marker-end="url(#ah-warm)"/>
+  <rect class="box purple" x="292" y="62" width="66" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="325" y="81">CPU 0</text>
+  <path class="ln thin muted" d="M138 139 L158 118"/>
+  <rect class="box gray" x="158" y="104" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="190" y="122">rx-1</text>
+  <path class="ln warm" d="M222 118 H286" marker-end="url(#ah-warm)"/>
+  <rect class="box purple" x="292" y="104" width="66" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="325" y="123">CPU 1</text>
+  <path class="ln thin muted" d="M138 139 L158 160"/>
+  <rect class="box gray" x="158" y="146" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="190" y="164">rx-2</text>
+  <path class="ln warm" d="M222 160 H286" marker-end="url(#ah-warm)"/>
+  <rect class="box purple" x="292" y="146" width="66" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="325" y="165">CPU 2</text>
+  <path class="ln thin muted" d="M138 139 L158 202"/>
+  <rect class="box gray" x="158" y="188" width="64" height="28" rx="6"/>
+  <text class="t-code mid" x="190" y="206">rx-3</text>
+  <path class="ln warm" d="M222 202 H286" marker-end="url(#ah-warm)"/>
+  <rect class="box purple" x="292" y="188" width="66" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="325" y="207">CPU 3</text>
+  <text class="t-xs" x="34" y="240">인터럽트부터 TCP까지 큐를 맡은 CPU가 한다</text>
+  <text class="t-xs" x="34" y="258">큐 수는 ethtool -L, 테이블은 ethtool -X</text>
+  <rect class="panel" x="388" y="16" width="352" height="250" rx="14"/>
+  <text class="t-b" x="402" y="42">RPS</text>
+  <text class="t-xs" x="442" y="42">커널이 해시로 CPU를 고른다</text>
+  <rect class="box gray" x="402" y="125" width="60" height="28" rx="6"/>
+  <text class="t-code mid" x="432" y="143">rx-0</text>
+  <path class="ln warm" d="M462 139 H494" marker-end="url(#ah-warm)"/>
+  <rect class="box purple" x="500" y="113" width="96" height="52" rx="8"/>
+  <text class="t-s t-ink t-b mid" x="548" y="134">CPU 0</text>
+  <text class="t-xs mid" x="548" y="153">poll · GRO</text>
+  <text class="t-code end" x="646" y="56">get_rps_cpu()</text>
+  <path class="ln thin purple dash" d="M596 139 L648 76" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="654" y="62" width="72" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="81">CPU 0</text>
+  <path class="ln thin purple dash" d="M596 139 L648 118" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="654" y="104" width="72" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="123">CPU 1</text>
+  <path class="ln thin purple dash" d="M596 139 L648 160" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="654" y="146" width="72" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="165">CPU 2</text>
+  <path class="ln thin purple dash" d="M596 139 L648 202" marker-end="url(#ah-purple)"/>
+  <rect class="box purple" x="654" y="188" width="72" height="28" rx="6"/>
+  <text class="t-s t-ink mid" x="690" y="207">CPU 3</text>
+  <text class="t-xs" x="402" y="240">그 뒤는 대상 CPU의 backlog에 넣고 IPI로 깨운다</text>
+  <text class="t-xs" x="402" y="258">큐가 하나뿐인 NIC에서도 쓸 수 있다 (rps_cpus)</text>
+</svg>

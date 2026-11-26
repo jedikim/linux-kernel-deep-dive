@@ -1,0 +1,56 @@
+<svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg">
+  <title>__schedule()의 흐름: 인터럽트를 끄고 런큐 락을 잡고, 시계를 갱신하고, 잠드는 태스크를 큐에서 빼고, 다음 태스크를 고르고, 요청 플래그를 지우고, 다르면 컨텍스트 스위치를 한다. 락은 prev가 잡고 next가 푼다.</title>
+
+  <rect class="box yellow" x="20" y="16" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="40">① local_irq_disable() · rq_lock(rq)</text>
+  <text class="t-s end" x="508" y="40">인터럽트를 끄고 런큐 락을 잡는다</text>
+
+  <rect class="box yellow" x="20" y="62" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="86">② update_rq_clock(rq)</text>
+  <text class="t-s end" x="508" y="86">런큐 시계를 맞춘다</text>
+
+  <rect class="box yellow" x="20" y="108" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="132">③ try_to_block_task()</text>
+  <text class="t-s end" x="508" y="132">스스로 잠드는 태스크면 큐에서 뺀다</text>
+
+  <rect class="box yellow" x="20" y="154" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="178">④ pick_next_task()</text>
+  <text class="t-s end" x="508" y="178">클래스에 다음 태스크를 묻는다</text>
+
+  <rect class="box yellow" x="20" y="200" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="224">⑤ clear_tsk_need_resched(prev)</text>
+  <text class="t-s end" x="508" y="224">재스케줄 요청을 지운다</text>
+
+  <rect class="solid" x="20" y="250" width="230" height="38" rx="19"/>
+  <text class="t-b t-on mid" x="135" y="274">⑥ prev와 next가 같은가</text>
+  <path class="ln" d="M250 269 H296" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="272" y="262">같다</text>
+  <rect class="box gray" x="300" y="250" width="220" height="38" rx="8"/>
+  <text class="t-s t-ink mid" x="410" y="274">락을 풀고 그대로 돌아간다</text>
+  <path class="ln" d="M135 288 V314" marker-end="url(#ah)"/>
+  <text class="t-xs" x="145" y="306">다르다</text>
+
+  <rect class="box warm" x="20" y="318" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="342">⑦ context_switch() → switch_to()</text>
+  <text class="t-s end" x="508" y="342">주소 공간과 스택을 바꾼다</text>
+
+  <rect class="box green" x="20" y="366" width="500" height="38" rx="8"/>
+  <text class="t-code" x="34" y="390">⑧ finish_task_switch(prev)</text>
+  <text class="t-s end" x="508" y="390">락을 풀고 인터럽트를 켠다</text>
+
+  <!-- 오른쪽: 락 구간과 스택 -->
+  <rect class="box red" x="544" y="16" width="20" height="388" rx="4"/>
+  <rect x="544" y="16" width="20" height="388" rx="4" fill="url(#hatch-red)"/>
+  <text class="t-s t-ink t-b" x="592" y="36">런큐 락을 쥔 구간</text>
+  <text class="t-xs" x="592" y="54">인터럽트도 꺼져 있다</text>
+
+  <path class="ln thick warm" d="M580 16 V356"/>
+  <text class="t-s t-ink" x="592" y="222">prev의 커널 스택</text>
+  <text class="t-s t-ink" x="592" y="240">위에서 실행된다</text>
+  <text class="t-xs" x="592" y="262">④에서 고른 next는</text>
+  <text class="t-xs" x="592" y="278">아직 잠들어 있다</text>
+
+  <path class="ln thick green" d="M580 366 V404"/>
+  <text class="t-s t-ink" x="592" y="382">next의 커널 스택</text>
+  <text class="t-xs" x="592" y="398">prev가 잡은 락을 푼다</text>
+</svg>

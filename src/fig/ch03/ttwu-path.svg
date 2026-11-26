@@ -1,0 +1,42 @@
+<svg viewBox="0 0 760 348" xmlns="http://www.w3.org/2000/svg">
+  <title>깨우는 길: wake_up()이 대기 큐의 항목마다 func를 부르고, func는 try_to_wake_up()을 부른다. try_to_wake_up()은 pi_lock을 잡고, 상태를 확인하고, 아직 런큐에 있으면 상태만 고치고, 아니면 CPU를 골라 그 런큐에 태스크를 넣는다.</title>
+
+  <!-- 위: 대기 큐에서 ttwu까지 -->
+  <rect class="box yellow" x="20" y="16" width="120" height="44" rx="10"/>
+  <text class="t-code t-b mid" x="80" y="43">wake_up(&amp;wq)</text>
+  <path class="ln" d="M140 38 H160" marker-end="url(#ah)"/>
+  <rect class="box yellow" x="164" y="16" width="160" height="44" rx="10"/>
+  <text class="t-code t-b mid" x="244" y="36">__wake_up_common()</text>
+  <text class="t-xs mid" x="244" y="53">리스트를 돌며</text>
+  <path class="ln" d="M324 38 H344" marker-end="url(#ah)"/>
+  <rect class="box yellow" x="348" y="16" width="190" height="44" rx="10"/>
+  <text class="t-code t-b mid" x="443" y="36">entry의 func</text>
+  <text class="t-xs mid" x="443" y="53">보통 default_wake_function()</text>
+  <path class="ln" d="M538 38 H558" marker-end="url(#ah)"/>
+  <rect class="solid" x="562" y="16" width="178" height="44" rx="10"/>
+  <text class="t-code t-b t-on mid" x="651" y="43">try_to_wake_up()</text>
+  <path class="ln" d="M651 60 V82" marker-end="url(#ah)"/>
+
+  <!-- 아래: ttwu의 단계 -->
+  <rect class="panel" x="20" y="86" width="720" height="246" rx="14"/>
+
+  <rect class="box" x="34" y="100" width="300" height="38" rx="8"/>
+  <text class="t-b" x="46" y="124">① 태스크의 pi_lock을 잡는다</text>
+  <text class="t-s" x="348" y="124">같은 태스크를 여럿이 동시에 깨우는 일을 막는다</text>
+
+  <rect class="box" x="34" y="146" width="300" height="38" rx="8"/>
+  <text class="t-b" x="46" y="170">② 상태가 맞는지 본다</text>
+  <text class="t-s" x="348" y="170">__state와 state에 겹치는 비트가 없으면 그만둔다</text>
+
+  <rect class="box green" x="34" y="192" width="300" height="38" rx="8"/>
+  <text class="t-b" x="46" y="216">③ 아직 런큐에 있는가</text>
+  <text class="t-s" x="348" y="216">있으면 상태만 TASK_RUNNING으로 고치고 끝낸다</text>
+
+  <rect class="box blue" x="34" y="238" width="300" height="38" rx="8"/>
+  <text class="t-b" x="46" y="262">④ TASK_WAKING, CPU 고르기</text>
+  <text class="t-s" x="348" y="262">select_task_rq()가 깨울 CPU를 정한다 (7장)</text>
+
+  <rect class="box blue" x="34" y="284" width="300" height="38" rx="8"/>
+  <text class="t-b" x="46" y="308">⑤ 런큐에 넣고 TASK_RUNNING</text>
+  <text class="t-s" x="348" y="308">현재 태스크를 선점할지도 여기서 정한다 (6장)</text>
+</svg>

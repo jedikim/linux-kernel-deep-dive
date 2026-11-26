@@ -1,0 +1,64 @@
+<svg viewBox="0 0 760 366" xmlns="http://www.w3.org/2000/svg">
+  <title>8259A PIC의 내부와 CPU와 주고받는 신호: 장치의 요청이 IMR, IRR, 우선순위 판정, ISR을 거치고, INTR과 INTA, 벡터 번호, EOI가 차례로 오간다</title>
+
+  <!-- 장치 -->
+  <text class="t-xs" x="20" y="44">① 선을 올린다</text>
+  <rect class="box gray" x="20" y="62" width="96" height="34" rx="6"/>
+  <text class="t-s t-ink mid" x="68" y="84">타이머</text>
+  <rect class="box gray" x="20" y="122" width="96" height="34" rx="6"/>
+  <text class="t-s t-ink mid" x="68" y="144">키보드</text>
+  <rect class="box gray" x="20" y="236" width="96" height="34" rx="6"/>
+  <text class="t-s t-ink mid" x="68" y="258">프린터</text>
+  <path class="ln thin" d="M116 79 H150 M116 139 H150 M116 253 H150"/>
+  <text class="t-code mid" x="133" y="72">IR0</text>
+  <text class="t-code mid" x="133" y="132">IR1</text>
+  <text class="t-code mid" x="133" y="246">IR7</text>
+  <text class="t-s mid" x="68" y="202">⋮</text>
+
+  <!-- PIC -->
+  <rect class="panel warm" x="150" y="20" width="300" height="280" rx="12"/>
+  <text class="t-b tc-warm" x="164" y="44">8259A PIC</text>
+
+  <rect class="box" x="164" y="56" width="272" height="46" rx="8"/>
+  <text class="t-b" x="176" y="75">IMR</text>
+  <text class="t-s" x="212" y="75">마스크</text>
+  <text class="t-xs" x="176" y="93">막아 둔 선의 요청은 여기서 걸러진다</text>
+
+  <rect class="box" x="164" y="114" width="272" height="46" rx="8"/>
+  <text class="t-b" x="176" y="133">IRR</text>
+  <text class="t-s" x="210" y="133">요청</text>
+  <text class="t-xs" x="176" y="151">처리를 기다리는 요청을 선마다 1비트로 기억</text>
+
+  <rect class="box" x="164" y="172" width="272" height="46" rx="8"/>
+  <text class="t-b" x="176" y="191">우선순위 판정</text>
+  <text class="t-xs" x="176" y="209">번호가 작은 선이 이긴다</text>
+
+  <rect class="box" x="164" y="230" width="272" height="46" rx="8"/>
+  <text class="t-b" x="176" y="249">ISR</text>
+  <text class="t-s" x="208" y="249">처리 중</text>
+  <text class="t-xs" x="176" y="267">CPU가 받아 간 요청. EOI가 오면 지운다</text>
+
+  <path class="ln thin" d="M300 102 V114 M300 160 V172 M300 218 V230"/>
+
+  <!-- CPU -->
+  <rect class="box blue" x="580" y="56" width="160" height="220" rx="12"/>
+  <use href="#i-chip" x="696" y="64" width="30" height="30" class="ic blue"/>
+  <text class="t-b" x="594" y="84">CPU</text>
+  <text class="t-xs" x="594" y="112">IF=1이면 받는다</text>
+  <text class="t-xs" x="594" y="148">받았다고 알린다</text>
+  <text class="t-xs" x="594" y="184">버스에서 읽는다</text>
+  <text class="t-s t-ink t-b" x="594" y="218">⑤ 핸들러 실행</text>
+  <text class="t-xs" x="594" y="252">끝났다고 알린다</text>
+
+  <path class="ln warm" d="M450 108 H575" marker-end="url(#ah-warm)"/>
+  <text class="t-s t-ink t-b mid" x="514" y="100">② INTR</text>
+  <path class="ln blue" d="M580 144 H455" marker-end="url(#ah-blue)"/>
+  <text class="t-s t-ink t-b mid" x="514" y="136">③ INTA</text>
+  <path class="ln warm" d="M450 180 H575" marker-end="url(#ah-warm)"/>
+  <text class="t-s t-ink t-b mid" x="514" y="172">④ 벡터 번호</text>
+  <path class="ln blue" d="M580 248 H455" marker-end="url(#ah-blue)"/>
+  <text class="t-s t-ink t-b mid" x="514" y="240">⑥ EOI</text>
+
+  <text class="t-s" x="20" y="326">벡터 번호 = 기준값 + IR 번호. v7.3은 첫째 PIC의 기준값을 0x30으로 설정한다 (ISA_IRQ_VECTOR).</text>
+  <text class="t-s" x="20" y="348">둘째 PIC(IRQ 8–15)는 첫째의 IR2에 물린다. INTR 선은 CPU 하나에만 닿는다.</text>
+</svg>

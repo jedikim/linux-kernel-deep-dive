@@ -1,0 +1,53 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>KVM_RUN 루프: VMM의 ioctl이 vcpu_run 반복문에 들어가고, vcpu_enter_guest가 VMRESUME으로 게스트를 실행한다. VM exit이 나면 핸들러가 빠른 경로로 재진입하거나, 커널에서 처리하고 루프를 계속하거나, 유저 공간으로 돌아간다.</title>
+
+  <!-- 유저 공간 -->
+  <rect class="panel green" x="20" y="16" width="720" height="78" rx="14"/>
+  <text class="t-b tc-green" x="34" y="40">유저 공간</text>
+  <text class="t-s" x="34" y="60">VMM</text>
+  <rect class="box green" x="150" y="40" width="220" height="42" rx="10"/>
+  <text class="t-code mid" x="260" y="66">ioctl(vcpu_fd, KVM_RUN)</text>
+  <rect class="box green" x="470" y="40" width="254" height="42" rx="10"/>
+  <text class="t-s t-ink mid" x="597" y="66">exit_reason 확인 → 장치 에뮬레이션</text>
+
+  <!-- 커널 -->
+  <rect class="panel yellow" x="20" y="106" width="720" height="150" rx="14"/>
+  <text class="t-b tc-yellow" x="34" y="130">호스트 커널</text>
+  <text class="t-s" x="34" y="150">KVM</text>
+  <rect class="box yellow" x="150" y="130" width="220" height="48" rx="10"/>
+  <text class="t-mono t-b mid" x="260" y="151">vcpu_run()</text>
+  <text class="t-xs mid" x="260" y="169">나갈 이유가 생길 때까지 돈다</text>
+  <rect class="box yellow" x="150" y="196" width="220" height="48" rx="10"/>
+  <text class="t-mono t-b mid" x="260" y="217">vcpu_enter_guest()</text>
+  <text class="t-xs mid" x="260" y="235">요청 처리 · 인터럽트 주입</text>
+  <rect class="box yellow" x="470" y="130" width="254" height="114" rx="10"/>
+  <text class="t-b" x="484" y="154">exit 핸들러</text>
+  <text class="t-s t-ink" x="484" y="180">① 빠른 경로: 곧바로 재진입</text>
+  <text class="t-s t-ink" x="484" y="204">② 커널에서 처리: 1 반환</text>
+  <text class="t-s t-ink" x="484" y="228">③ 유저 공간이 필요: 0 반환</text>
+
+  <!-- 게스트 -->
+  <rect class="panel blue" x="20" y="286" width="720" height="70" rx="14"/>
+  <text class="t-b tc-blue" x="34" y="312">게스트</text>
+  <text class="t-s" x="34" y="332">non-root 모드</text>
+  <rect class="box blue" x="330" y="302" width="250" height="40" rx="10"/>
+  <text class="t-b mid" x="455" y="327">게스트 코드 실행</text>
+
+  <!-- 흐름 -->
+  <path class="ln" d="M260 82 V126" marker-end="url(#ah)"/>
+  <path class="ln" d="M260 178 V192" marker-end="url(#ah)"/>
+  <path class="ln blue" d="M260 244 V322 H326" marker-end="url(#ah-blue)"/>
+  <text class="t-code tc-blue" x="268" y="276">VMRESUME</text>
+  <path class="ln red" d="M580 322 H690 V248" marker-end="url(#ah-red)"/>
+  <text class="t-code tc-red end" x="682" y="276">VM exit</text>
+  <path class="ln blue" d="M520 244 V298" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue end" x="512" y="276">① 재진입</text>
+  <path class="ln" d="M470 154 H374" marker-end="url(#ah)"/>
+  <text class="t-xs mid" x="420" y="146">②</text>
+  <path class="ln green" d="M597 130 V86" marker-end="url(#ah-green)"/>
+  <text class="t-xs tc-green" x="605" y="124">③</text>
+  <path class="ln green" d="M470 61 H374" marker-end="url(#ah-green)"/>
+  <text class="t-xs mid" x="420" y="53">다시 KVM_RUN</text>
+
+  <text class="t-s mid" x="380" y="378">①이 가장 싸다. ③은 시스템 콜 복귀와 VMM의 처리, 재진입 비용까지 치른다</text>
+</svg>

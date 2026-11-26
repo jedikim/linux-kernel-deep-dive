@@ -1,0 +1,65 @@
+<svg viewBox="0 0 760 292" xmlns="http://www.w3.org/2000/svg">
+  <title>x86-64 v7.3의 preempt_count 비트 배치: 선점 0–7, softirq 8–15, hardirq 비활성 16–23, hardirq 24–27, NMI 28–31, 비트 63에 PREEMPT_NEED_RESCHED</title>
+
+  <text class="t-h" x="20" y="30">preempt_count</text>
+  <text class="t-s" x="158" y="30">x86-64에서는 CPU별 변수 __preempt_count</text>
+
+  <!-- 비트 번호 -->
+  <text class="t-code mid tc-muted" x="48" y="62">63</text>
+  <text class="t-code mid tc-muted" x="140" y="62">31–28</text>
+  <text class="t-code mid tc-muted" x="220" y="62">27–24</text>
+  <text class="t-code mid tc-muted" x="340" y="62">23–16</text>
+  <text class="t-code mid tc-muted" x="500" y="62">15–8</text>
+  <text class="t-code mid tc-muted" x="660" y="62">7–0</text>
+
+  <!-- 칸 -->
+  <rect class="box gray" x="20" y="70" width="56" height="48"/>
+  <text class="t-b mid" x="48" y="99">NR</text>
+  <text class="t-s mid" x="88" y="99">⋯</text>
+  <rect class="box red" x="100" y="70" width="80" height="48"/>
+  <text class="t-b mid" x="140" y="99">NMI</text>
+  <rect class="box warm" x="180" y="70" width="80" height="48"/>
+  <text class="t-b mid" x="220" y="99">hardirq</text>
+  <rect class="box yellow" x="260" y="70" width="160" height="48"/>
+  <text class="t-b mid" x="340" y="99">hardirq 비활성</text>
+  <rect class="box purple" x="420" y="70" width="160" height="48"/>
+  <text class="t-b mid" x="500" y="99">softirq</text>
+  <rect class="box blue" x="580" y="70" width="160" height="48"/>
+  <text class="t-b mid" x="660" y="99">선점</text>
+
+  <!-- 마스크 -->
+  <text class="t-code mid tc-muted" x="140" y="136">0xf0000000</text>
+  <text class="t-code mid tc-muted" x="220" y="136">0x0f000000</text>
+  <text class="t-code mid tc-muted" x="340" y="136">0x00ff0000</text>
+  <text class="t-code mid tc-muted" x="500" y="136">0x0000ff00</text>
+  <text class="t-code mid tc-muted" x="660" y="136">0x000000ff</text>
+
+  <path class="ln thin muted" d="M20 154 H740"/>
+
+  <!-- 범례: 누가 올리는가 -->
+  <rect class="box blue" x="20" y="170" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="44" y="182">선점 카운트</text>
+  <text class="t-code" x="200" y="182">preempt_disable(), spin_lock()</text>
+
+  <rect class="box purple" x="20" y="196" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="44" y="208">softirq 카운트</text>
+  <text class="t-code" x="200" y="208">local_bh_disable()</text>
+
+  <rect class="box yellow" x="20" y="222" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="44" y="234">hardirq 비활성 카운트</text>
+  <text class="t-code" x="200" y="234">local_interrupt_disable()</text>
+
+  <rect class="box warm" x="430" y="170" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="454" y="182">hardirq 카운트</text>
+  <text class="t-code" x="566" y="182">irq_enter()</text>
+
+  <rect class="box red" x="430" y="196" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="454" y="208">NMI</text>
+  <text class="t-code" x="566" y="208">nmi_enter()</text>
+
+  <rect class="box gray" x="430" y="222" width="14" height="14" rx="3"/>
+  <text class="t-s t-ink t-b" x="454" y="234">NR (비트 63)</text>
+  <text class="t-code" x="566" y="234">PREEMPT_NEED_RESCHED</text>
+
+  <text class="t-s mid" x="380" y="272">NR은 재스케줄 요청을 뒤집어 저장한다. 요청이 있으면 0, 없으면 1이다.</text>
+</svg>

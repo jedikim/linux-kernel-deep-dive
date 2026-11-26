@@ -1,0 +1,36 @@
+<svg viewBox="0 0 760 336" xmlns="http://www.w3.org/2000/svg">
+  <title>SYSCALL_DEFINE3(read, ...)가 만드는 세 함수: pt_regs에서 인자를 꺼내는 __x64_sys_read, long을 선언된 타입으로 바꾸는 __se_sys_read, 본문인 __do_sys_read, 그리고 추적용 메타데이터</title>
+
+  <rect class="box code" x="20" y="16" width="720" height="40" rx="8"/>
+  <text class="t-code" x="34" y="41">SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count) { … }</text>
+  <path class="ln" d="M380 56 V80" marker-end="url(#ah)"/>
+  <text class="t-xs" x="390" y="73">매크로가 펼친다</text>
+
+  <rect class="box yellow" x="20" y="84" width="226" height="130" rx="10"/>
+  <text class="t-code t-b" x="32" y="108">__x64_sys_read</text>
+  <text class="t-code" x="32" y="126">(const struct pt_regs *)</text>
+  <text class="t-xs" x="32" y="152">switch의 case가 부른다</text>
+  <text class="t-xs" x="32" y="170">regs의 di, si, dx를 꺼내</text>
+  <text class="t-xs" x="32" y="188">다음 함수에 넘긴다</text>
+  <path class="ln" d="M246 149 H263" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="267" y="84" width="226" height="130" rx="10"/>
+  <text class="t-code t-b" x="279" y="108">__se_sys_read</text>
+  <text class="t-code" x="279" y="126">(long, long, long)</text>
+  <text class="t-xs" x="279" y="152">인자를 모두 long으로 받아</text>
+  <text class="t-xs" x="279" y="170">선언된 타입으로 바꾼다</text>
+  <text class="t-xs" x="279" y="188">너무 큰 타입은 빌드 오류</text>
+  <path class="ln" d="M493 149 H510" marker-end="url(#ah)"/>
+
+  <rect class="box green" x="514" y="84" width="226" height="130" rx="10"/>
+  <text class="t-code t-b" x="526" y="108">__do_sys_read</text>
+  <text class="t-code" x="526" y="126">(fd, buf, count)</text>
+  <text class="t-xs" x="526" y="152">중괄호 안에 쓴 본문</text>
+  <text class="t-code" x="526" y="170">ksys_read(fd, buf, count)</text>
+  <text class="t-xs" x="526" y="188">inline이라 앞 함수에 합쳐진다</text>
+
+  <rect class="box gray" x="20" y="240" width="720" height="80" rx="10"/>
+  <text class="t-mono t-b" x="34" y="264">SYSCALL_METADATA</text>
+  <text class="t-s" x="34" y="286">인자의 이름과 타입을 문자열 표로 남긴다</text>
+  <text class="t-s" x="34" y="306">추적점 syscalls:sys_enter_read가 fd, buf, count를 이름 붙여 보여 주는 근거</text>
+</svg>

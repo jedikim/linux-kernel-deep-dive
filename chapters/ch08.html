@@ -1,0 +1,1218 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>시간과 타이머 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="jiffies와 틱에서 고해상도 타이머와 틱 없는 커널까지">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="시간과 타이머 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="jiffies와 틱에서 고해상도 타이머와 틱 없는 커널까지">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch08" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html" aria-current="page"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">3부 시간과 인터럽트 › <b>8장 시간과 타이머</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-warm">
+<div class="ch-kicker"><span class="ch-no">08</span><span class="part">3부 · 시간과 인터럽트</span></div>
+<h1>시간과 타이머</h1>
+<p class="ch-sub">jiffies와 틱에서 고해상도 타이머와 틱 없는 커널까지</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 55분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kernel/tsc.c" target="_blank" rel="noopener">arch/x86/kernel/tsc.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kernel/apic/apic.c" target="_blank" rel="noopener">arch/x86/kernel/apic/apic.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/Kconfig.hz" target="_blank" rel="noopener">kernel/Kconfig.hz</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/jiffies.h" target="_blank" rel="noopener">include/linux/jiffies.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/tick-sched.c" target="_blank" rel="noopener">kernel/time/tick-sched.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/timer.c" target="_blank" rel="noopener">kernel/time/timer.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/hrtimer.c" target="_blank" rel="noopener">kernel/time/hrtimer.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/timekeeping.c" target="_blank" rel="noopener">kernel/time/timekeeping.c</a></div>
+</header><div class="lead">
+<p>커널은 시간에 대해 두 가지를 알아야 합니다. 지금이 몇 시인지, 그리고 정해 둔 때가 되면 누가 깨워 줄 것인지입니다. 오랫동안 두 질문의 답은 하나였습니다. 1초에 수백 번 울리는 타이머 인터럽트, 곧 틱입니다. 그런데 틱만으로는 마이크로초 단위의 타이머를 만들 수 없고, 할 일이 없는 CPU까지 1초에 수백 번 깨우게 됩니다. 이 장은 틱 하나에 묶여 있던 일들이 어떻게 갈라져 나갔는지, 그리고 v7.3에서 틱이 무엇으로 남았는지를 따라갑니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li>clocksource와 clockevent는 무엇이 다르고, 왜 따로 추상화했는가?</li>
+<li><code>jiffies</code>는 무엇을 세고, 넘침은 어떻게 다루는가?</li>
+<li>v7.3에서 틱은 어디에서 오고, 틱 한 번에 어떤 함수가 불리는가?</li>
+<li>쉬는 CPU와 태스크 하나만 도는 CPU에서 틱을 멈추면 시간은 누가 관리하는가?</li>
+<li>타이머 휠과 hrtimer는 왜 자료구조가 다른가?</li>
+<li><code>clock_gettime()</code>은 어떻게 시스템 콜 없이 시각을 읽는가?</li>
+</ul>
+</div>
+<section class="level2" id="two-jobs">
+<h2><span class="sec-n">8.1</span>시간으로 하는 두 가지 일<a aria-label="이 절의 링크" class="anchor" href="#two-jobs">#</a></h2>
+<p>커널이 시간으로 하는 일은 둘로 나뉩니다.</p>
+<ul>
+<li><strong>시각 읽기</strong>(timekeeping): 지금이 몇 시인지 아는 일입니다. <code>clock_gettime()</code>, 파일의 수정 시각, 스케줄러의 실행 시간 계산이 여기에 기댑니다.</li>
+<li><strong>이벤트 예약</strong>: 정한 시각이 되면 코드가 실행되게 하는 일입니다. 네트워크 타임아웃, <code>nanosleep()</code>, 스케줄러의 틱이 여기에 속합니다.</li>
+</ul>
+<p>하드웨어도 둘로 나뉩니다. 계속 올라가는 숫자를 읽게 해 주는 카운터가 있고, 정한 시각에 인터럽트를 거는 타이머 장치가 있습니다. 커널은 앞의 것을 <strong>clocksource</strong>, 뒤의 것을 <strong>clockevent</strong>라는 인터페이스로 감쌉니다. 구조체 이름은 <code>struct clocksource</code>와 <code>struct clock_event_device</code>입니다.</p>
+<figure class="fig" id="fig-clock-source-event"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>시간 하드웨어의 두 역할: 카운터를 읽는 clocksource는 timekeeper를 거쳐 시각을 알려 주고, 인터럽트를 예약하는 clock_event_device는 틱과 타이머를 깨운다</title>
+
+  <!-- 왼쪽: 시각 읽기 -->
+  <use href="#i-clock" x="20" y="10" width="32" height="32" class="ic blue"/>
+  <text class="t-l" x="62" y="24">지금 몇 시인가</text>
+  <text class="t-s" x="62" y="42">카운터를 읽어 시각을 계산한다</text>
+
+  <rect class="box blue" x="20" y="58" width="340" height="54" rx="10"/>
+  <text class="t-mono t-b" x="34" y="81">ktime_get() · clock_gettime()</text>
+  <text class="t-s" x="34" y="101">커널 코드와 유저 프로그램이 묻는다</text>
+
+  <rect class="box blue" x="20" y="138" width="340" height="54" rx="10"/>
+  <text class="t-mono t-b" x="34" y="161">struct timekeeper</text>
+  <text class="t-s" x="34" y="181">기준 시각 + 지난 사이클 × mult &gt;&gt; shift</text>
+
+  <rect class="box blue" x="20" y="218" width="340" height="54" rx="10"/>
+  <text class="t-mono t-b" x="34" y="241">struct clocksource</text>
+  <text class="t-code" x="34" y="261">.read()  .mult  .shift  .rating</text>
+
+  <rect class="box gray" x="20" y="298" width="340" height="54" rx="10"/>
+  <text class="t-b" x="34" y="321">카운터</text>
+  <text class="t-s" x="34" y="341">TSC · HPET · ACPI PM · arm arch timer</text>
+
+  <path class="ln blue" d="M190 298 V277" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M190 218 V197" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M190 138 V117" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="200" y="290">사이클 값</text>
+  <text class="t-xs tc-blue" x="200" y="210">read()</text>
+  <text class="t-xs tc-blue" x="200" y="130">나노초</text>
+
+  <!-- 오른쪽: 이벤트 예약 -->
+  <use href="#i-hourglass" x="400" y="10" width="32" height="32" class="ic warm"/>
+  <text class="t-l" x="442" y="24">언제 깨울까</text>
+  <text class="t-s" x="442" y="42">정한 시각에 인터럽트가 오게 예약한다</text>
+
+  <rect class="box warm" x="400" y="58" width="340" height="54" rx="10"/>
+  <text class="t-b" x="414" y="81">틱 · 타이머 휠 · hrtimer</text>
+  <text class="t-s" x="414" y="101">스케줄러, 타임아웃, nanosleep()</text>
+
+  <rect class="box warm" x="400" y="138" width="340" height="54" rx="10"/>
+  <text class="t-mono t-b" x="414" y="161">tick_device · hrtimer_cpu_base</text>
+  <text class="t-s" x="414" y="181">CPU마다 가장 이른 만료 시각을 고른다</text>
+
+  <rect class="box warm" x="400" y="218" width="340" height="54" rx="10"/>
+  <text class="t-mono t-b" x="414" y="241">struct clock_event_device</text>
+  <text class="t-code" x="414" y="261">.set_next_event()  .event_handler()</text>
+
+  <rect class="box gray" x="400" y="298" width="340" height="54" rx="10"/>
+  <text class="t-b" x="414" y="321">타이머 인터럽트 장치</text>
+  <text class="t-s" x="414" y="341">LAPIC 타이머 · HPET · arm arch timer</text>
+
+  <path class="ln warm" d="M500 112 V133" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M500 192 V213" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M500 272 V293" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm end" x="490" y="290">예약</text>
+
+  <path class="ln red" d="M640 298 V277" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M640 218 V197" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M640 138 V117" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="650" y="290">인터럽트</text>
+  <text class="t-xs tc-red" x="650" y="210">event_handler()</text>
+  <text class="t-xs tc-red" x="650" y="130">콜백</text>
+
+  <text class="t-s mid" x="380" y="378">같은 칩(HPET, arm arch timer)이 두 역할을 다 해도 커널에는 따로 등록된다</text>
+</svg></div><figcaption><b>그림 8-1</b>시간 하드웨어의 두 역할. 왼쪽은 읽기만 하고, 오른쪽은 예약을 내려보내고 인터럽트를 올려 받습니다.</figcaption></figure>
+<p>x86 PC에서 clocksource로 주로 쓰이는 것은 TSC입니다. CPU 안에 있는 64비트 카운터이고 <code>rdtsc</code> 명령어 하나로 읽습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kernel/tsc.c#L1176" rel="noopener" target="_blank">arch/x86/kernel/tsc.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/kernel/tsc.c" data-line="1176" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="dt">static</span> <span class="kw">struct</span> clocksource clocksource_tsc <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb1-2">    <span class="op">.</span>name           <span class="op">=</span> <span class="st">"tsc"</span><span class="op">,</span></span>
+<span id="cb1-3">    <span class="op">.</span>rating         <span class="op">=</span> <span class="dv">300</span><span class="op">,</span></span>
+<span id="cb1-4">    <span class="op">.</span>read           <span class="op">=</span> read_tsc<span class="op">,</span></span>
+<span id="cb1-5">    <span class="op">.</span>mask           <span class="op">=</span> CLOCKSOURCE_MASK<span class="op">(</span><span class="dv">64</span><span class="op">),</span></span>
+<span id="cb1-6">    <span class="op">.</span>flags          <span class="op">=</span> CLOCK_SOURCE_IS_CONTINUOUS <span class="op">|</span></span>
+<span id="cb1-7">                  CLOCK_SOURCE_CAN_INLINE_READ <span class="op">|</span></span>
+<span id="cb1-8">                  CLOCK_SOURCE_MUST_VERIFY <span class="op">|</span></span>
+<span id="cb1-9">                  CLOCK_SOURCE_HAS_COUPLED_CLOCK_EVENT<span class="op">,</span></span>
+<span id="cb1-10">    <span class="op">.</span>id         <span class="op">=</span> CSID_X86_TSC<span class="op">,</span></span>
+<span id="cb1-11">    <span class="op">.</span>vdso_clock_mode    <span class="op">=</span> VDSO_CLOCKMODE_TSC<span class="op">,</span></span>
+<span id="cb1-12">    <span class="co">/* ... */</span></span>
+<span id="cb1-13"><span class="op">};</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li><code>.read</code>가 인터페이스의 전부에 가깝습니다. 호출하면 지금의 사이클 값을 돌려줍니다. 사이클을 나노초로 바꾸는 계산은 코어가 합니다.</li>
+<li><code>.rating</code>은 여러 clocksource 가운데 하나를 고르는 점수입니다. v7.3 소스에서 <code>jiffies</code>는 1, PIT는 110, ACPI PM 타이머는 200, HPET은 250, TSC는 300입니다. 커널은 가장 높은 것을 씁니다.</li>
+<li><code>CLOCK_SOURCE_MUST_VERIFY</code>는 검증이 필요하다는 표시입니다. 워치독이 주기적으로 다른 clocksource와 견주어 보고, 어긋나면 불안정하다고 표시한 뒤 다음 순위로 바꿉니다.</li>
+</ul>
+<p>clockevent 쪽은 CPU마다 하나씩 있는 Local APIC 타이머입니다. APIC 자체는 <a href="ch09.html">9장</a>에서 다룹니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/arch/x86/kernel/apic/apic.c#L496" rel="noopener" target="_blank">arch/x86/kernel/apic/apic.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="arch/x86/kernel/apic/apic.c" data-line="496" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><span class="dt">static</span> <span class="kw">struct</span> clock_event_device lapic_clockevent <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb2-2">    <span class="op">.</span>name               <span class="op">=</span> <span class="st">"lapic"</span><span class="op">,</span></span>
+<span id="cb2-3">    <span class="op">.</span>features           <span class="op">=</span> CLOCK_EVT_FEAT_PERIODIC <span class="op">|</span></span>
+<span id="cb2-4">                      CLOCK_EVT_FEAT_ONESHOT <span class="op">|</span> CLOCK_EVT_FEAT_C3STOP</span>
+<span id="cb2-5">                      <span class="op">|</span> CLOCK_EVT_FEAT_DUMMY<span class="op">,</span></span>
+<span id="cb2-6">    <span class="co">/* ... */</span></span>
+<span id="cb2-7">    <span class="op">.</span>set_state_periodic     <span class="op">=</span> lapic_timer_set_periodic<span class="op">,</span></span>
+<span id="cb2-8">    <span class="op">.</span>set_state_oneshot      <span class="op">=</span> lapic_timer_set_oneshot<span class="op">,</span></span>
+<span id="cb2-9">    <span class="co">/* ... */</span></span>
+<span id="cb2-10">    <span class="op">.</span>set_next_event         <span class="op">=</span> lapic_next_event<span class="op">,</span></span>
+<span id="cb2-11">    <span class="op">.</span>broadcast          <span class="op">=</span> lapic_timer_broadcast<span class="op">,</span></span>
+<span id="cb2-12">    <span class="co">/* ... */</span></span>
+<span id="cb2-13"><span class="op">};</span></span></code></pre></div></div>
+<ul>
+<li>모드가 둘입니다. <code>PERIODIC</code>은 일정한 간격으로 계속 인터럽트를 겁니다. <code>ONESHOT</code>은 한 번만 걸고, 다음 것은 <code>set_next_event()</code>로 다시 예약해야 합니다.</li>
+<li><code>event_handler</code>가 초기화 목록에 없습니다. 이 필드는 코어가 채웁니다. 장치 드라이버는 인터럽트가 오면 <code>evt-&gt;event_handler(evt)</code>를 부르기만 합니다. 여기에 어떤 함수가 걸려 있는지가 뒤에서 볼 틱 모드입니다.</li>
+<li><code>C3STOP</code>은 CPU가 깊은 절전 상태에 들어가면 이 타이머도 멈춘다는 뜻입니다. 그런 CPU는 스스로 깨어날 수 없으므로, 멈추지 않는 다른 장치가 대신 인터럽트를 받아 깨워 줍니다. 이것이 <strong>틱 브로드캐스트</strong>(tick broadcast)입니다. <code>ARAT</code> 기능이 있는 CPU에서는 타이머가 멈추지 않으므로 <code>setup_APIC_timer()</code>가 이 플래그를 지웁니다.</li>
+</ul>
+<p>같은 함수는 CPU가 TSC 데드라인 모드를 지원하면 장치 이름을 <code>lapic-deadline</code>으로 바꿉니다. 남은 시간을 세는 대신 "TSC가 이 값에 닿으면 인터럽트를 걸어라"고 MSR에 써 넣는 방식입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p><code>drivers/clocksource/</code> 아래에만 드라이버 파일이 백 개 가까이 있습니다. 그런데 코어(<code>kernel/time/</code>)가 장치에 요구하는 것은 둘뿐입니다. "지금 값을 읽어 달라"와 "이때 인터럽트를 걸어 달라"입니다. 인터페이스를 장치의 기능 목록이 아니라 <strong>코어가 필요한 최소한</strong>에 맞췄기 때문에, 주기 모드만 되는 낡은 칩과 나노초 단위로 예약되는 최신 칩이 같은 코드 위에서 돕니다. 장치마다 다른 능력은 <code>features</code> 비트와 <code>rating</code> 점수로 알리고, 무엇을 쓸지는 코어가 고릅니다.</p>
+</div>
+</section>
+<section class="level2" id="jiffies">
+<h2><span class="sec-n">8.2</span>jiffies와 HZ<a aria-label="이 절의 링크" class="anchor" href="#jiffies">#</a></h2>
+<p><strong>틱</strong>(tick)은 일정한 간격으로 오는 타이머 인터럽트입니다. 1초에 몇 번 오는지가 <code>HZ</code>이고 빌드할 때 정합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/Kconfig.hz#L6" rel="noopener" target="_blank">kernel/Kconfig.hz</a><span class="code-ver">v7.3</span></div><pre class="kconfig" data-file="kernel/Kconfig.hz" data-line="6"><code>choice
+    prompt "Timer frequency"
+    default HZ_250</code></pre></div>
+<p>선택지는 100, 250, 300, 1000이고 기본값은 250입니다. <code>HZ</code>가 크면 타임아웃과 스케줄링의 눈금이 촘촘해지고, 그만큼 인터럽트가 자주 옵니다.</p>
+<p><strong><code>jiffies</code></strong>는 부팅한 뒤로 틱이 몇 번 지났는지 세는 전역 변수입니다. 실체는 64비트 변수 <code>jiffies_64</code>이고, <code>jiffies</code>는 그 아래쪽 <code>unsigned long</code>만큼을 가리키는 이름입니다. 64비트 시스템에서는 둘이 같습니다.</p>
+<p><code>jiffies</code>가 32비트인 시스템에서는 <code>HZ=1000</code>일 때 49.7일마다 값이 0으로 돌아갑니다. 그래서 두 시각을 <code>&gt;</code>로 직접 비교하면 안 됩니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/jiffies.h#L123" rel="noopener" target="_blank">include/linux/jiffies.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/jiffies.h" data-line="123" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="pp">#define time_after</span><span class="op">(</span><span class="pp">a</span><span class="op">,</span><span class="pp">b</span><span class="op">)</span><span class="pp">     </span><span class="op">\</span></span>
+<span id="cb4-2"><span class="pp">    </span><span class="op">(</span><span class="pp">typecheck</span><span class="op">(</span><span class="dt">unsigned</span><span class="pp"> </span><span class="dt">long</span><span class="op">,</span><span class="pp"> a</span><span class="op">)</span><span class="pp"> </span><span class="op">&amp;&amp;</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb4-3"><span class="pp">     typecheck</span><span class="op">(</span><span class="dt">unsigned</span><span class="pp"> </span><span class="dt">long</span><span class="op">,</span><span class="pp"> b</span><span class="op">)</span><span class="pp"> </span><span class="op">&amp;&amp;</span><span class="pp"> </span><span class="op">\</span></span>
+<span id="cb4-4"><span class="pp">     </span><span class="op">((</span><span class="dt">long</span><span class="op">)((</span><span class="pp">b</span><span class="op">)</span><span class="pp"> </span><span class="op">-</span><span class="pp"> </span><span class="op">(</span><span class="pp">a</span><span class="op">))</span><span class="pp"> </span><span class="op">&lt;</span><span class="pp"> </span><span class="dv">0</span><span class="op">))</span></span>
+<span id="cb4-5"><span class="co">/* ... */</span></span>
+<span id="cb4-6"><span class="co">/*</span></span>
+<span id="cb4-7"><span class="co"> * Have the 32-bit jiffies value wrap 5 minutes after boot</span></span>
+<span id="cb4-8"><span class="co"> * so jiffies wrap bugs show up earlier.</span></span>
+<span id="cb4-9"><span class="co"> */</span></span>
+<span id="cb4-10"><span class="pp">#define INITIAL_JIFFIES </span><span class="op">((</span><span class="dt">unsigned</span><span class="pp"> </span><span class="dt">long</span><span class="op">)(</span><span class="dt">unsigned</span><span class="pp"> </span><span class="dt">int</span><span class="op">)</span><span class="pp"> </span><span class="op">(-</span><span class="dv">300</span><span class="op">*</span><span class="pp">HZ</span><span class="op">))</span></span></code></pre></div></div>
+<p><code>time_after(a, b)</code>는 두 값을 빼서 <strong>부호 있는 정수</strong>로 본 뒤 음수인지만 확인합니다. 부호 없는 뺄셈은 넘침이 있어도 두 값의 간격을 맞게 내놓으므로, 간격이 표현 범위의 절반보다 작으면 결과가 맞습니다.</p>
+<figure class="fig" id="fig-jiffies-wrap"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 326" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>32비트 jiffies가 넘칠 때 단순 비교는 틀리고 time_after()의 부호 있는 뺄셈은 맞는다</title>
+
+  <text class="t-b" x="20" y="24">32비트 jiffies</text>
+  <text class="t-xs mid" x="380" y="24">0xffffffff → 0x00000000</text>
+
+  <!-- 타임아웃 길이 -->
+  <path class="ln thin warm" d="M120 54 H540" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm mid" x="240" y="47">+500틱 (HZ=250에서 2초)</text>
+
+  <!-- 수직선 -->
+  <path class="ln" d="M40 96 H720" marker-end="url(#ah)"/>
+  <path class="ln thin muted dash" d="M380 32 V116"/>
+  <path class="ln" d="M120 89 V103 M280 89 V103 M540 89 V103 M640 89 V103"/>
+  <text class="t-code mid" x="120" y="80">0xffffff00</text>
+  <text class="t-code mid" x="280" y="80">0xffffffa0</text>
+  <text class="t-code mid" x="540" y="80">0x000000f4</text>
+  <text class="t-code mid" x="640" y="80">0x00000100</text>
+  <text class="t-xs mid" x="120" y="122">타임아웃을 건 시각</text>
+  <text class="t-xs t-ink t-b mid" x="280" y="122">지금 ①</text>
+  <text class="t-xs tc-warm mid" x="540" y="122">timeout</text>
+  <text class="t-xs t-ink t-b mid" x="640" y="122">지금 ②</text>
+
+  <!-- 표 머리 -->
+  <text class="t-s t-ink t-b" x="180" y="156">단순 비교  jiffies &gt; timeout</text>
+  <text class="t-s t-ink t-b" x="460" y="156">time_after(jiffies, timeout)</text>
+
+  <!-- ① -->
+  <text class="t-b" x="20" y="186">① 넘치기 전</text>
+  <text class="t-code" x="20" y="206">0xffffffa0</text>
+  <rect class="box red" x="180" y="166" width="270" height="52" rx="8"/>
+  <text class="t-code" x="194" y="187">0xffffffa0 &gt; 0x000000f4</text>
+  <text class="t-xs tc-red" x="194" y="207">참 → 340틱이 남았는데 만료로 본다</text>
+  <rect class="box green" x="460" y="166" width="280" height="52" rx="8"/>
+  <text class="t-code" x="474" y="187">(long)(0xf4 - 0xffffffa0) = 340</text>
+  <text class="t-xs tc-green" x="474" y="207">음수가 아니다 → 아직 만료 전 (맞음)</text>
+
+  <!-- ② -->
+  <text class="t-b" x="20" y="248">② 넘친 뒤</text>
+  <text class="t-code" x="20" y="268">0x00000100</text>
+  <rect class="box green" x="180" y="228" width="270" height="52" rx="8"/>
+  <text class="t-code" x="194" y="249">0x00000100 &gt; 0x000000f4</text>
+  <text class="t-xs tc-green" x="194" y="269">참 → 만료 (맞음)</text>
+  <rect class="box green" x="460" y="228" width="280" height="52" rx="8"/>
+  <text class="t-code" x="474" y="249">(long)(0xf4 - 0x00000100) = -12</text>
+  <text class="t-xs tc-green" x="474" y="269">음수다 → 만료 (맞음)</text>
+
+  <text class="t-s mid" x="380" y="308">두 시각의 간격이 표현 범위의 절반보다 작으면, 부호 있는 뺄셈은 넘침과 상관없이 앞뒤를 맞게 가린다</text>
+</svg></div><figcaption><b>그림 8-2</b>타임아웃을 건 뒤에 <code>jiffies</code>가 넘치는 경우. 단순 비교는 넘치기 전의 큰 값을 "이미 지났다"로 잘못 판정합니다.</figcaption></figure>
+<p><code>INITIAL_JIFFIES</code>는 이 버그를 일찍 드러내려는 장치입니다. <code>jiffies</code>는 0이 아니라 "32비트 값이 넘치기 5분 전"에서 출발합니다. 넘침을 잘못 다루는 코드는 부팅 5분 뒤에 고장 납니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p><code>HZ</code>는 유저 공간에 그대로 보이지 않습니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ getconf CLK_TCK
+100
+$ grep 'CONFIG_HZ=' /boot/config-$(uname -r)
+CONFIG_HZ=250</code></pre></div>
+<p>첫 번째 값은 <code>USER_HZ</code>입니다. <code>/proc/stat</code>이나 <code>times()</code>처럼 틱 단위로 시간을 알려 주는 인터페이스의 단위이고, 커널의 <code>HZ</code>와 상관없이 100입니다. 내부 구현의 숫자가 유저 공간 인터페이스로 새어 나가면 나중에 바꿀 수 없으므로 둘을 갈라 두었습니다.</p>
+</div>
+</section>
+<section class="level2" id="tick">
+<h2><span class="sec-n">8.3</span>틱 한 번에 일어나는 일<a aria-label="이 절의 링크" class="anchor" href="#tick">#</a></h2>
+<p>틱이 오면 커널은 두 종류의 일을 합니다. 시스템 전체에서 한 번만 하면 되는 일(<code>jiffies</code>를 올리고 시계를 갱신)과, CPU마다 해야 하는 일(지금 돌던 태스크에 대한 처리)입니다. x86-64에서 고해상도 타이머가 켜진 v7.3 커널의 호출 사슬은 다음과 같습니다.</p>
+<figure class="fig" id="fig-tick-path"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 524" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>v7.3 x86-64 고해상도 모드에서 틱 한 번의 호출 사슬: LAPIC 타이머 인터럽트에서 hrtimer_interrupt, tick_nohz_handler를 거쳐 jiffies 갱신과 update_process_times로 갈라진다</title>
+
+  <rect class="box gray" x="20" y="14" width="720" height="38" rx="10"/>
+  <use href="#i-clock" x="30" y="20" width="26" height="26" class="ic gray"/>
+  <text class="t-b" x="64" y="38">LAPIC 타이머가 만료된다</text>
+  <text class="t-code end" x="728" y="38">벡터 0xec (LOCAL_TIMER_VECTOR)</text>
+  <path class="ln" d="M380 52 V63" marker-end="url(#ah)"/>
+
+  <rect class="box" x="20" y="68" width="720" height="50" rx="10"/>
+  <text class="t-mono t-b" x="34" y="89">sysvec_apic_timer_interrupt()</text>
+  <text class="t-xs end" x="728" y="89">arch/x86/kernel/apic/apic.c</text>
+  <text class="t-s" x="34" y="108">EOI를 보내고 이 CPU의 clock_event_device에 등록된 event_handler를 부른다</text>
+  <path class="ln" d="M380 118 V129" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="20" y="134" width="720" height="50" rx="10"/>
+  <text class="t-mono t-b" x="34" y="155">hrtimer_interrupt()</text>
+  <text class="t-xs end" x="728" y="155">kernel/time/hrtimer.c</text>
+  <text class="t-s" x="34" y="174">만료 시각이 지난 hrtimer를 차례로 꺼내 콜백을 실행한다. 틱도 그중 하나다</text>
+  <path class="ln" d="M380 184 V195" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="20" y="200" width="720" height="50" rx="10"/>
+  <text class="t-mono t-b" x="34" y="221">tick_nohz_handler()</text>
+  <text class="t-xs end" x="728" y="221">kernel/time/tick-sched.c</text>
+  <text class="t-s" x="34" y="240">CPU마다 하나씩 있는 hrtimer인 sched_timer의 콜백. 여기서 두 가지 일로 갈라진다</text>
+
+  <path class="ln blue" d="M170 250 V265" marker-end="url(#ah-blue)"/>
+  <path class="ln green" d="M540 250 V265" marker-end="url(#ah-green)"/>
+
+  <!-- 왼쪽: 시스템 전체의 시간 -->
+  <rect class="panel blue" x="20" y="270" width="300" height="184" rx="12"/>
+  <text class="t-b tc-blue" x="34" y="294">① 시스템 전체의 시간</text>
+  <text class="t-code" x="34" y="318">tick_sched_do_timer()</text>
+  <text class="t-code" x="34" y="338">└ tick_do_update_jiffies64()</text>
+  <rect class="box" x="34" y="350" width="272" height="68" rx="8"/>
+  <text class="t-code" x="46" y="370">jiffies_64 += ticks</text>
+  <text class="t-code" x="46" y="389">calc_global_load()</text>
+  <text class="t-xs end" x="296" y="389">부하 평균</text>
+  <text class="t-code" x="46" y="408">update_wall_time()</text>
+  <text class="t-xs end" x="296" y="408">timekeeper</text>
+  <text class="t-xs tc-blue" x="34" y="440">tick_do_timer_cpu로 지정된 CPU 하나만 한다</text>
+
+  <!-- 오른쪽: 이 CPU의 태스크 -->
+  <rect class="panel green" x="340" y="270" width="400" height="184" rx="12"/>
+  <text class="t-b tc-green" x="354" y="294">② 이 CPU에서 돌던 태스크</text>
+  <text class="t-code" x="354" y="318">tick_sched_handle() → update_process_times()</text>
+  <rect class="box" x="354" y="330" width="372" height="112" rx="8"/>
+  <text class="t-code" x="366" y="350">account_process_tick()</text>
+  <text class="t-xs end" x="716" y="350">유저·시스템 시간 누적</text>
+  <text class="t-code" x="366" y="370">run_local_timers()</text>
+  <text class="t-xs end" x="716" y="370">타이머 휠 → TIMER_SOFTIRQ</text>
+  <text class="t-code" x="366" y="390">rcu_sched_clock_irq()</text>
+  <text class="t-xs end" x="716" y="390">RCU 정지 상태 확인</text>
+  <text class="t-code" x="366" y="410">sched_tick()</text>
+  <text class="t-xs end" x="716" y="410">타임 슬라이스 검사, 재스케줄 요청</text>
+  <text class="t-code" x="366" y="430">run_posix_cpu_timers()</text>
+  <text class="t-xs end" x="716" y="430">CPU 시간 기준 타이머</text>
+
+  <path class="ln" d="M170 454 V469" marker-end="url(#ah)"/>
+  <path class="ln" d="M540 454 V469" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="20" y="474" width="720" height="36" rx="10"/>
+  <text class="t-mono" x="34" y="497">hrtimer_forward(timer, now, TICK_NSEC)</text>
+  <text class="t-xs end" x="728" y="497">다음 틱 시각으로 다시 맞춘다 (HRTIMER_RESTART)</text>
+</svg></div><figcaption><b>그림 8-3</b>v7.3의 틱 경로. 틱은 타이머 장치의 주기 인터럽트가 아니라 CPU마다 하나씩 있는 hrtimer의 만료입니다.</figcaption></figure>
+<p>눈여겨볼 것은 가운데의 <code>hrtimer_interrupt()</code>입니다. 타이머 장치는 원샷 모드로 돌고, 인터럽트의 주인은 틱이 아니라 <a href="#hrtimer">고해상도 타이머</a>입니다. 틱은 그 위에 얹힌 타이머 하나(<code>tick_sched</code> 구조체의 <code>sched_timer</code>)일 뿐입니다. 콜백은 이렇게 생겼습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/tick-sched.c#L304" rel="noopener" target="_blank">kernel/time/tick-sched.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/time/tick-sched.c" data-line="304" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="dt">static</span> <span class="kw">enum</span> hrtimer_restart tick_nohz_handler<span class="op">(</span><span class="kw">struct</span> hrtimer <span class="op">*</span>timer<span class="op">)</span></span>
+<span id="cb6-2"><span class="op">{</span></span>
+<span id="cb6-3">    <span class="kw">struct</span> tick_sched <span class="op">*</span>ts <span class="op">=</span> container_of<span class="op">(</span>timer<span class="op">,</span> <span class="kw">struct</span> tick_sched<span class="op">,</span> sched_timer<span class="op">);</span></span>
+<span id="cb6-4">    <span class="kw">struct</span> pt_regs <span class="op">*</span>regs <span class="op">=</span> get_irq_regs<span class="op">();</span></span>
+<span id="cb6-5">    ktime_t now <span class="op">=</span> ktime_get<span class="op">();</span></span>
+<span id="cb6-6"></span>
+<span id="cb6-7">    tick_sched_do_timer<span class="op">(</span>ts<span class="op">,</span> now<span class="op">);</span></span>
+<span id="cb6-8"></span>
+<span id="cb6-9">    <span class="co">/* ... */</span></span>
+<span id="cb6-10">    <span class="cf">if</span> <span class="op">(</span>regs<span class="op">)</span></span>
+<span id="cb6-11">        tick_sched_handle<span class="op">(</span>ts<span class="op">,</span> regs<span class="op">);</span></span>
+<span id="cb6-12">    <span class="cf">else</span></span>
+<span id="cb6-13">        ts<span class="op">-&gt;</span>next_tick <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb6-14"></span>
+<span id="cb6-15">    <span class="co">/*</span></span>
+<span id="cb6-16"><span class="co">     * In dynticks mode, tick reprogram is deferred:</span></span>
+<span id="cb6-17"><span class="co">     * - to the idle task if in dynticks-idle</span></span>
+<span id="cb6-18"><span class="co">     * - to IRQ exit if in full-dynticks.</span></span>
+<span id="cb6-19"><span class="co">     */</span></span>
+<span id="cb6-20">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>tick_sched_flag_test<span class="op">(</span>ts<span class="op">,</span> TS_FLAG_STOPPED<span class="op">)))</span></span>
+<span id="cb6-21">        <span class="cf">return</span> HRTIMER_NORESTART<span class="op">;</span></span>
+<span id="cb6-22"></span>
+<span id="cb6-23">    hrtimer_forward<span class="op">(</span>timer<span class="op">,</span> now<span class="op">,</span> TICK_NSEC<span class="op">);</span></span>
+<span id="cb6-24"></span>
+<span id="cb6-25">    <span class="cf">return</span> HRTIMER_RESTART<span class="op">;</span></span>
+<span id="cb6-26"><span class="op">}</span></span></code></pre></div></div>
+<p><code>tick_sched_do_timer()</code>가 그림의 ①이고 <code>tick_sched_handle()</code>이 ②입니다. 마지막 두 줄은 타이머를 <code>TICK_NSEC</code>(1/HZ초) 뒤로 다시 맞춥니다. 주기적인 틱은 "매번 스스로를 다시 거는 원샷 타이머"입니다. 틱이 멈춘 상태(<code>TS_FLAG_STOPPED</code>)라면 다시 걸지 않습니다. <a href="#nohz">틱 없는 커널 절</a>에서 봅니다.</p>
+<section class="level3" id="시스템-전체의-시간">
+<h3>시스템 전체의 시간</h3>
+<p><code>jiffies</code>를 올리는 일은 CPU 하나만 맡습니다. 그 번호가 전역 변수 <code>tick_do_timer_cpu</code>에 들어 있고, <code>tick_sched_do_timer()</code>는 자기가 담당일 때만 아래 함수를 부릅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/tick-sched.c#L57" rel="noopener" target="_blank">kernel/time/tick-sched.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/time/tick-sched.c" data-line="57" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="dt">static</span> <span class="dt">void</span> tick_do_update_jiffies64<span class="op">(</span>ktime_t now<span class="op">)</span></span>
+<span id="cb7-2"><span class="op">{</span></span>
+<span id="cb7-3">    <span class="dt">unsigned</span> <span class="dt">long</span> ticks <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb7-4">    ktime_t delta<span class="op">,</span> nextp<span class="op">;</span></span>
+<span id="cb7-5"></span>
+<span id="cb7-6">    <span class="co">/* ... 락 없이 하는 빠른 검사: 다음 틱 시각 전이면 돌아간다 ... */</span></span>
+<span id="cb7-7"></span>
+<span id="cb7-8">    raw_spin_lock<span class="op">(&amp;</span>jiffies_lock<span class="op">);</span></span>
+<span id="cb7-9">    <span class="co">/* ... */</span></span>
+<span id="cb7-10">    write_seqcount_begin<span class="op">(&amp;</span>jiffies_seq<span class="op">);</span></span>
+<span id="cb7-11"></span>
+<span id="cb7-12">    delta <span class="op">=</span> ktime_sub<span class="op">(</span>now<span class="op">,</span> tick_next_period<span class="op">);</span></span>
+<span id="cb7-13">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>delta <span class="op">&gt;=</span> TICK_NSEC<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb7-14">        <span class="co">/* Slow path for long idle sleep times */</span></span>
+<span id="cb7-15">        s64 incr <span class="op">=</span> TICK_NSEC<span class="op">;</span></span>
+<span id="cb7-16"></span>
+<span id="cb7-17">        ticks <span class="op">+=</span> ktime_divns<span class="op">(</span>delta<span class="op">,</span> incr<span class="op">);</span></span>
+<span id="cb7-18">        <span class="co">/* ... */</span></span>
+<span id="cb7-19">    <span class="op">}</span></span>
+<span id="cb7-20">    <span class="co">/* ... */</span></span>
+<span id="cb7-21"></span>
+<span id="cb7-22">    <span class="co">/* Advance jiffies to complete the 'jiffies_seq' protected job */</span></span>
+<span id="cb7-23">    jiffies_64 <span class="op">+=</span> ticks<span class="op">;</span></span>
+<span id="cb7-24">    <span class="co">/* ... */</span></span>
+<span id="cb7-25">    write_seqcount_end<span class="op">(&amp;</span>jiffies_seq<span class="op">);</span></span>
+<span id="cb7-26"></span>
+<span id="cb7-27">    calc_global_load<span class="op">();</span></span>
+<span id="cb7-28"></span>
+<span id="cb7-29">    raw_spin_unlock<span class="op">(&amp;</span>jiffies_lock<span class="op">);</span></span>
+<span id="cb7-30">    update_wall_time<span class="op">();</span></span>
+<span id="cb7-31"><span class="op">}</span></span></code></pre></div></div>
+<p><code>jiffies_64 += ticks</code>에서 더하는 값이 1이 아닐 수 있다는 점이 중요합니다. 이 함수는 "틱이 한 번 왔다"고 가정하지 않습니다. 지금 시각(<code>now</code>)과 마지막으로 갱신한 시각의 차이를 틱 길이로 나누어, 지나간 틱 수만큼 한꺼번에 올립니다. 틱이 한참 오지 않았어도 <code>jiffies</code>가 맞게 따라옵니다. <code>jiffies</code>의 뜻이 "인터럽트가 온 횟수"에서 "지나간 시간을 틱 단위로 나타낸 값"으로 바뀐 것입니다.</p>
+<p><code>calc_global_load()</code>는 <code>uptime</code>이 보여 주는 부하 평균을 갱신하고, <code>update_wall_time()</code>은 <a href="#timekeeping">timekeeper</a>를 갱신합니다.</p>
+</section>
+<section class="level3" id="이-cpu의-태스크">
+<h3>이 CPU의 태스크</h3>
+<p>모든 CPU가 틱마다 하는 일은 <code>update_process_times()</code>에 모여 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/timer.c#L2468" rel="noopener" target="_blank">kernel/time/timer.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/time/timer.c" data-line="2468" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="dt">void</span> update_process_times<span class="op">(</span><span class="dt">int</span> user_tick<span class="op">)</span></span>
+<span id="cb8-2"><span class="op">{</span></span>
+<span id="cb8-3">    <span class="kw">struct</span> task_struct <span class="op">*</span>p <span class="op">=</span> current<span class="op">;</span></span>
+<span id="cb8-4"></span>
+<span id="cb8-5">    <span class="co">/* Note: this timer irq context must be accounted for as well. */</span></span>
+<span id="cb8-6">    account_process_tick<span class="op">(</span>p<span class="op">,</span> user_tick<span class="op">);</span></span>
+<span id="cb8-7">    run_local_timers<span class="op">();</span></span>
+<span id="cb8-8">    rcu_sched_clock_irq<span class="op">(</span>user_tick<span class="op">);</span></span>
+<span id="cb8-9"><span class="pp">#ifdef CONFIG_IRQ_WORK</span></span>
+<span id="cb8-10">    <span class="cf">if</span> <span class="op">(</span>in_hardirq<span class="op">())</span></span>
+<span id="cb8-11">        irq_work_tick<span class="op">();</span></span>
+<span id="cb8-12"><span class="pp">#endif</span></span>
+<span id="cb8-13">    sched_tick<span class="op">();</span></span>
+<span id="cb8-14">    <span class="cf">if</span> <span class="op">(</span>IS_ENABLED<span class="op">(</span>CONFIG_POSIX_TIMERS<span class="op">))</span></span>
+<span id="cb8-15">        run_posix_cpu_timers<span class="op">();</span></span>
+<span id="cb8-16"><span class="op">}</span></span></code></pre></div></div>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 50%"/>
+<col style="width: 50%"/>
+</colgroup>
+<thead>
+<tr>
+<th>호출</th>
+<th>하는 일</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>account_process_tick()</code></td>
+<td>끊긴 자리가 유저 모드였는지(<code>user_tick</code>)에 따라 현재 태스크의 유저 시간이나 시스템 시간에 틱 하나를 더합니다.</td>
+</tr>
+<tr>
+<td><code>run_local_timers()</code></td>
+<td>만료된 <a href="#wheel">타이머 휠</a> 타이머가 있으면 <code>TIMER_SOFTIRQ</code>를 올립니다. 콜백은 softirq에서 실행됩니다(<a href="ch11.html">11장</a>).</td>
+</tr>
+<tr>
+<td><code>rcu_sched_clock_irq()</code></td>
+<td>이 CPU가 RCU의 정지 상태를 지났는지 확인합니다(<a href="ch16.html">16장</a>).</td>
+</tr>
+<tr>
+<td><code>sched_tick()</code></td>
+<td>현재 태스크가 자기 몫을 다 썼는지 보고 재스케줄을 요청합니다(<a href="ch04.html">4장</a>).</td>
+</tr>
+<tr>
+<td><code>run_posix_cpu_timers()</code></td>
+<td>"CPU 시간을 N초 쓰면 시그널을 보내라"는 타이머를 검사합니다.</td>
+</tr>
+</tbody>
+</table></div>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>많은 자료가 틱 핸들러를 이렇게 그립니다. <code>do_timer(struct pt_regs *regs)</code>가 <code>jiffies_64++</code>를 하고, <code>update_process_times(user_mode(regs))</code>를 부르고, <code>update_times()</code>가 <code>wall_jiffies</code>와 견주어 벽시계를 틱 수만큼 전진시킨 뒤 <code>calc_load()</code>를 부릅니다. 2.6 초기의 구조입니다. 이때는 벽시계가 <code>jiffies</code>에서 나왔습니다. 틱을 놓치면 시계가 늦어졌습니다.</p>
+<p>v7.3의 <code>do_timer(unsigned long ticks)</code>는 <code>jiffies_64 += ticks</code>와 <code>calc_global_load()</code> 두 줄뿐입니다(<code>kernel/time/timekeeping.c</code>). <code>regs</code> 인자가 없고 태스크에 대한 일도 하지 않습니다. 부르는 곳도 주기 모드의 <code>tick_periodic()</code>과 일부 옛 아키텍처용 코드뿐입니다. 원샷 모드로 넘어간 시스템에서는 앞에서 본 <code>tick_do_update_jiffies64()</code>가 같은 일을 직접 합니다. 방향도 뒤집혔습니다. 벽시계가 <code>jiffies</code>에서 나오는 것이 아니라, clocksource에서 읽은 시각으로 <code>jiffies</code>를 얼마나 올릴지 정합니다.</p>
+</div>
+</section>
+<section class="level3" id="주기-모드에서-원샷-모드로">
+<h3>주기 모드에서 원샷 모드로</h3>
+<p>CPU마다 틱을 만들어 줄 clockevent 장치를 하나 골라 <code>struct tick_device</code>에 넣어 둡니다. 필드는 장치 포인터(<code>evtdev</code>)와 모드(<code>TICKDEV_MODE_PERIODIC</code>, <code>TICKDEV_MODE_ONESHOT</code>) 둘입니다.</p>
+<p>부팅 직후에는 주기 모드입니다. 장치의 <code>event_handler</code>는 <code>tick_handle_periodic()</code>이고, 이 함수가 <code>do_timer(1)</code>과 <code>update_process_times()</code>를 부릅니다. 쓸 만한 clocksource와 원샷이 되는 장치가 확인되면 커널은 <code>hrtimer_switch_to_hres()</code>로 모드를 바꿉니다. 이때 <code>event_handler</code>가 <code>hrtimer_interrupt()</code>로 바뀌고, 틱은 <code>tick_setup_sched_timer()</code>가 만드는 hrtimer로 옮겨 갑니다. 그림 8-3은 이 전환이 끝난 뒤의 모습입니다.</p>
+</section>
+</section>
+<section class="level2" id="nohz">
+<h2><span class="sec-n">8.4</span>틱 없는 커널<a aria-label="이 절의 링크" class="anchor" href="#nohz">#</a></h2>
+<p>주기적인 틱은 낭비가 큽니다. 쉬는 CPU는 깊은 절전 상태로 들어가야 전력을 아끼는데, 1초에 수백 번 깨우면 그럴 수가 없습니다. 계산 작업 하나를 쉬지 않고 돌리는 CPU에서는 틱이 올 때마다 작업이 끊깁니다. 틱 모드는 빌드할 때 <code>HZ_PERIODIC</code>, <code>NO_HZ_IDLE</code>, <code>NO_HZ_FULL</code> 셋 가운데 고릅니다.</p>
+<figure class="fig" id="fig-nohz-timeline"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 348" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>틱 모드 세 가지의 시간선: HZ_PERIODIC은 항상 틱이 오고, NO_HZ_IDLE은 쉬는 동안 틱을 멈추고, NO_HZ_FULL은 태스크 하나만 도는 동안에도 틱을 멈춘다</title>
+
+  <!-- CPU가 하는 일 -->
+  <text class="t-s t-ink t-b" x="20" y="48">CPU가 하는 일</text>
+  <rect class="box green" x="160" y="28" width="180" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="250" y="49">태스크 A, B가 번갈아 실행</text>
+  <rect class="box gray" x="340" y="28" width="210" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="445" y="49">쉬는 중 (idle)</text>
+  <rect class="box blue" x="550" y="28" width="180" height="32" rx="6"/>
+  <text class="t-s t-ink mid" x="640" y="49">태스크 C 하나만 실행</text>
+
+  <path class="ln thin muted dash" d="M340 64 V128 M340 150 V208 M340 230 V286"/>
+  <path class="ln thin muted dash" d="M550 64 V128 M550 150 V208 M550 230 V286"/>
+
+  <!-- HZ_PERIODIC -->
+  <text class="t-b" x="20" y="112">HZ_PERIODIC</text>
+  <path class="ln thin muted" d="M160 122 H730"/>
+  <path class="ln warm" d="M169 106 V122 M187 106 V122 M205 106 V122 M223 106 V122 M241 106 V122 M259 106 V122 M277 106 V122 M295 106 V122 M313 106 V122 M331 106 V122 M349 106 V122 M367 106 V122 M385 106 V122 M403 106 V122 M421 106 V122 M439 106 V122 M457 106 V122 M475 106 V122 M493 106 V122 M511 106 V122 M529 106 V122 M547 106 V122 M565 106 V122 M583 106 V122 M601 106 V122 M619 106 V122 M637 106 V122 M655 106 V122 M673 106 V122 M691 106 V122 M709 106 V122 M727 106 V122"/>
+  <text class="t-xs" x="160" y="142">할 일이 있든 없든 1/HZ초마다 틱이 온다</text>
+
+  <!-- NO_HZ_IDLE -->
+  <text class="t-b" x="20" y="192">NO_HZ_IDLE</text>
+  <path class="ln thin muted" d="M160 202 H730"/>
+  <path class="ln warm" d="M169 186 V202 M187 186 V202 M205 186 V202 M223 186 V202 M241 186 V202 M259 186 V202 M277 186 V202 M295 186 V202 M313 186 V202 M331 186 V202 M565 186 V202 M583 186 V202 M601 186 V202 M619 186 V202 M637 186 V202 M655 186 V202 M673 186 V202 M691 186 V202 M709 186 V202 M727 186 V202"/>
+  <path class="ln red" d="M475 182 V202"/>
+  <text class="t-xs tc-red mid" x="475" y="176">다음 타이머 만료</text>
+  <text class="t-xs" x="160" y="222">쉬는 동안은 가장 이른 타이머에 맞춘 인터럽트 한 번만 예약한다</text>
+
+  <!-- NO_HZ_FULL -->
+  <text class="t-b" x="20" y="268">NO_HZ_FULL</text>
+  <text class="t-xs" x="20" y="286">nohz_full= CPU</text>
+  <path class="ln thin muted" d="M160 282 H730"/>
+  <path class="ln warm" d="M169 266 V282 M187 266 V282 M205 266 V282 M223 266 V282 M241 266 V282 M259 266 V282 M277 266 V282 M295 266 V282 M313 266 V282 M331 266 V282"/>
+  <path class="ln red" d="M475 262 V282"/>
+  <text class="t-xs" x="160" y="302">런큐에 태스크가 하나뿐이면 실행 중에도 틱을 멈춘다</text>
+  <text class="t-xs" x="160" y="320">jiffies 갱신은 다른 CPU가 맡고, 스케줄러 통계는 1초에 한 번 원격으로 갱신한다</text>
+
+  <path class="ln warm" d="M20 338 V326"/>
+  <text class="t-xs" x="28" y="337">틱 인터럽트</text>
+</svg></div><figcaption><b>그림 8-4</b>같은 CPU에서 세 가지 틱 모드가 인터럽트를 거는 시점. 아래로 갈수록 "필요할 때만" 겁니다.</figcaption></figure>
+<section class="level3" id="쉬는-cpu">
+<h3>쉬는 CPU</h3>
+<p><code>NO_HZ_IDLE</code>에서 쉬는 CPU는 idle 루프 안에서 <code>tick_nohz_idle_stop_tick()</code>을 부릅니다. 이 함수는 틱이 챙겨야 하는 가장 이른 시각, 곧 타이머 휠에 걸린 타이머 가운데 가장 이른 만료를 구합니다. 그 시각이 한 틱보다 멀면 <code>sched_timer</code>를 그 시각으로 옮겨 걸고, 걸린 타이머가 없으면 아예 취소합니다. 틱 핸들러는 <code>TS_FLAG_STOPPED</code>가 서 있으면 스스로를 다시 걸지 않으므로, 그때까지 틱은 오지 않습니다.</p>
+<p>여기서 문제가 하나 생깁니다. <code>jiffies</code>를 올리던 담당 CPU가 잠들면 누가 올릴까요. <code>tick_nohz_stop_tick()</code>은 자기가 담당이었으면 <code>tick_do_timer_cpu</code>에 <code>TICK_DO_TIMER_NONE</code>을 써서 자리를 비웁니다. 그 뒤에 틱을 받은 아무 CPU나 <code>tick_sched_do_timer()</code>에서 빈자리를 보고 담당을 넘겨받습니다. 모든 CPU가 잠들어도 괜찮습니다. 누군가 인터럽트로 깨어나면 <code>tick_irq_enter()</code>가 먼저 <code>jiffies</code>를 따라잡습니다. 앞에서 본 "지나간 틱 수만큼 한꺼번에 올리는" 코드가 이때 쓰입니다.</p>
+</section>
+<section class="level3" id="태스크-하나만-도는-cpu">
+<h3>태스크 하나만 도는 CPU</h3>
+<p><code>NO_HZ_FULL</code>은 한 걸음 더 갑니다. 런큐에 태스크가 하나뿐이면 바꿔 줄 상대가 없으므로 스케줄러 틱이 필요 없습니다. 틱을 멈춰도 되는지는 인터럽트에서 돌아갈 때마다 다시 판단합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/tick-sched.c#L381" rel="noopener" target="_blank">kernel/time/tick-sched.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/time/tick-sched.c" data-line="381" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="dt">static</span> <span class="dt">bool</span> can_stop_full_tick<span class="op">(</span><span class="dt">int</span> cpu<span class="op">,</span> <span class="kw">struct</span> tick_sched <span class="op">*</span>ts<span class="op">)</span></span>
+<span id="cb9-2"><span class="op">{</span></span>
+<span id="cb9-3">    <span class="co">/* ... */</span></span>
+<span id="cb9-4">    <span class="cf">if</span> <span class="op">(</span>check_tick_dependency<span class="op">(&amp;</span>tick_dep_mask<span class="op">))</span></span>
+<span id="cb9-5">        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb9-6"></span>
+<span id="cb9-7">    <span class="cf">if</span> <span class="op">(</span>check_tick_dependency<span class="op">(&amp;</span>ts<span class="op">-&gt;</span>tick_dep_mask<span class="op">))</span></span>
+<span id="cb9-8">        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb9-9"></span>
+<span id="cb9-10">    <span class="cf">if</span> <span class="op">(</span>check_tick_dependency<span class="op">(&amp;</span>current<span class="op">-&gt;</span>tick_dep_mask<span class="op">))</span></span>
+<span id="cb9-11">        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb9-12"></span>
+<span id="cb9-13">    <span class="cf">if</span> <span class="op">(</span>check_tick_dependency<span class="op">(&amp;</span>current<span class="op">-&gt;</span>signal<span class="op">-&gt;</span>tick_dep_mask<span class="op">))</span></span>
+<span id="cb9-14">        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb9-15"></span>
+<span id="cb9-16">    <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb9-17"><span class="op">}</span></span></code></pre></div></div>
+<p>검사하는 것은 <strong>틱 의존성</strong>(tick dependency) 비트입니다. 틱이 필요한 쪽이 자기 비트를 세워 둡니다. 범위는 넷입니다. 시스템 전체, 이 CPU, 현재 태스크, 현재 프로세스입니다. 비트의 종류는 <code>TICK_DEP_BIT_SCHED</code>(런큐에 태스크가 둘 이상), <code>TICK_DEP_BIT_POSIX_TIMER</code>, <code>TICK_DEP_BIT_PERF_EVENTS</code>, <code>TICK_DEP_BIT_RCU</code> 등입니다. 네 곳이 모두 비어 있을 때만 틱을 멈춥니다. 멈춰도 되는 조건을 한곳에 나열하지 않고, 틱이 필요한 쪽이 스스로 등록하게 한 구조입니다.</p>
+<p>틱이 하던 일은 사라지지 않고 다른 CPU로 옮겨 갑니다. <code>nohz_full=</code>에 들지 않은 CPU를 <strong>하우스키핑 CPU</strong>(housekeeping CPU)라고 하는데, <code>jiffies</code> 갱신 담당은 이쪽에서만 맡습니다. 틱을 멈춘 CPU의 스케줄러 통계는 워크큐가 1초에 한 번 <code>sched_tick_remote()</code>로 대신 갱신하고, RCU 콜백은 커널 스레드로 넘어갑니다(<code>RCU_NOCB_CPU</code>). CPU 격리 전반은 <a href="ch07.html">7장</a>에서 다룹니다.</p>
+<div class="callout warn"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-warn"></use></svg>주의</div>
+<p><code>NO_HZ_FULL</code>은 공짜가 아닙니다. 틱 없이 CPU 시간을 계산하려면 유저 모드와 커널 모드를 오갈 때마다 시각을 기록해야 하므로 시스템 콜과 인터럽트가 무거워집니다. 유저 모드에서 거의 벗어나지 않는 작업을 특정 CPU에 고정할 때 쓰는 기능이고, <code>nohz_full=</code> 부팅 인자를 주지 않으면 <code>NO_HZ_IDLE</code>과 똑같이 동작합니다.</p>
+</div>
+</section>
+</section>
+<section class="level2" id="wheel">
+<h2><span class="sec-n">8.5</span>타이머 휠<a aria-label="이 절의 링크" class="anchor" href="#wheel">#</a></h2>
+<p>커널 코드가 "나중에 이 함수를 불러 달라"고 예약하는 가장 흔한 방법은 <code>struct timer_list</code>입니다. 만료 시각을 <code>jiffies</code> 단위로 적습니다.</p>
+<p>쓰는 법은 세 단계입니다. <code>timer_setup(&amp;t, 콜백, 0)</code>으로 초기화하고, <code>mod_timer(&amp;t, jiffies + 2 * HZ)</code>로 2초 뒤에 걸고, <code>timer_delete_sync(&amp;t)</code>로 지웁니다. 마지막 함수는 콜백이 다른 CPU에서 돌고 있으면 끝날 때까지 기다립니다. 콜백은 softirq 컨텍스트에서 실행되므로 잠들 수 없습니다.</p>
+<p>이 타이머들은 수가 많고, 거의 다 만료되기 전에 취소됩니다. TCP의 재전송 타이머가 그렇습니다. 패킷이 제때 도착하면 쓸모가 없습니다. 그러니 넣고 빼는 연산이 빨라야 합니다. 정렬된 트리에 넣으면 O(log n)이 듭니다. <strong>타이머 휠</strong>(timer wheel)은 만료 시각을 배열 인덱스로 바꿔 O(1)에 넣습니다.</p>
+<figure class="fig" id="fig-timer-wheel"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 372" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>HZ=1000일 때 타이머 휠의 아홉 레벨: 레벨마다 버킷 64개가 있고 위로 갈수록 한 칸의 폭이 8배씩 넓어진다. 만료까지 남은 시간이 길수록 높은 레벨에 들어간다</title>
+
+  <text class="t-h" x="20" y="26">타이머 휠</text>
+  <text class="t-s" x="104" y="26">HZ=1000, CPU마다 하나</text>
+  <text class="t-xs mid" x="40" y="46">레벨</text>
+  <text class="t-xs" x="64" y="46">버킷 64개 (세로선은 8칸마다)</text>
+  <text class="t-xs" x="400" y="46">한 칸의 폭</text>
+  <text class="t-xs" x="484" y="46">맡는 범위</text>
+  <text class="t-xs" x="612" y="46">예</text>
+
+  <text class="t-mono t-b mid" x="40" y="70">0</text>
+  <rect class="box blue" x="64" y="56" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 56 V74 M144 56 V74 M184 56 V74 M224 56 V74 M264 56 V74 M304 56 V74 M344 56 V74"/>
+  <rect class="solid warm" x="89" y="56" width="8" height="18"/>
+  <text class="t-xs t-ink t-b" x="108" y="70">A</text>
+  <text class="t-s tc-warm t-b" x="612" y="70">A · 5 ms 뒤 만료</text>
+  <text class="t-code" x="400" y="70">1 ms</text>
+  <text class="t-code" x="484" y="70">0 – 63 ms</text>
+  <text class="t-mono t-b mid" x="40" y="97">1</text>
+  <rect class="box blue" x="64" y="83" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 83 V101 M144 83 V101 M184 83 V101 M224 83 V101 M264 83 V101 M304 83 V101 M344 83 V101"/>
+  <rect class="solid warm" x="189" y="83" width="8" height="18"/>
+  <text class="t-xs t-ink t-b" x="201" y="97">B</text>
+  <text class="t-s tc-warm t-b" x="612" y="97">B · 200 ms 뒤</text>
+  <text class="t-code" x="400" y="97">8 ms</text>
+  <text class="t-code" x="484" y="97">64 – 511 ms</text>
+  <text class="t-mono t-b mid" x="40" y="124">2</text>
+  <rect class="box blue" x="64" y="110" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 110 V128 M144 110 V128 M184 110 V128 M224 110 V128 M264 110 V128 M304 110 V128 M344 110 V128"/>
+  <text class="t-code" x="400" y="124">64 ms</text>
+  <text class="t-code" x="484" y="124">512 ms – 4 s</text>
+  <text class="t-mono t-b mid" x="40" y="151">3</text>
+  <rect class="box blue" x="64" y="137" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 137 V155 M144 137 V155 M184 137 V155 M224 137 V155 M264 137 V155 M304 137 V155 M344 137 V155"/>
+  <rect class="solid warm" x="164" y="137" width="8" height="18"/>
+  <text class="t-xs t-ink t-b" x="176" y="151">C</text>
+  <text class="t-s tc-warm t-b" x="612" y="151">C · 10 s 뒤</text>
+  <text class="t-code" x="400" y="151">512 ms</text>
+  <text class="t-code" x="484" y="151">4 s – 32 s</text>
+  <text class="t-mono t-b mid" x="40" y="178">4</text>
+  <rect class="box blue" x="64" y="164" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 164 V182 M144 164 V182 M184 164 V182 M224 164 V182 M264 164 V182 M304 164 V182 M344 164 V182"/>
+  <text class="t-code" x="400" y="178">약 4 s</text>
+  <text class="t-code" x="484" y="178">32 s – 4 m</text>
+  <text class="t-mono t-b mid" x="40" y="205">5</text>
+  <rect class="box blue" x="64" y="191" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 191 V209 M144 191 V209 M184 191 V209 M224 191 V209 M264 191 V209 M304 191 V209 M344 191 V209"/>
+  <text class="t-code" x="400" y="205">약 32 s</text>
+  <text class="t-code" x="484" y="205">4 m – 34 m</text>
+  <text class="t-mono t-b mid" x="40" y="232">6</text>
+  <rect class="box blue" x="64" y="218" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 218 V236 M144 218 V236 M184 218 V236 M224 218 V236 M264 218 V236 M304 218 V236 M344 218 V236"/>
+  <rect class="solid warm" x="134" y="218" width="8" height="18"/>
+  <text class="t-xs t-ink t-b" x="146" y="232">D</text>
+  <text class="t-s tc-warm t-b" x="612" y="232">D · 1 h 뒤</text>
+  <text class="t-code" x="400" y="232">약 4 m</text>
+  <text class="t-code" x="484" y="232">34 m – 4 h</text>
+  <text class="t-mono t-b mid" x="40" y="259">7</text>
+  <rect class="box blue" x="64" y="245" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 245 V263 M144 245 V263 M184 245 V263 M224 245 V263 M264 245 V263 M304 245 V263 M344 245 V263"/>
+  <text class="t-code" x="400" y="259">약 34 m</text>
+  <text class="t-code" x="484" y="259">4 h – 1 d</text>
+  <text class="t-mono t-b mid" x="40" y="286">8</text>
+  <rect class="box blue" x="64" y="272" width="320" height="18" rx="3"/>
+  <path class="ln thin muted" d="M104 272 V290 M144 272 V290 M184 272 V290 M224 272 V290 M264 272 V290 M304 272 V290 M344 272 V290"/>
+  <text class="t-code" x="400" y="286">약 4 h</text>
+  <text class="t-code" x="484" y="286">1 d – 12 d</text>
+
+  <path class="ln thin muted" d="M20 304 H740"/>
+  <text class="t-s" x="20" y="326">타이머를 걸 때 만료까지 남은 시간으로 레벨을 고른다. 한번 넣은 타이머는 다른 레벨로 옮기지 않는다.</text>
+  <text class="t-s" x="20" y="348">레벨 n은 8의 n제곱 틱마다 한 칸씩 만료된다. 타이머는 일찍 울리지 않고, 늦어도 한 칸의 폭만큼만 늦는다.</text>
+</svg></div><figcaption><b>그림 8-5</b>타이머 휠의 레벨. 만료가 먼 타이머일수록 폭이 넓은 칸에 들어가고, 그만큼 덜 정확하게 울립니다.</figcaption></figure>
+<p>구조는 소스의 주석에 표로 정리되어 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/timer.c#L104" rel="noopener" target="_blank">kernel/time/timer.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/time/timer.c" data-line="104" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"> <span class="op">*</span> HZ <span class="dv">1000</span> steps</span>
+<span id="cb10-2"> <span class="op">*</span> Level Offset  Granularity            Range</span>
+<span id="cb10-3"> <span class="op">*</span>  <span class="dv">0</span>      <span class="dv">0</span>         <span class="dv">1</span> ms                <span class="dv">0</span> ms <span class="op">-</span>         <span class="dv">63</span> ms</span>
+<span id="cb10-4"> <span class="op">*</span>  <span class="dv">1</span>     <span class="dv">64</span>         <span class="dv">8</span> ms               <span class="dv">64</span> ms <span class="op">-</span>        <span class="dv">511</span> ms</span>
+<span id="cb10-5"> <span class="op">*</span>  <span class="dv">2</span>    <span class="dv">128</span>        <span class="dv">64</span> ms              <span class="dv">512</span> ms <span class="op">-</span>       <span class="dv">4095</span> ms <span class="op">(</span><span class="dv">512</span><span class="er">ms</span> <span class="op">-</span> <span class="op">~</span><span class="dv">4</span><span class="er">s</span><span class="op">)</span></span>
+<span id="cb10-6"> <span class="op">*</span>  <span class="dv">3</span>    <span class="dv">192</span>       <span class="dv">512</span> ms             <span class="dv">4096</span> ms <span class="op">-</span>      <span class="dv">32767</span> ms <span class="op">(~</span><span class="dv">4</span><span class="er">s</span> <span class="op">-</span> <span class="op">~</span><span class="dv">32</span><span class="er">s</span><span class="op">)</span></span>
+<span id="cb10-7"> <span class="op">*</span>  <span class="dv">4</span>    <span class="dv">256</span>      <span class="dv">4096</span> ms <span class="op">(~</span><span class="dv">4</span><span class="er">s</span><span class="op">)</span>      <span class="dv">32768</span> ms <span class="op">-</span>     <span class="dv">262143</span> ms <span class="op">(~</span><span class="dv">32</span><span class="er">s</span> <span class="op">-</span> <span class="op">~</span><span class="dv">4</span><span class="er">m</span><span class="op">)</span></span></code></pre></div></div>
+<p>레벨마다 버킷이 64개 있고, 한 레벨 올라갈 때마다 칸의 폭이 8배가 됩니다. 버킷은 타이머의 연결 리스트입니다. 타이머를 걸 때 만료까지 남은 틱 수로 레벨을 고르고, 다음 함수로 그 레벨 안의 칸을 정합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/timer.c#L524" rel="noopener" target="_blank">kernel/time/timer.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/time/timer.c" data-line="524" id="cb11"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb11-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">unsigned</span> calc_index<span class="op">(</span><span class="dt">unsigned</span> <span class="dt">long</span> expires<span class="op">,</span> <span class="dt">unsigned</span> lvl<span class="op">,</span></span>
+<span id="cb11-2">                  <span class="dt">unsigned</span> <span class="dt">long</span> <span class="op">*</span>bucket_expiry<span class="op">)</span></span>
+<span id="cb11-3"><span class="op">{</span></span>
+<span id="cb11-4"></span>
+<span id="cb11-5">    <span class="co">/*</span></span>
+<span id="cb11-6"><span class="co">     * The timer wheel has to guarantee that a timer does not fire</span></span>
+<span id="cb11-7"><span class="co">     * early. Early expiry can happen due to:</span></span>
+<span id="cb11-8"><span class="co">     * - Timer is armed at the edge of a tick</span></span>
+<span id="cb11-9"><span class="co">     * - Truncation of the expiry time in the outer wheel levels</span></span>
+<span id="cb11-10"><span class="co">     *</span></span>
+<span id="cb11-11"><span class="co">     * Round up with level granularity to prevent this.</span></span>
+<span id="cb11-12"><span class="co">     */</span></span>
+<span id="cb11-13">    expires <span class="op">=</span> <span class="op">(</span>expires <span class="op">&gt;&gt;</span> LVL_SHIFT<span class="op">(</span>lvl<span class="op">))</span> <span class="op">+</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb11-14">    <span class="op">*</span>bucket_expiry <span class="op">=</span> expires <span class="op">&lt;&lt;</span> LVL_SHIFT<span class="op">(</span>lvl<span class="op">);</span></span>
+<span id="cb11-15">    <span class="cf">return</span> LVL_OFFS<span class="op">(</span>lvl<span class="op">)</span> <span class="op">+</span> <span class="op">(</span>expires <span class="op">&amp;</span> LVL_MASK<span class="op">);</span></span>
+<span id="cb11-16"><span class="op">}</span></span></code></pre></div></div>
+<p>시프트 한 번, 덧셈 한 번, 마스크 한 번입니다. <code>+ 1</code>은 올림입니다. 타이머는 요청한 시각보다 일찍 울리면 안 되므로 항상 다음 칸에 넣습니다. 그 대가로 최대 한 칸의 폭만큼 늦을 수 있습니다. 10초 뒤를 요청한 타이머는 레벨 3에 들어가 최대 0.5초쯤 늦게 울립니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>이 구조는 <strong>정확도를 버리고 속도를 얻은</strong> 선택입니다. 근거는 쓰임새에 대한 관찰입니다. 소스 주석은 타이머 휠의 주된 용도가 타임아웃이고, 타임아웃은 대부분 만료 전에 취소되며, 만료되었다면 이미 정상 동작이 어긋난 상황이라 조금 늦어도 문제가 없다고 적습니다. 흔한 경우(넣었다가 빼기)를 가장 싸게 만들고, 드문 경우(실제 만료)의 품질을 낮췄습니다. 정확한 만료가 필요한 쓰임새는 다른 도구(hrtimer)로 보냈습니다. 하나의 자료구조로 모든 요구를 만족시키려 하지 않은 것이 요점입니다.</p>
+</div>
+<p>만료 처리는 <code>TIMER_SOFTIRQ</code>에서 합니다. 레벨 0은 틱마다, 레벨 1은 8틱마다, 레벨 2는 64틱마다 한 칸씩 차례가 옵니다. 차례가 온 칸의 타이머는 모두 만료된 것이므로 리스트를 통째로 떼어 콜백을 차례로 부릅니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>옛 자료의 타이머 휠은 <code>tv1</code>부터 <code>tv5</code>까지 다섯 배열로 되어 있고, 아래 배열이 한 바퀴 돌 때마다 위 배열의 타이머를 아래로 옮겨 담는 <strong>캐스케이드</strong>(cascade)를 합니다. 정확한 틱에 만료시키기 위한 구조였지만 타이머를 한꺼번에 옮기는 비용에 상한이 없었습니다. v7.3의 휠은 타이머를 옮기지 않습니다. 4.8에서 바뀌었습니다.</p>
+<p>API 이름도 달라졌습니다. <code>init_timer()</code>와 <code>setup_timer()</code>는 4.15에서 <code>timer_setup()</code>으로 정리되었고, 콜백의 인자는 <code>unsigned long data</code>에서 <code>struct timer_list *</code>로 바뀌었습니다. <code>del_timer()</code>와 <code>del_timer_sync()</code>는 6.15에서 <code>timer_delete()</code>와 <code>timer_delete_sync()</code>로 완전히 바뀌어 옛 이름이 사라졌습니다. 콜백에서 바깥 구조체를 얻는 <code>from_timer()</code>는 v7.3에서 <code>timer_container_of()</code>입니다.</p>
+</div>
+<p>틱 없는 커널에서 CPU마다 휠은 셋입니다. 이 CPU에 고정된 타이머용(<code>BASE_LOCAL</code>), 어느 CPU에서 만료되어도 되는 타이머용(<code>BASE_GLOBAL</code>), 쉬는 CPU를 깨우지 않아도 되는 타이머용(<code>BASE_DEF</code>)입니다. 자기 타이머 때문에 깨어나야 하는 CPU는 깊이 잠들 수 없습니다. 그래서 고정되지 않은 타이머는 CPU가 잠들 때 <strong>타이머 마이그레이션 계층</strong>(<code>kernel/time/timer_migration.c</code>)에 맡깁니다. CPU들을 8개씩 그룹으로 묶은 트리이고, 그룹마다 깨어 있는 CPU 하나가 잠든 CPU들의 타이머를 대신 만료시킵니다.</p>
+</section>
+<section class="level2" id="hrtimer">
+<h2><span class="sec-n">8.6</span>고해상도 타이머<a aria-label="이 절의 링크" class="anchor" href="#hrtimer">#</a></h2>
+<p>타이머 휠의 눈금은 틱입니다. <code>HZ=250</code>이면 4ms보다 짧은 간격을 표현할 수 없습니다. 오디오 재생, 실시간 제어, <code>nanosleep()</code>의 마이크로초 단위 요청에는 모자랍니다. <strong>hrtimer</strong>(high-resolution timer)는 만료 시각을 나노초 단위의 <code>ktime_t</code>로 적고, 그 시각에 맞춰 타이머 장치를 직접 예약합니다.</p>
+<p>요구가 다르니 자료구조도 다릅니다. hrtimer는 대부분 실제로 만료되고, 만료 순서가 정확해야 합니다. 그래서 만료 시각순으로 정렬한 레드블랙 트리에 넣고, 가장 이른 타이머인 맨 왼쪽 노드를 가리키는 포인터를 따로 둡니다.</p>
+<figure class="fig" id="fig-hrtimer-next-event"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 404" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>hrtimer의 한 바퀴: CPU별 클록 베이스에서 가장 이른 만료 시각을 clockevent 장치에 예약하고, 인터럽트가 오면 hrtimer_interrupt가 콜백을 실행한 뒤 다음 만료를 다시 예약한다</title>
+
+  <!-- 베이스 -->
+  <rect class="panel warm" x="20" y="14" width="450" height="212" rx="12"/>
+  <text class="t-mono t-b" x="34" y="38">hrtimer_cpu_base</text>
+  <text class="t-s" x="178" y="38">CPU마다 하나</text>
+  <text class="t-xs end" x="458" y="38">베이스마다 만료 시각순 트리</text>
+
+  <text class="t-code" x="34" y="71">MONOTONIC</text>
+  <rect class="solid warm" x="120" y="52" width="96" height="28" rx="6"/>
+  <text class="t-xs t-on t-b mid" x="168" y="71">틱 +1 ms</text>
+  <rect class="box" x="222" y="52" width="124" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="284" y="71">nanosleep +3 ms</text>
+  <rect class="box" x="352" y="52" width="106" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="405" y="71">워치독 +4 s</text>
+
+  <text class="t-code" x="34" y="107">REALTIME</text>
+  <rect class="box" x="120" y="88" width="124" height="28" rx="6"/>
+  <text class="t-xs t-ink mid" x="182" y="107">timerfd +20 ms</text>
+
+  <text class="t-code" x="34" y="143">BOOTTIME</text>
+  <text class="t-xs" x="120" y="143">비어 있음</text>
+
+  <text class="t-code" x="34" y="179">TAI</text>
+  <text class="t-xs" x="120" y="179">비어 있음</text>
+
+  <text class="t-xs" x="34" y="210">softirq에서 콜백을 부르는 타이머용 베이스가 넷 더 있다</text>
+
+  <!-- 가장 이른 만료 -->
+  <path class="ln warm" d="M470 44 H495" marker-end="url(#ah-warm)"/>
+  <rect class="box warm" x="500" y="14" width="240" height="60" rx="10"/>
+  <text class="t-mono t-b" x="514" y="38">expires_next</text>
+  <text class="t-s" x="514" y="60">모든 베이스에서 가장 이른 만료</text>
+
+  <path class="ln warm" d="M690 74 V115" marker-end="url(#ah-warm)"/>
+  <text class="t-code end" x="680" y="100">tick_program_event()</text>
+
+  <rect class="box gray" x="500" y="120" width="240" height="60" rx="10"/>
+  <use href="#i-clock" x="510" y="136" width="28" height="28" class="ic gray"/>
+  <text class="t-b" x="548" y="144">clockevent 장치</text>
+  <text class="t-xs" x="548" y="164">예약한 시각에 인터럽트를 건다</text>
+
+  <path class="ln red" d="M580 180 V245" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="590" y="218">인터럽트</text>
+
+  <!-- 핸들러 -->
+  <rect class="panel" x="20" y="250" width="720" height="140" rx="12"/>
+  <text class="t-mono t-b" x="34" y="274">hrtimer_interrupt()</text>
+
+  <rect class="box purple" x="34" y="288" width="153" height="88" rx="8"/>
+  <text class="t-b" x="46" y="312">① soft는 넘긴다</text>
+  <text class="t-xs" x="46" y="336">soft 타이머가 만료됐으면</text>
+  <text class="t-code" x="46" y="356">HRTIMER_SOFTIRQ</text>
+  <path class="ln" d="M187 332 H204" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="209" y="288" width="153" height="88" rx="8"/>
+  <text class="t-b" x="221" y="312">② 콜백 실행</text>
+  <text class="t-xs" x="221" y="336">만료된 hard 타이머를</text>
+  <text class="t-xs" x="221" y="356">꺼내 function을 부른다</text>
+  <path class="ln" d="M362 332 H379" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="384" y="288" width="153" height="88" rx="8"/>
+  <text class="t-b" x="396" y="312">③ 다음 만료 찾기</text>
+  <text class="t-xs" x="396" y="336">남은 타이머 가운데</text>
+  <text class="t-xs" x="396" y="356">가장 이른 만료 시각</text>
+  <path class="ln" d="M537 332 H554" marker-end="url(#ah)"/>
+
+  <rect class="box warm" x="559" y="288" width="153" height="88" rx="8"/>
+  <text class="t-b" x="571" y="312">④ 재설정을 미룬다</text>
+  <text class="t-code" x="571" y="336">TIF_HRTIMER_REARM</text>
+  <text class="t-xs" x="571" y="356">복귀 길에서 장치를 맞춘다</text>
+
+  <path class="ln warm dash" d="M700 288 V185" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm end" x="692" y="238">다시 예약</text>
+</svg></div><figcaption><b>그림 8-6</b>hrtimer의 한 바퀴. 가장 이른 만료 시각 하나만 장치에 예약하고, 인터럽트가 오면 다음으로 이른 것을 다시 예약합니다.</figcaption></figure>
+<p>트리는 CPU마다, 그리고 <strong>클록 베이스</strong>마다 따로 있습니다. 클록은 <code>CLOCK_MONOTONIC</code>, <code>CLOCK_REALTIME</code>, <code>CLOCK_BOOTTIME</code>, <code>CLOCK_TAI</code> 넷이고, 타이머를 만들 때 고릅니다. 누군가 벽시계를 한 시간 앞으로 돌리면 <code>REALTIME</code> 타이머는 그만큼 일찍 만료되어야 하지만 <code>MONOTONIC</code> 타이머는 영향을 받지 않아야 하므로 트리를 섞을 수 없습니다.</p>
+<p>타이머 장치가 인터럽트를 걸면 다음 함수가 불립니다. 앞 절에서 본 <code>event_handler</code>입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/hrtimer.c#L2220" rel="noopener" target="_blank">kernel/time/hrtimer.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/time/hrtimer.c" data-line="2220" id="cb12"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb12-1"><span class="dt">void</span> hrtimer_interrupt<span class="op">(</span><span class="kw">struct</span> clock_event_device <span class="op">*</span>dev<span class="op">)</span></span>
+<span id="cb12-2"><span class="op">{</span></span>
+<span id="cb12-3">    <span class="kw">struct</span> hrtimer_cpu_base <span class="op">*</span>cpu_base <span class="op">=</span> this_cpu_ptr<span class="op">(&amp;</span>hrtimer_bases<span class="op">);</span></span>
+<span id="cb12-4">    <span class="co">/* ... */</span></span>
+<span id="cb12-5">    raw_spin_lock_irqsave<span class="op">(&amp;</span>cpu_base<span class="op">-&gt;</span>lock<span class="op">,</span> flags<span class="op">);</span></span>
+<span id="cb12-6">    entry_time <span class="op">=</span> now <span class="op">=</span> hrtimer_update_base<span class="op">(</span>cpu_base<span class="op">);</span></span>
+<span id="cb12-7">retry<span class="op">:</span></span>
+<span id="cb12-8">    <span class="co">/* ... */</span></span>
+<span id="cb12-9">    <span class="cf">if</span> <span class="op">(!</span>ktime_before<span class="op">(</span>now<span class="op">,</span> cpu_base<span class="op">-&gt;</span>softirq_expires_next<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb12-10">        cpu_base<span class="op">-&gt;</span>softirq_expires_next <span class="op">=</span> KTIME_MAX<span class="op">;</span></span>
+<span id="cb12-11">        cpu_base<span class="op">-&gt;</span>softirq_activated <span class="op">=</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb12-12">        raise_timer_softirq<span class="op">(</span>HRTIMER_SOFTIRQ<span class="op">);</span></span>
+<span id="cb12-13">    <span class="op">}</span></span>
+<span id="cb12-14"></span>
+<span id="cb12-15">    __hrtimer_run_queues<span class="op">(</span>cpu_base<span class="op">,</span> now<span class="op">,</span> flags<span class="op">,</span> HRTIMER_ACTIVE_HARD<span class="op">);</span></span>
+<span id="cb12-16"></span>
+<span id="cb12-17">    <span class="co">/* ... */</span></span>
+<span id="cb12-18">    now <span class="op">=</span> hrtimer_update_base<span class="op">(</span>cpu_base<span class="op">);</span></span>
+<span id="cb12-19">    expires_next <span class="op">=</span> hrtimer_update_next_event<span class="op">(</span>cpu_base<span class="op">);</span></span>
+<span id="cb12-20">    cpu_base<span class="op">-&gt;</span>hang_detected <span class="op">=</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb12-21">    <span class="cf">if</span> <span class="op">(</span>expires_next <span class="op">&lt;</span> now<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-22">        <span class="cf">if</span> <span class="op">(++</span>retries <span class="op">&lt;</span> <span class="dv">3</span><span class="op">)</span> <span class="op">{</span></span>
+<span id="cb12-23">            cpu_base<span class="op">-&gt;</span>nr_retries<span class="op">++;</span></span>
+<span id="cb12-24">            <span class="cf">goto</span> retry<span class="op">;</span></span>
+<span id="cb12-25">        <span class="op">}</span></span>
+<span id="cb12-26">        <span class="co">/* ... */</span></span>
+<span id="cb12-27">    <span class="op">}</span></span>
+<span id="cb12-28"></span>
+<span id="cb12-29">    hrtimer_interrupt_rearm<span class="op">(</span>cpu_base<span class="op">,</span> expires_next<span class="op">);</span></span>
+<span id="cb12-30">    raw_spin_unlock_irqrestore<span class="op">(&amp;</span>cpu_base<span class="op">-&gt;</span>lock<span class="op">,</span> flags<span class="op">);</span></span>
+<span id="cb12-31"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 네 군데입니다.</p>
+<ul>
+<li><strong>콜백이 도는 컨텍스트가 둘입니다.</strong> <code>HRTIMER_MODE_HARD</code>로 건 타이머는 여기, hardirq 안에서 바로 실행됩니다. <code>HRTIMER_MODE_SOFT</code>로 건 타이머는 <code>HRTIMER_SOFTIRQ</code>를 올려 두고 인터럽트가 끝난 뒤 실행됩니다. 클록 베이스가 4개가 아니라 8개인 까닭입니다. <code>PREEMPT_RT</code> 커널에서는 <code>HARD</code>를 명시하지 않은 타이머가 모두 soft 쪽으로 갑니다.</li>
+<li><strong>콜백을 부르는 동안에는 락을 풉니다.</strong> <code>__run_hrtimer()</code>가 <code>cpu_base-&gt;lock</code>을 풀고 콜백을 부른 뒤 다시 잡습니다. 콜백이 <code>HRTIMER_RESTART</code>를 돌려주면 타이머를 트리에 다시 넣습니다. 틱이 이 방식으로 주기를 만듭니다.</li>
+<li><strong><code>retry</code>.</strong> 콜백을 실행하는 사이에 다음 타이머의 만료 시각이 지났으면 인터럽트를 다시 받지 않고 한 번 더 돕니다. 핸들러에서 빠져나오지 못하는 일이 없도록 세 번까지만 합니다.</li>
+<li><strong>마지막 줄의 <code>hrtimer_interrupt_rearm()</code>은 장치를 바로 다시 맞추지 않습니다.</strong></li>
+</ul>
+<p>마지막 항목은 최근의 변화입니다. <code>CONFIG_HRTIMER_REARM_DEFERRED</code>가 켜진 빌드(x86-64에서는 기본)에서 이 함수는 다음 만료 시각을 적어 두고 스레드 플래그 <code>TIF_HRTIMER_REARM</code>만 세웁니다. 장치를 실제로 맞추는 <code>__hrtimer_rearm_deferred()</code>는 인터럽트에서 돌아가는 길에, 재스케줄이 끝난 뒤에 불립니다. <a href="ch06.html">6장</a>에서 본 복귀 경로의 그 자리입니다.</p>
+<p>미루는 이유는 스케줄러에 있습니다. 타이머 인터럽트 뒤에는 태스크가 바뀌는 일이 잦고, 스케줄러는 새 태스크의 슬라이스가 끝나는 시각에 맞춰 자기 hrtimer(<code>hrtick</code>)를 다시 겁니다. 인터럽트 안에서 장치를 맞추고 곧이어 스케줄러 때문에 또 맞추면 장치에 두 번 써야 합니다. 모든 것이 정해진 뒤에 한 번만 쓰도록 순서를 바꾼 것입니다. 이 옵션이 켜진 v7.3 빌드에서는 스케줄러의 <code>HRTICK</code> 기능도 기본으로 켜집니다(<code>kernel/sched/features.h</code>).</p>
+<p>타이머를 쓰는 쪽의 API는 타이머 휠과 닮았습니다. 틱 자신이 좋은 예입니다. <code>tick_setup_sched_timer()</code>는 <code>hrtimer_setup(&amp;ts-&gt;sched_timer, tick_nohz_handler, CLOCK_MONOTONIC, HRTIMER_MODE_ABS_HARD)</code>로 타이머를 만들고 <code>hrtimer_start_expires()</code>로 겁니다. 콜백, 기준 클록, 모드를 한 번에 받습니다. <code>hrtimer_init()</code>을 부른 뒤 <code>timer-&gt;function</code>을 따로 대입하던 예전 방식은 6.15에서 사라졌습니다.</p>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"<code>HZ</code>가 타이머의 해상도다." 타이머 휠에는 맞고 hrtimer에는 틀립니다. 고해상도 모드에서 <code>clock_getres(CLOCK_MONOTONIC)</code>이 돌려주는 값은 <code>HZ</code>와 상관없이 1나노초입니다. <code>HZ=100</code>인 커널에서도 <code>nanosleep()</code>은 마이크로초 단위로 깨워 줍니다. <code>HZ</code>가 정하는 것은 <code>jiffies</code>를 쓰는 타임아웃의 눈금과 스케줄러 틱의 주기입니다.</p>
+</div>
+</section>
+<section class="level2" id="timekeeping">
+<h2><span class="sec-n">8.7</span>지금 몇 시인가<a aria-label="이 절의 링크" class="anchor" href="#timekeeping">#</a></h2>
+<p>clocksource는 사이클 값만 줍니다. 이것을 "1970년부터 몇 나노초"로 바꾸려면 기준점과 환산 비율이 필요합니다. 이 값들을 쥐고 있는 것이 <code>struct timekeeper</code>입니다.</p>
+<p>계산은 "기준 시각에, 마지막 갱신 뒤로 지나간 사이클을 나노초로 바꿔 더한다"입니다. <code>cycle_last</code>는 마지막으로 timekeeper를 갱신했을 때의 사이클 값이고, <code>mult</code>와 <code>shift</code>는 사이클을 나노초로 바꾸는 비율을 "곱하고 시프트"로 나타낸 것입니다. 나눗셈을 피하려는 표현입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/timekeeping.c#L456" rel="noopener" target="_blank">kernel/time/timekeeping.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/time/timekeeping.c" data-line="456" id="cb13"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1"><span class="dt">static</span> __always_inline u64 timekeeping_cycles_to_ns<span class="op">(</span><span class="dt">const</span> <span class="kw">struct</span> tk_read_base <span class="op">*</span>tkr<span class="op">,</span> u64 cycles<span class="op">)</span></span>
+<span id="cb13-2"><span class="op">{</span></span>
+<span id="cb13-3">    <span class="co">/* Calculate the delta since the last update_wall_time() */</span></span>
+<span id="cb13-4">    u64 mask <span class="op">=</span> tkr<span class="op">-&gt;</span>mask<span class="op">,</span> delta <span class="op">=</span> <span class="op">(</span>cycles <span class="op">-</span> tkr<span class="op">-&gt;</span>cycle_last<span class="op">)</span> <span class="op">&amp;</span> mask<span class="op">;</span></span>
+<span id="cb13-5"></span>
+<span id="cb13-6">    <span class="co">/* ... 넘침과 뒤로 간 값 처리 ... */</span></span>
+<span id="cb13-7"></span>
+<span id="cb13-8">    <span class="cf">return</span> <span class="op">((</span>delta <span class="op">*</span> tkr<span class="op">-&gt;</span>mult<span class="op">)</span> <span class="op">+</span> tkr<span class="op">-&gt;</span>xtime_nsec<span class="op">)</span> <span class="op">&gt;&gt;</span> tkr<span class="op">-&gt;</span>shift<span class="op">;</span></span>
+<span id="cb13-9"><span class="op">}</span></span></code></pre></div></div>
+<p>이 식의 값들은 틱마다 <code>update_wall_time()</code>이 고칩니다. 그 사이에 다른 CPU가 시각을 읽으면 고치다 만 값을 볼 수 있습니다. 읽는 쪽은 락을 잡지 않고 <strong>시퀀스 카운터</strong>(sequence counter)로 이것을 피합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/time/timekeeping.c#L992" rel="noopener" target="_blank">kernel/time/timekeeping.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/time/timekeeping.c" data-line="992" id="cb14"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb14-1">ktime_t ktime_get<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb14-2"><span class="op">{</span></span>
+<span id="cb14-3">    <span class="kw">struct</span> timekeeper <span class="op">*</span>tk <span class="op">=</span> <span class="op">&amp;</span>tk_core<span class="op">.</span>timekeeper<span class="op">;</span></span>
+<span id="cb14-4">    <span class="dt">unsigned</span> <span class="dt">int</span> seq<span class="op">;</span></span>
+<span id="cb14-5">    ktime_t base<span class="op">;</span></span>
+<span id="cb14-6">    u64 nsecs<span class="op">;</span></span>
+<span id="cb14-7"></span>
+<span id="cb14-8">    <span class="co">/* ... */</span></span>
+<span id="cb14-9">    <span class="cf">do</span> <span class="op">{</span></span>
+<span id="cb14-10">        seq <span class="op">=</span> read_seqcount_begin<span class="op">(&amp;</span>tk_core<span class="op">.</span>seq<span class="op">);</span></span>
+<span id="cb14-11">        base <span class="op">=</span> tk<span class="op">-&gt;</span>tkr_mono<span class="op">.</span>base<span class="op">;</span></span>
+<span id="cb14-12">        nsecs <span class="op">=</span> timekeeping_get_ns<span class="op">(&amp;</span>tk<span class="op">-&gt;</span>tkr_mono<span class="op">);</span></span>
+<span id="cb14-13"></span>
+<span id="cb14-14">    <span class="op">}</span> <span class="cf">while</span> <span class="op">(</span>read_seqcount_retry<span class="op">(&amp;</span>tk_core<span class="op">.</span>seq<span class="op">,</span> seq<span class="op">));</span></span>
+<span id="cb14-15"></span>
+<span id="cb14-16">    <span class="cf">return</span> ktime_add_ns<span class="op">(</span>base<span class="op">,</span> nsecs<span class="op">);</span></span>
+<span id="cb14-17"><span class="op">}</span></span></code></pre></div></div>
+<p>쓰는 쪽은 고치기 전후에 카운터를 올립니다. 읽는 쪽은 읽기 전후의 카운터가 같은지 확인하고, 다르면 다시 읽습니다. 읽는 쪽이 공유 메모리에 아무것도 쓰지 않으므로 CPU가 수백 개여도 서로 방해하지 않습니다. 읽기는 매우 잦고 쓰기는 틱마다 한 번뿐이라 이 방식이 잘 맞습니다. seqcount의 내부는 <a href="ch14.html">14장</a>에서 봅니다.</p>
+<p>커널이 내주는 시계는 여러 개이고, 전부 같은 카운터에서 나옵니다. 다른 것은 기준점과 보정뿐입니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+<col style="width: 25%"/>
+</colgroup>
+<thead>
+<tr>
+<th>클록</th>
+<th>뜻</th>
+<th>벽시계를 고치면</th>
+<th>절전 중</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CLOCK_REALTIME</code></td>
+<td>1970년부터의 시각(벽시계)</td>
+<td>따라 바뀜</td>
+<td>흐름</td>
+</tr>
+<tr>
+<td><code>CLOCK_MONOTONIC</code></td>
+<td>부팅 뒤 흐른 시간. 뒤로 가지 않음</td>
+<td>안 바뀜</td>
+<td>멈춤</td>
+</tr>
+<tr>
+<td><code>CLOCK_BOOTTIME</code></td>
+<td><code>MONOTONIC</code>에 절전 시간을 더한 것</td>
+<td>안 바뀜</td>
+<td>흐름</td>
+</tr>
+<tr>
+<td><code>CLOCK_MONOTONIC_RAW</code></td>
+<td>NTP 보정을 하지 않은 <code>MONOTONIC</code></td>
+<td>안 바뀜</td>
+<td>멈춤</td>
+</tr>
+<tr>
+<td><code>CLOCK_TAI</code></td>
+<td>윤초가 없는 국제원자시</td>
+<td>따라 바뀜</td>
+<td>흐름</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>timekeeper</code>는 <code>MONOTONIC</code>을 기본으로 두고 나머지를 오프셋(<code>offs_real</code>, <code>offs_boot</code>, <code>offs_tai</code>)으로 구합니다. NTP는 시계가 조금 빠르거나 느릴 때 시각을 건너뛰게 하지 않고 <code>mult</code>를 조금 고쳐 흐르는 속도를 바꿉니다. 그래서 <code>MONOTONIC</code>은 뒤로 가지 않습니다. 경과 시간은 <code>REALTIME</code>이 아니라 <code>MONOTONIC</code>으로 재야 합니다.</p>
+<section class="level3" id="시스템-콜-없이-시각-읽기">
+<h3>시스템 콜 없이 시각 읽기</h3>
+<p>유저 프로그램의 <code>clock_gettime()</code>은 대부분 커널에 들어오지 않습니다. 커널은 모든 프로세스의 주소 공간에 작은 공유 라이브러리(<strong>vDSO</strong>)와 읽기 전용 데이터 페이지를 매핑해 둡니다. 데이터 페이지에는 위 식에 필요한 값이 들어 있고, <code>update_wall_time()</code>이 timekeeper를 고칠 때마다 <code>update_vsyscall()</code>이 이 페이지도 함께 고칩니다.</p>
+<figure class="fig" id="fig-clock-read-path"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 374" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>시계를 읽는 두 길: 유저 프로그램은 vDSO 코드가 데이터 페이지와 TSC를 직접 읽고, 커널 코드는 ktime_get()이 timekeeper와 clocksource를 읽는다. 틱마다 update_wall_time()이 둘을 갱신한다</title>
+
+  <!-- 유저 공간 -->
+  <rect class="panel blue" x="20" y="14" width="720" height="104" rx="12"/>
+  <text class="t-b tc-blue" x="34" y="37">유저 공간</text>
+  <rect class="box" x="34" y="48" width="170" height="58" rx="8"/>
+  <text class="t-mono t-b" x="46" y="71">clock_gettime()</text>
+  <text class="t-xs" x="46" y="93">시스템 콜 없이 끝난다</text>
+  <path class="ln blue" d="M204 77 H223" marker-end="url(#ah-blue)"/>
+  <rect class="box" x="228" y="48" width="220" height="58" rx="8"/>
+  <text class="t-mono t-b" x="240" y="71">vDSO: do_hres()</text>
+  <text class="t-xs" x="240" y="93">커널이 매핑해 준 코드, 유저 모드</text>
+  <path class="ln blue" d="M448 77 H485" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue mid" x="466" y="69">읽기</text>
+  <rect class="box" x="490" y="48" width="236" height="58" rx="8"/>
+  <text class="t-b" x="502" y="71">vDSO 데이터 페이지</text>
+  <text class="t-code" x="502" y="93">seq cycle_last mult shift</text>
+
+  <!-- 커널 -->
+  <rect class="panel yellow" x="20" y="134" width="720" height="118" rx="12"/>
+  <text class="t-b tc-yellow" x="34" y="157">커널</text>
+  <rect class="box" x="34" y="170" width="170" height="68" rx="8"/>
+  <text class="t-mono t-b" x="46" y="193">ktime_get()</text>
+  <text class="t-xs" x="46" y="215">커널 코드가 부른다</text>
+  <path class="ln" d="M204 204 H257" marker-end="url(#ah)"/>
+  <rect class="box" x="262" y="170" width="186" height="68" rx="8"/>
+  <text class="t-mono t-b" x="274" y="193">tk_core.timekeeper</text>
+  <text class="t-code" x="274" y="212">cycle_last mult shift</text>
+  <text class="t-xs" x="274" y="230">seqcount로 보호</text>
+  <path class="ln warm" d="M490 204 H453" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm mid" x="471" y="196">쓰기</text>
+  <rect class="box warm" x="490" y="170" width="236" height="68" rx="8"/>
+  <text class="t-mono t-b" x="502" y="193">update_wall_time()</text>
+  <text class="t-xs" x="502" y="212">틱마다 지난 사이클을 누적하고</text>
+  <text class="t-xs" x="502" y="230">NTP 보정을 mult에 반영한다</text>
+
+  <path class="ln warm" d="M660 170 V111" marker-end="url(#ah-warm)"/>
+  <text class="t-code end" x="652" y="130">update_vsyscall()</text>
+
+  <!-- 하드웨어 -->
+  <rect class="box gray" x="20" y="274" width="720" height="50" rx="10"/>
+  <use href="#i-chip" x="30" y="284" width="30" height="30" class="ic gray"/>
+  <text class="t-b" x="70" y="304">TSC</text>
+  <text class="t-s" x="110" y="304">CPU 안의 64비트 카운터. rdtsc 명령은 유저 모드에서도 실행된다</text>
+
+  <path class="ln blue dash" d="M240 106 V269" marker-end="url(#ah-blue)"/>
+  <text class="t-code tc-blue" x="248" y="264">rdtsc</text>
+  <path class="ln" d="M119 238 V269" marker-end="url(#ah)"/>
+  <text class="t-code" x="127" y="264">clock-&gt;read()</text>
+
+  <text class="t-s mid" x="380" y="354">시각 = 기준값 + ((지금 사이클 − cycle_last) × mult + xtime_nsec) &gt;&gt; shift</text>
+</svg></div><figcaption><b>그림 8-7</b>시계를 읽는 두 길. 유저 공간의 길은 커널 모드로 들어가지 않고 끝납니다.</figcaption></figure>
+<p>vDSO의 <code>do_hres()</code>는 <code>ktime_get()</code>과 같은 일을 유저 모드에서 합니다. 시퀀스 카운터를 읽고, <code>rdtsc</code>로 TSC를 읽고, 곱하고 시프트하고, 카운터가 바뀌었으면 다시 합니다. <code>clocksource_tsc</code>의 <code>.vdso_clock_mode = VDSO_CLOCKMODE_TSC</code>가 "이 카운터는 유저 모드에서 읽을 수 있다"는 표시입니다. HPET처럼 이 표시가 없는 clocksource가 선택되면 vDSO는 진짜 시스템 콜로 넘어가고, 시각 읽기가 훨씬 느려집니다. vDSO가 매핑되고 호출되는 방식은 <a href="ch19.html">19장</a>에서 다룹니다.</p>
+<div class="callout note"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-book"></use></svg>참고 · 보조 클록</div>
+<p>v7.3의 <code>timekeeper_data[]</code>는 배열입니다. 0번이 지금까지 본 코어 timekeeper이고, <code>CONFIG_POSIX_AUX_CLOCKS</code>를 켜면 <strong>보조 클록</strong>(auxiliary clock)용 timekeeper가 최대 8개 붙습니다. 클록 ID는 <code>CLOCK_AUX</code>부터입니다. NTP가 다스리는 시스템 시계와 따로 맞출 수 있는 시계이고, 한 기계가 서로 동기화되지 않은 여러 PTP 시간 영역에 걸쳐 있을 때 씁니다. 6.17에서 들어왔고 vDSO로도 읽을 수 있습니다.</p>
+</div>
+</section>
+</section>
+<section class="level2" id="sleep">
+<h2><span class="sec-n">8.8</span>잠들기<a aria-label="이 절의 링크" class="anchor" href="#sleep">#</a></h2>
+<p>"일정 시간 기다리기"는 두 타이머 가운데 하나에 얹혀 있습니다. 어느 쪽인지에 따라 정확도가 다릅니다.</p>
+<div class="table-wrap"><table>
+<colgroup>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+<col style="width: 33%"/>
+</colgroup>
+<thead>
+<tr>
+<th>함수</th>
+<th>바탕</th>
+<th>눈금</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schedule_timeout(jiffies)</code></td>
+<td>타이머 휠</td>
+<td>틱</td>
+</tr>
+<tr>
+<td><code>msleep(ms)</code></td>
+<td><code>schedule_timeout()</code></td>
+<td>틱</td>
+</tr>
+<tr>
+<td><code>usleep_range(min, max)</code></td>
+<td>hrtimer</td>
+<td>마이크로초, 범위 지정</td>
+</tr>
+<tr>
+<td><code>nanosleep()</code>, <code>clock_nanosleep()</code></td>
+<td>hrtimer</td>
+<td>나노초 + 타이머 슬랙</td>
+</tr>
+<tr>
+<td><code>udelay(us)</code>, <code>ndelay(ns)</code></td>
+<td>반복문(잠들지 않음)</td>
+<td>원자적 컨텍스트에서도 됨</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>schedule_timeout()</code>은 스택에 <code>timer_list</code>를 하나 만들어 걸고 <code>schedule()</code>을 부릅니다. 콜백은 <code>wake_up_process()</code> 한 줄입니다. <code>msleep(1)</code>은 이름과 달리 <code>HZ=250</code>에서 4~8ms를 잡니다. 틱 단위로 올림하고, 휠이 한 칸 더 올리기 때문입니다.</p>
+<p>드라이버 작성자가 이 표를 외울 필요가 없도록 <code>fsleep()</code>이 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/delay.h#L129" rel="noopener" target="_blank">include/linux/delay.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/delay.h" data-line="129" id="cb15"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb15-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">void</span> fsleep<span class="op">(</span><span class="dt">unsigned</span> <span class="dt">long</span> usecs<span class="op">)</span></span>
+<span id="cb15-2"><span class="op">{</span></span>
+<span id="cb15-3">    <span class="cf">if</span> <span class="op">(</span>usecs <span class="op">&lt;=</span> <span class="dv">10</span><span class="op">)</span></span>
+<span id="cb15-4">        udelay<span class="op">(</span>usecs<span class="op">);</span></span>
+<span id="cb15-5">    <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>usecs <span class="op">&lt;</span> USLEEP_RANGE_UPPER_BOUND<span class="op">)</span></span>
+<span id="cb15-6">        usleep_range<span class="op">(</span>usecs<span class="op">,</span> usecs <span class="op">+</span> <span class="op">(</span>usecs <span class="op">&gt;&gt;</span> max_slack_shift<span class="op">));</span></span>
+<span id="cb15-7">    <span class="cf">else</span></span>
+<span id="cb15-8">        msleep<span class="op">(</span>DIV_ROUND_UP<span class="op">(</span>usecs<span class="op">,</span> USEC_PER_MSEC<span class="op">));</span></span>
+<span id="cb15-9"><span class="op">}</span></span></code></pre></div></div>
+<p>10마이크로초 이하는 타이머를 거는 비용이 더 크므로 헛돌며 기다립니다. 그보다 길고 틱 몇 개보다 짧으면 hrtimer를 쓰되 25%의 여유를 줍니다. 충분히 길면 싼 타이머 휠로 갑니다.</p>
+<p>여유를 주는 까닭은 인터럽트를 줄이기 위해서입니다. hrtimer는 만료 시각을 범위(가장 이른 시각과 가장 늦은 시각)로 가집니다. 범위가 겹치는 타이머들은 인터럽트 한 번에 함께 처리됩니다. 유저 공간의 <code>nanosleep()</code>에는 이 범위가 <strong>타이머 슬랙</strong>(timer slack)으로 붙습니다. 기본값은 50마이크로초이고 <code>prctl(PR_SET_TIMERSLACK)</code>으로 바꿉니다. 실시간 정책의 태스크는 슬랙이 0입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>타이머 하드웨어와 타이머 목록을 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ cd /sys/devices/system/clocksource/clocksource0
+$ cat current_clocksource available_clocksource
+tsc
+tsc hpet acpi_pm
+
+$ grep LOC /proc/interrupts
+ LOC:     412345     398211  ...   Local timer interrupts
+
+# grep -E 'Clock Event Device|event_handler' /proc/timer_list | sort | uniq -c
+      8 Clock Event Device: lapic-deadline
+      8  event_handler:  hrtimer_interrupt
+      ...</code></pre></div>
+<p><code>LOC</code> 줄을 1초 간격으로 두 번 읽어 차이를 내 보세요. 쉬는 CPU에서는 <code>HZ</code>보다 훨씬 작은 값이 나옵니다. 틱이 멈춰 있다는 뜻입니다. <code>event_handler</code>가 <code>hrtimer_interrupt</code>이면 고해상도 모드이고, <code>tick_handle_periodic</code>이면 주기 모드입니다.</p>
+<p>어떤 hrtimer가 자주 만료되는지는 추적점으로 셉니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># bpftrace -e 'tracepoint:timer:hrtimer_expire_entry { @[ksym(args-&gt;function)] = count(); }'
+^C
+@[hrtimer_wakeup]: 1830
+@[tick_nohz_handler]: 9214
+...</code></pre></div>
+<p><code>tick_nohz_handler</code>가 틱이고 <code>hrtimer_wakeup</code>이 잠든 태스크를 깨우는 만료입니다. <code>tracepoint:timer:tick_stop</code>은 틱을 멈추지 못한 이유(틱 의존성)를 알려 줍니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.6.16 · 2006</dt>
+<dd>
+hrtimer가 들어옵니다.
+</dd>
+<dt>2.6.21 · 2007</dt>
+<dd>
+clockevent 추상화와 그 위의 고해상도 모드, 쉬는 CPU의 틱을 멈추는 dynticks(<code>NO_HZ</code>)가 들어옵니다.
+</dd>
+<dt>3.10 · 2013</dt>
+<dd>
+<code>NO_HZ_FULL</code>. 태스크 하나만 도는 CPU의 틱을 줄입니다.
+</dd>
+<dt>4.8 · 2016</dt>
+<dd>
+타이머 휠이 캐스케이드 없는 구조로 바뀝니다.
+</dd>
+<dt>4.15 · 2018</dt>
+<dd>
+타이머 콜백이 <code>struct timer_list *</code>를 받는 <code>timer_setup()</code>으로 통일됩니다.
+</dd>
+<dt>6.9 · 2024</dt>
+<dd>
+타이머 마이그레이션 계층. 잠든 CPU의 타이머를 깨어 있는 CPU가 끌어다 처리합니다.
+</dd>
+<dt>6.15 · 2025</dt>
+<dd>
+<code>del_timer*()</code>와 <code>hrtimer_init()</code>이 사라지고 <code>timer_delete*()</code>와 <code>hrtimer_setup()</code>만 남습니다.
+</dd>
+<dt>6.17 · 2025</dt>
+<dd>
+보조 클록(<code>CLOCK_AUX</code>).
+</dd>
+<dt>7.1 · 2026</dt>
+<dd>
+hrtimer 재정비. 장치 재설정을 인터럽트 복귀 길로 미룹니다.
+</dd>
+</dl>
+</div>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>시간 하드웨어는 두 인터페이스로 추상화됩니다. 카운터를 읽는 clocksource와 인터럽트를 예약하는 clockevent입니다.</li>
+<li><code>jiffies</code>는 틱 단위로 센 경과 시간입니다. 비교는 <code>time_after()</code>류로 합니다. v7.3에서는 인터럽트 횟수가 아니라 clocksource로 잰 시간에서 계산됩니다.</li>
+<li>고해상도 모드에서 틱은 CPU마다 하나씩 있는 hrtimer(<code>sched_timer</code>)입니다. 콜백 <code>tick_nohz_handler()</code>가 <code>jiffies</code> 갱신과 <code>update_process_times()</code>를 부릅니다.</li>
+<li><code>NO_HZ_IDLE</code>은 쉬는 CPU의 틱을, <code>NO_HZ_FULL</code>은 태스크 하나만 도는 CPU의 틱까지 멈춥니다. 시간 관리 담당은 깨어 있는 CPU로 넘어갑니다.</li>
+<li>타이머 휠은 대부분 취소되는 타임아웃을 위한 구조입니다. O(1)에 넣고 빼는 대신 먼 타이머는 덜 정확합니다.</li>
+<li>hrtimer는 실제로 만료되는 정밀한 타이머를 위한 구조입니다. 정렬된 트리에서 가장 이른 만료 하나만 장치에 예약합니다.</li>
+<li>시각은 <code>기준 + (사이클 차이 × mult) &gt;&gt; shift</code>로 계산하고, 시퀀스 카운터로 보호합니다. vDSO는 같은 계산을 유저 모드에서 합니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p>드라이버에 <code>if (jiffies &gt; dev-&gt;deadline)</code>이라는 코드가 있습니다. 32비트 시스템에서 어떤 상황에 잘못 동작합니까? <code>INITIAL_JIFFIES</code>는 이 버그를 찾는 데 어떻게 도움이 됩니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>deadline</code>을 계산한 덧셈이 넘쳐 작은 값이 된 경우입니다. <code>jiffies</code>는 아직 넘치기 전의 큰 값이므로 비교가 곧바로 참이 되어, 시간이 남았는데도 만료로 판정합니다. <code>time_after(jiffies, dev-&gt;deadline)</code>은 두 값의 차이를 부호 있는 정수로 보므로 맞게 판정합니다. <code>INITIAL_JIFFIES</code>는 <code>jiffies</code>의 아래 32비트가 부팅 5분 뒤에 넘치도록 잡아 둔 초기값이어서, 이런 코드는 49일 뒤가 아니라 부팅 직후의 시험에서 고장 납니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>NO_HZ_IDLE</code> 커널에서 모든 CPU가 10초 동안 잠들어 있었습니다. 그동안 틱 인터럽트는 한 번도 오지 않았습니다. 깨어난 뒤 <code>jiffies</code>는 어떻게 맞는 값이 됩니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>tick_do_update_jiffies64()</code>는 지금 시각과 마지막 갱신 시각의 차이를 <code>TICK_NSEC</code>로 나눠 그만큼을 한꺼번에 더합니다. 지금 시각은 clocksource에서 읽으므로 인터럽트가 오지 않은 동안에도 흐릅니다. 잠들기 전에 담당 CPU는 <code>tick_do_timer_cpu</code>를 <code>TICK_DO_TIMER_NONE</code>으로 비워 두고, 처음 깨어난 CPU가 인터럽트 진입 길(<code>tick_irq_enter()</code>)에서 <code>jiffies</code>를 따라잡습니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>TCP 재전송 타이머는 타이머 휠에, <code>nanosleep()</code>은 hrtimer에 얹혀 있습니다. 반대로 하면 각각 무엇이 나빠집니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>재전송 타이머를 hrtimer에 얹으면, 걸었다가 거의 다 취소되는 타이머를 레드블랙 트리에 O(log n)으로 넣고 빼야 하고, 가장 이른 타이머가 바뀔 때마다 타이머 장치를 다시 예약해야 합니다. 얻는 것은 필요 없는 정밀도입니다. <code>nanosleep()</code>을 타이머 휠에 얹으면 눈금이 틱이 되어 <code>HZ=250</code>에서 4ms보다 짧은 잠을 표현할 수 없고, 먼 만료는 높은 레벨에 들어가 한 칸의 폭만큼 늦어질 수 있습니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>ktime_get()</code>은 락을 잡지 않습니다. 다른 CPU가 <code>update_wall_time()</code>으로 <code>mult</code>와 <code>cycle_last</code>를 고치는 도중에 읽어도 틀린 시각을 돌려주지 않는 까닭은 무엇입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>시퀀스 카운터 때문입니다. 쓰는 쪽은 고치기 시작할 때와 끝낼 때 <code>tk_core.seq</code>를 올립니다. 읽는 쪽은 <code>read_seqcount_begin()</code>으로 카운터를 읽고, 값을 읽어 계산한 뒤, <code>read_seqcount_retry()</code>로 카운터가 그대로인지 확인합니다. 그사이에 쓰기가 있었으면 카운터가 달라져 있으므로 반복문을 다시 돕니다. 고치다 만 값으로 계산한 결과는 버려집니다.</p>
+</div></details></div></div>
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>틱<small>tick</small></dt>
+<dd>
+일정한 간격으로 오는 타이머 인터럽트. 주기는 1/HZ초.
+</dd>
+<dt>jiffies</dt>
+<dd>
+부팅 뒤 흐른 시간을 틱 단위로 센 전역 변수.
+</dd>
+<dt>clocksource</dt>
+<dd>
+계속 올라가는 카운터를 읽는 인터페이스. 시각 계산의 바탕.
+</dd>
+<dt>clockevent</dt>
+<dd>
+정한 시각에 인터럽트를 거는 타이머 장치의 인터페이스(<code>struct clock_event_device</code>).
+</dd>
+<dt>타이머 휠<small>timer wheel</small></dt>
+<dd>
+<code>jiffies</code> 단위 타이머를 만료 시각별 버킷 배열에 담는 자료구조.
+</dd>
+<dt>hrtimer</dt>
+<dd>
+나노초 단위 만료 시각을 가진 고해상도 타이머.
+</dd>
+<dt>틱 의존성<small>tick dependency</small></dt>
+<dd>
+<code>NO_HZ_FULL</code>에서 틱을 멈추면 안 되는 이유를 나타내는 비트.
+</dd>
+<dt>하우스키핑 CPU<small>housekeeping CPU</small></dt>
+<dd>
+틱을 멈춘 CPU들을 대신해 시간 관리와 커널 잡무를 맡는 CPU.
+</dd>
+<dt>timekeeper</dt>
+<dd>
+사이클 값을 시각으로 바꾸는 기준점과 환산 비율을 담은 구조체.
+</dd>
+<dt>vDSO</dt>
+<dd>
+커널이 모든 프로세스에 매핑해 주는 작은 공유 라이브러리. 시스템 콜 없이 시각을 읽게 한다.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/timers/highres.html" rel="noopener" target="_blank"><code>Documentation/timers/highres.rst</code></a>: clocksource, clockevent, hrtimer, dynticks의 설계 개요.</li>
+<li><a href="https://docs.kernel.org/timers/no_hz.html" rel="noopener" target="_blank"><code>Documentation/timers/no_hz.rst</code></a>: 세 가지 틱 모드와 <code>NO_HZ_FULL</code>의 제약.</li>
+<li><a href="https://docs.kernel.org/timers/hrtimers.html" rel="noopener" target="_blank"><code>Documentation/timers/hrtimers.rst</code></a>: 타이머 휠과 별개로 hrtimer를 만든 이유.</li>
+<li><a href="https://docs.kernel.org/timers/delay_sleep_functions.html" rel="noopener" target="_blank"><code>Documentation/timers/delay_sleep_functions.rst</code></a>: 지연·잠들기 함수를 고르는 기준.</li>
+<li><a href="https://docs.kernel.org/core-api/timekeeping.html" rel="noopener" target="_blank"><code>Documentation/core-api/timekeeping.rst</code></a>: <code>ktime_get()</code> 계열 함수와 클록의 뜻.</li>
+<li>LWN, <a href="https://lwn.net/Articles/646950/" rel="noopener" target="_blank">Reinventing the timer wheel</a>: 캐스케이드를 없앤 타이머 휠의 설계.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch07.html"><small>← 7장</small><b>멀티코어 스케줄링</b></a><a class="next" href="ch09.html"><small>9장 →</small><b>인터럽트 하드웨어</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#two-jobs">시간으로 하는 두 가지 일</a><a href="#jiffies">jiffies와 HZ</a><a href="#tick">틱 한 번에 일어나는 일</a><a href="#nohz">틱 없는 커널</a><a href="#wheel">타이머 휠</a><a href="#hrtimer">고해상도 타이머</a><a href="#timekeeping">지금 몇 시인가</a><a href="#sleep">잠들기</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

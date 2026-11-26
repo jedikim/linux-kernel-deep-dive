@@ -1,0 +1,86 @@
+<svg viewBox="0 0 760 312" xmlns="http://www.w3.org/2000/svg">
+  <title>태스크에서 슈퍼블록까지의 객체 사슬: task_struct, fdtable, struct file 둘, dentry, inode, mount, super_block</title>
+
+  <!-- task_struct -->
+  <rect class="box blue" x="20" y="96" width="104" height="150" rx="10"/>
+  <text class="t-mono t-b" x="30" y="118">task_struct</text>
+  <text class="t-code" x="30" y="150">files</text>
+  <text class="t-code" x="30" y="226">fs</text>
+  <path class="ln blue" d="M124 146 H150" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M124 222 H150" marker-end="url(#ah-blue)"/>
+
+  <!-- fdtable -->
+  <rect class="panel blue" x="154" y="30" width="116" height="150" rx="10"/>
+  <text class="t-mono t-b" x="164" y="52">fdtable</text>
+  <rect class="box" x="164" y="62" width="96" height="22"/>
+  <text class="t-code" x="172" y="78">fd[0]</text>
+  <rect class="box" x="164" y="84" width="96" height="22"/>
+  <text class="t-code" x="172" y="100">fd[1]</text>
+  <rect class="box" x="164" y="106" width="96" height="22"/>
+  <text class="t-code" x="172" y="122">fd[2]</text>
+  <rect class="box blue" x="164" y="128" width="96" height="22"/>
+  <text class="t-code" x="172" y="144">fd[3]</text>
+  <rect class="box blue" x="164" y="150" width="96" height="22"/>
+  <text class="t-code" x="172" y="166">fd[4]</text>
+
+  <!-- fs_struct -->
+  <rect class="box blue" x="154" y="196" width="116" height="70" rx="10"/>
+  <text class="t-mono t-b" x="164" y="218">fs_struct</text>
+  <text class="t-code" x="164" y="238">root · pwd</text>
+  <text class="t-xs" x="164" y="256">struct path 둘</text>
+
+  <!-- struct file ×2 -->
+  <path class="ln blue" d="M260 139 H286 V111 H306" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M260 161 H286 V195 H306" marker-end="url(#ah-blue)"/>
+
+  <rect class="box yellow" x="310" y="76" width="140" height="70" rx="10"/>
+  <text class="t-mono t-b" x="320" y="97">struct file</text>
+  <text class="t-code" x="320" y="116">f_pos = 100</text>
+  <text class="t-code" x="320" y="134">f_op · f_path</text>
+
+  <rect class="box yellow" x="310" y="160" width="140" height="70" rx="10"/>
+  <text class="t-mono t-b" x="320" y="181">struct file</text>
+  <text class="t-code" x="320" y="200">f_pos = 0</text>
+  <text class="t-code" x="320" y="218">f_op · f_path</text>
+
+  <!-- dentry -->
+  <path class="ln yellow" d="M450 111 H468 V140 H482" marker-end="url(#ah-yellow)"/>
+  <path class="ln yellow" d="M450 195 H468 V166 H482" marker-end="url(#ah-yellow)"/>
+
+  <rect class="box green" x="486" y="30" width="104" height="52" rx="10"/>
+  <text class="t-mono t-b" x="496" y="51">dentry</text>
+  <text class="t-code" x="496" y="70">"kim"</text>
+
+  <rect class="box green" x="486" y="118" width="104" height="70" rx="10"/>
+  <text class="t-mono t-b" x="496" y="139">dentry</text>
+  <text class="t-code" x="496" y="158">"notes.txt"</text>
+  <text class="t-code" x="496" y="176">d_inode</text>
+  <path class="ln green" d="M538 118 V86" marker-end="url(#ah-green)"/>
+  <text class="t-code" x="546" y="106">d_parent</text>
+
+  <!-- inode -->
+  <path class="ln green" d="M590 153 H620" marker-end="url(#ah-green)"/>
+  <rect class="box green" x="624" y="118" width="116" height="70" rx="10"/>
+  <text class="t-mono t-b" x="634" y="139">inode</text>
+  <text class="t-code" x="634" y="158">i_fop</text>
+  <text class="t-code" x="634" y="176">i_mapping</text>
+
+  <!-- mount, super_block -->
+  <path class="ln yellow" d="M380 230 V244 H482" marker-end="url(#ah-yellow)"/>
+  <text class="t-code" x="390" y="262">f_path.mnt</text>
+  <rect class="box gray" x="486" y="222" width="104" height="44" rx="10"/>
+  <text class="t-mono t-b" x="496" y="249">mount</text>
+  <path class="ln muted" d="M590 244 H620" marker-end="url(#ah-muted)"/>
+  <rect class="box gray" x="624" y="222" width="116" height="44" rx="10"/>
+  <text class="t-mono t-b" x="634" y="249">super_block</text>
+  <path class="ln muted" d="M682 188 V218" marker-end="url(#ah-muted)"/>
+  <text class="t-code" x="690" y="208">i_sb</text>
+
+  <!-- 묶음 표시 -->
+  <path class="ln thin blue" d="M20 282 H270"/>
+  <text class="t-xs mid" x="145" y="300">태스크마다 (스레드끼리는 공유 가능)</text>
+  <path class="ln thin yellow" d="M310 282 H450"/>
+  <text class="t-xs mid" x="380" y="300">open()마다 하나</text>
+  <path class="ln thin green" d="M486 282 H740"/>
+  <text class="t-xs mid" x="613" y="300">시스템 전체가 함께 쓰는 객체</text>
+</svg>

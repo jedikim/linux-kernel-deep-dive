@@ -1,0 +1,36 @@
+<svg viewBox="0 0 760 318" xmlns="http://www.w3.org/2000/svg">
+  <title>같은 CPU에서 태스크가 스핀락을 쥔 채 인터럽트가 들어와 핸들러가 같은 락을 잡으려 하면 교착이 된다. spin_lock_irqsave()를 쓰면 인터럽트가 락을 풀 때까지 미뤄진다.</title>
+
+  <!-- 위: spin_lock() -->
+  <text class="t-b" x="20" y="26">태스크가 spin_lock()으로 잡았을 때</text>
+  <text class="t-xs tc-warm" x="304" y="46">↓ 인터럽트</text>
+
+  <text class="t-s t-ink t-b" x="20" y="72">태스크</text>
+  <rect class="box blue" x="110" y="52" width="190" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="72">락 L을 쥐고 실행</text>
+  <rect class="ghost blue dash" x="300" y="52" width="440" height="30" rx="6"/>
+  <text class="t-xs tc-blue mid" x="520" y="72">끊긴 채 멈춰 있다. L을 풀 기회가 없다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="112">hardirq</text>
+  <rect class="box red" x="300" y="92" width="440" height="30" rx="6"/>
+  <rect x="300" y="92" width="440" height="30" rx="6" fill="url(#hatch-red)"/>
+  <text class="t-s tc-red mid" x="430" y="144">핸들러가 spin_lock(&amp;L)에서 영원히 돈다. 핸들러가 끝나야 태스크가 돌아오는데 끝나지 않는다</text>
+
+  <path class="ln thin muted dash" d="M20 166 H740"/>
+
+  <!-- 아래: spin_lock_irqsave() -->
+  <text class="t-b" x="20" y="196">태스크가 spin_lock_irqsave()로 잡았을 때</text>
+  <text class="t-xs tc-warm" x="244" y="216">↓ 인터럽트: CPU가 받지 않고 미뤄 둔다</text>
+
+  <text class="t-s t-ink t-b" x="20" y="242">태스크</text>
+  <rect class="box blue" x="110" y="222" width="230" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="225" y="242">락 L을 쥐고 실행, 인터럽트 꺼짐</text>
+  <rect class="box blue" x="500" y="222" width="240" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="620" y="242">이어서 실행</text>
+
+  <text class="t-s t-ink t-b" x="20" y="282">hardirq</text>
+  <rect class="box warm" x="340" y="262" width="160" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="420" y="282">L을 잡고 처리</text>
+  <path class="ln thin blue dash" d="M340 224 V298"/>
+  <text class="t-xs" x="346" y="310">spin_unlock_irqrestore()가 인터럽트를 켜는 순간 핸들러가 실행된다</text>
+</svg>

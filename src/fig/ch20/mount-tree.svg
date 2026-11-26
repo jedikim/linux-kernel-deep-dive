@@ -1,0 +1,69 @@
+<svg viewBox="0 0 760 396" xmlns="http://www.w3.org/2000/svg">
+  <title>새 마운트 API의 다섯 단계와 마운트 트리: fsopen·fsconfig로 슈퍼블록을 만들고 fsmount·move_mount로 트리에 붙인다. 슈퍼블록 하나가 두 mount로 붙을 수 있다</title>
+
+  <!-- API 단계 -->
+  <rect class="box blue" x="20" y="14" width="136" height="50" rx="10"/>
+  <text class="t-code t-b mid" x="88" y="35">fsopen()</text>
+  <text class="t-xs mid" x="88" y="54">fs_context 만들기</text>
+  <path class="ln thin" d="M156 39 H166"/>
+  <rect class="box blue" x="166" y="14" width="136" height="50" rx="10"/>
+  <text class="t-code t-b mid" x="234" y="35">fsconfig()</text>
+  <text class="t-xs mid" x="234" y="54">옵션을 하나씩</text>
+  <path class="ln thin" d="M302 39 H312"/>
+  <rect class="box blue" x="312" y="14" width="136" height="50" rx="10"/>
+  <text class="t-code t-b mid" x="380" y="35">fsconfig(CREATE)</text>
+  <text class="t-xs mid" x="380" y="54">슈퍼블록 만들기</text>
+  <path class="ln thin" d="M448 39 H458"/>
+  <rect class="box green" x="458" y="14" width="136" height="50" rx="10"/>
+  <text class="t-code t-b mid" x="526" y="35">fsmount()</text>
+  <text class="t-xs mid" x="526" y="54">붙지 않은 mount</text>
+  <path class="ln thin" d="M594 39 H604"/>
+  <rect class="box green" x="604" y="14" width="136" height="50" rx="10"/>
+  <text class="t-code t-b mid" x="672" y="35">move_mount()</text>
+  <text class="t-xs mid" x="672" y="54">트리에 붙이기</text>
+  <path class="ln thin blue" d="M20 74 H448"/>
+  <text class="t-xs tc-blue mid" x="234" y="92">① 슈퍼블록을 만든다</text>
+  <path class="ln thin green" d="M458 74 H740"/>
+  <text class="t-xs tc-green mid" x="599" y="92">② 트리의 한 곳에 붙인다</text>
+
+  <path class="ln thin muted dash" d="M20 108 H740"/>
+
+  <!-- 마운트 트리 -->
+  <text class="t-s t-ink t-b" x="20" y="134">struct mount · 붙인 자리</text>
+  <text class="t-s t-ink t-b end" x="740" y="134">super_block · 파일시스템</text>
+
+  <rect class="box green" x="20" y="146" width="170" height="40" rx="8"/>
+  <text class="t-mono t-b" x="32" y="171">/</text>
+  <path class="ln thin" d="M40 186 V218 H56"/>
+  <path class="ln thin" d="M40 218 V270 H56"/>
+  <path class="ln thin" d="M40 270 V322 H56"/>
+  <rect class="box green" x="60" y="198" width="170" height="40" rx="8"/>
+  <text class="t-mono t-b" x="72" y="223">/home</text>
+  <rect class="box green" x="60" y="250" width="170" height="40" rx="8"/>
+  <text class="t-mono t-b" x="72" y="275">/srv/www</text>
+  <rect class="box green" x="60" y="302" width="170" height="40" rx="8"/>
+  <text class="t-mono t-b" x="72" y="327">/proc</text>
+
+  <rect class="box blue" x="470" y="146" width="270" height="40" rx="8"/>
+  <text class="t-b" x="482" y="171">ext4</text>
+  <text class="t-code end" x="728" y="171">/dev/nvme0n1p2</text>
+  <rect class="box blue" x="470" y="212" width="270" height="66" rx="8"/>
+  <text class="t-b" x="482" y="238">ext4</text>
+  <text class="t-code end" x="728" y="238">/dev/nvme0n1p3</text>
+  <text class="t-xs" x="482" y="262">dentry 트리 · inode · 페이지 캐시는 하나</text>
+  <rect class="box blue" x="470" y="302" width="270" height="40" rx="8"/>
+  <text class="t-b" x="482" y="327">proc</text>
+  <text class="t-xs end" x="728" y="327">장치 없음</text>
+
+  <path class="ln green" d="M190 166 H466" marker-end="url(#ah-green)"/>
+  <text class="t-code mid" x="328" y="158">mnt_root = "/"</text>
+  <path class="ln green" d="M230 218 H440 V232 H466" marker-end="url(#ah-green)"/>
+  <text class="t-code mid" x="335" y="210">mnt_root = "/"</text>
+  <path class="ln warm" d="M230 270 H440 V258 H466" marker-end="url(#ah-warm)"/>
+  <text class="t-code mid" x="335" y="262">mnt_root = "/www"</text>
+  <text class="t-xs tc-warm mid" x="335" y="288">바인드 마운트: 하위 디렉터리를 다른 곳에</text>
+  <path class="ln green" d="M230 322 H466" marker-end="url(#ah-green)"/>
+  <text class="t-code mid" x="348" y="314">mnt_root = "/"</text>
+
+  <text class="t-s mid" x="380" y="376">경로 탐색은 (부모 mount, 덮인 dentry)로 해시를 조회해 자식 mount를 찾는다</text>
+</svg>

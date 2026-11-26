@@ -1,0 +1,64 @@
+<svg viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg">
+  <title>블록 스택의 층: 파일시스템이 만든 bio가 디바이스 매퍼와 파티션에서 주소가 바뀌고, blk-mq에서 request가 되어 드라이버와 장치에 닿는다</title>
+
+  <text class="t-s t-ink t-b" x="20" y="24">블록 스택</text>
+  <text class="t-s t-ink t-b" x="500" y="24">예: 암호화 볼륨에서 읽기 한 건</text>
+
+  <rect class="box green" x="20" y="36" width="450" height="44" rx="10"/>
+  <text class="t-b" x="36" y="63">파일시스템 · 페이지 캐시</text>
+  <text class="t-s end" x="454" y="63">bio를 만든다</text>
+  <path class="ln" d="M245 80 V104" marker-end="url(#ah)"/>
+  <text class="t-code" x="257" y="97">submit_bio()</text>
+
+  <rect class="box yellow" x="20" y="108" width="450" height="44" rx="10"/>
+  <text class="t-b" x="36" y="135">디바이스 매퍼 · md</text>
+  <text class="t-s end" x="454" y="135">암호화 · RAID · LVM</text>
+  <path class="ln" d="M245 152 V176" marker-end="url(#ah)"/>
+  <text class="t-code" x="257" y="169">submit_bio()</text>
+
+  <rect class="box yellow" x="20" y="180" width="450" height="44" rx="10"/>
+  <text class="t-b" x="36" y="207">파티션</text>
+  <text class="t-code end" x="454" y="207">blk_partition_remap()</text>
+  <path class="ln" d="M245 224 V248" marker-end="url(#ah)"/>
+
+  <rect class="box yellow" x="20" y="252" width="450" height="60" rx="10"/>
+  <text class="t-b" x="36" y="277">blk-mq</text>
+  <text class="t-s end" x="454" y="277">bio → request</text>
+  <text class="t-s" x="36" y="298">태그 · 플러그와 병합 · I/O 스케줄러 · 하드웨어 큐</text>
+  <path class="ln" d="M245 312 V336" marker-end="url(#ah)"/>
+  <text class="t-code" x="257" y="329">queue_rq()</text>
+
+  <rect class="box blue" x="20" y="340" width="450" height="44" rx="10"/>
+  <text class="t-b" x="36" y="367">드라이버</text>
+  <text class="t-code end" x="454" y="367">nvme · sd · virtio_blk · ublk</text>
+  <path class="ln" d="M245 384 V408" marker-end="url(#ah)"/>
+
+  <rect class="box gray" x="20" y="412" width="450" height="44" rx="10"/>
+  <use href="#i-disk" x="32" y="420" width="28" height="28" class="ic gray"/>
+  <text class="t-b" x="70" y="439">저장 장치</text>
+
+  <!-- 오른쪽: 주소가 바뀌는 모습 -->
+  <rect class="box" x="500" y="36" width="240" height="44" rx="10"/>
+  <text class="t-xs" x="512" y="54">bio의 목적지</text>
+  <text class="t-code" x="512" y="71">dm-0 · 섹터 8192</text>
+  <path class="ln thin muted dash" d="M620 80 V104" marker-end="url(#ah-muted)"/>
+
+  <rect class="box" x="500" y="108" width="240" height="44" rx="10"/>
+  <text class="t-xs" x="512" y="126">매핑 테이블로 장치와 섹터를 바꾼다</text>
+  <text class="t-code" x="512" y="143">nvme0n1p2 · 섹터 12288</text>
+  <path class="ln thin muted dash" d="M620 152 V176" marker-end="url(#ah-muted)"/>
+
+  <rect class="box" x="500" y="180" width="240" height="44" rx="10"/>
+  <text class="t-xs" x="512" y="198">파티션 시작 섹터를 더한다</text>
+  <text class="t-code" x="512" y="215">nvme0n1 · 섹터 2109440</text>
+  <path class="ln thin muted dash" d="M620 224 V248" marker-end="url(#ah-muted)"/>
+
+  <rect class="box" x="500" y="252" width="240" height="60" rx="10"/>
+  <text class="t-xs" x="512" y="276">request가 되어 태그를 받는다</text>
+  <text class="t-code" x="512" y="296">tag 37 · hctx 5</text>
+  <path class="ln thin muted dash" d="M620 312 V336" marker-end="url(#ah-muted)"/>
+
+  <rect class="box" x="500" y="340" width="240" height="44" rx="10"/>
+  <text class="t-xs" x="512" y="358">장치의 명령으로 바뀐다</text>
+  <text class="t-code" x="512" y="375">NVMe Read · command_id 37</text>
+</svg>

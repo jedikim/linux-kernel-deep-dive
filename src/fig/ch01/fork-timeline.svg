@@ -1,0 +1,42 @@
+<svg viewBox="0 0 760 276" xmlns="http://www.w3.org/2000/svg">
+  <title>fork() 시간선: 부모가 시스템 콜 한 번으로 커널에 들어가고, 부모와 자식이 각각 한 번씩 유저 모드로 돌아온다. 부모는 자식의 PID를, 자식은 0을 받는다.</title>
+
+  <text class="t-xs mid" x="230" y="22">fork() 호출</text>
+  <path class="ln thin muted dash" d="M230 28 V50"/>
+  <text class="t-xs mid" x="440" y="22">자식을 런큐에 올림</text>
+  <path class="ln thin muted dash" d="M440 28 V50"/>
+
+  <!-- 부모 -->
+  <text class="t-b" x="20" y="68">부모</text>
+  <text class="t-xs" x="20" y="86">PID 100</text>
+  <rect class="box blue" x="110" y="52" width="120" height="36" rx="6"/>
+  <text class="t-s t-ink mid" x="170" y="75">유저 코드</text>
+  <rect class="box yellow" x="230" y="52" width="250" height="36" rx="6"/>
+  <text class="t-code mid" x="355" y="75">kernel_clone() → copy_process()</text>
+  <rect class="box blue" x="480" y="52" width="260" height="36" rx="6"/>
+  <text class="t-s t-ink mid" x="610" y="75">유저 코드 · fork()가 101을 돌려줌</text>
+
+  <!-- 부모에서 자식으로 -->
+  <path class="ln green" d="M440 88 V136" marker-end="url(#ah-green)"/>
+  <text class="t-code" x="450" y="117">wake_up_new_task()</text>
+  <text class="t-xs end" x="430" y="117">부모를 본떠 만든 태스크를</text>
+
+  <!-- 자식 -->
+  <text class="t-b" x="20" y="158">자식</text>
+  <text class="t-xs" x="20" y="176">PID 101</text>
+  <rect class="ghost dash" x="110" y="142" width="330" height="36" rx="6"/>
+  <text class="t-s mid" x="275" y="165">아직 없다</text>
+  <rect class="box gray" x="440" y="142" width="100" height="36" rx="6"/>
+  <text class="t-s t-ink mid" x="490" y="165">런큐에서 대기</text>
+  <rect class="box yellow" x="540" y="142" width="110" height="36" rx="6"/>
+  <text class="t-code mid" x="595" y="165">ret_from_fork</text>
+  <rect class="box green" x="650" y="142" width="90" height="36" rx="6"/>
+  <text class="t-s t-ink mid" x="695" y="165">0을 돌려줌</text>
+
+  <!-- 같은 자리로 돌아온다 -->
+  <rect class="box code" x="110" y="206" width="630" height="54" rx="8"/>
+  <text class="t-mono t-b" x="126" y="229">pid = fork();</text>
+  <text class="t-s tc-blue t-b" x="300" y="229">부모에서는 pid == 101</text>
+  <text class="t-s tc-green t-b" x="520" y="229">자식에서는 pid == 0</text>
+  <text class="t-s" x="126" y="249">두 태스크 모두 syscall 명령어 바로 다음에서 실행을 잇는다. 다른 것은 반환값 레지스터뿐이다.</text>
+</svg>

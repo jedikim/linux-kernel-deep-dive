@@ -1,0 +1,1166 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>태스크의 상태와 대기 — 리눅스 커널 깊이 읽기</title>
+<meta name="description" content="잠들고, 깨어나고, 죽고, 거둬지기까지">
+<meta name="author" content="Jedi Kim">
+<meta property="og:title" content="태스크의 상태와 대기 — 리눅스 커널 깊이 읽기">
+<meta property="og:description" content="잠들고, 깨어나고, 죽고, 거둬지기까지">
+<meta property="og:type" content="article">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../assets/site.css">
+</head>
+<body data-page="ch03" data-root="../">
+<svg xmlns="http://www.w3.org/2000/svg" class="defs" width="0" height="0" aria-hidden="true" focusable="false">
+<defs>
+  <!-- 화살촉: marker-end="url(#ah)" 또는 #ah-blue 등 -->
+  <marker id="ah" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-blue" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk blue" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-green" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk green" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-warm" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk warm" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-red" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk red" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-purple" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk purple" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-muted" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk muted" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-teal" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk teal" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <marker id="ah-yellow" viewBox="0 0 10 10" refX="8.6" refY="5" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto-start-reverse"><path class="mk yellow" d="M0 0.9 L9.4 5 L0 9.1z"/></marker>
+  <!-- 빗금 무늬: fill="url(#hatch)" — 선점·인터럽트가 꺼진 구간 등에 쓴다 -->
+  <pattern id="hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx" d="M0 0V8"/></pattern>
+  <pattern id="hatch-red" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx red" d="M0 0V8"/></pattern>
+  <pattern id="hatch-blue" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx blue" d="M0 0V8"/></pattern>
+  <pattern id="hatch-warm" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path class="hx warm" d="M0 0V8"/></pattern>
+  <marker id="dot" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9"><circle class="mk" cx="5" cy="5" r="4"/></marker>
+
+  <!-- 아이콘: <use href="#i-server" x="" y="" width="48" height="48" class="ic blue"/> -->
+  <symbol id="i-user" viewBox="0 0 48 48"><path class="i-f" d="M8 42c0-9 7-15 16-15s16 6 16 15z"/><circle class="i-f" cx="24" cy="16" r="8"/></symbol>
+  <symbol id="i-users" viewBox="0 0 48 48"><path class="i-f" d="M22 42c0-7 5-12 12-12s12 5 12 12z"/><circle class="i-f" cx="34" cy="21" r="6.5"/><path class="i-f" d="M2 42c0-8 6-13.500 14-13.500S30 34 30 42z"/><circle class="i-f" cx="16" cy="17" r="7.500"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 48 48"><rect class="i-f" x="9" y="10" width="30" height="21" rx="3"/><path class="i-f" d="M4 35h40l-2.500 5h-35z"/></symbol>
+  <symbol id="i-monitor" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="25" rx="3"/><path class="i-s" d="M17 41h14M24 33v8"/></symbol>
+  <symbol id="i-server" viewBox="0 0 48 48"><rect class="i-f" x="7" y="6" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="19" width="34" height="11" rx="2.500"/><rect class="i-f" x="7" y="32" width="34" height="11" rx="2.500"/><circle class="i-d" cx="13" cy="11.500" r="1.600"/><circle class="i-d" cx="13" cy="24.500" r="1.600"/><circle class="i-d" cx="13" cy="37.500" r="1.600"/><path class="i-s" d="M28 11.500h8M28 24.500h8M28 37.500h8"/></symbol>
+  <symbol id="i-db" viewBox="0 0 48 48"><path class="i-f" d="M8 12v24c0 3.300 7.200 6 16 6s16-2.700 16-6V12"/><ellipse class="i-f" cx="24" cy="12" rx="16" ry="6"/><path class="i-s" d="M8 20c0 3.300 7.200 6 16 6s16-2.700 16-6M8 28c0 3.300 7.200 6 16 6s16-2.700 16-6"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 48 48"><path class="i-f" d="M14 38a9 9 0 0 1-1.500-17.900A12 12 0 0 1 35.600 17 10.500 10.500 0 0 1 35 38z"/></symbol>
+  <symbol id="i-file" viewBox="0 0 48 48"><path class="i-f" d="M12 5h16l9 9v29H12z"/><path class="i-s" d="M28 5v9h9M18 24h13M18 30h13M18 36h8"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 48 48"><path class="i-f" d="M5 12a3 3 0 0 1 3-3h10l4 5h18a3 3 0 0 1 3 3v20a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3z"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 48 48"><path class="i-s" d="M24 4v7M24 37v7M4 24h7M37 24h7M9.900 9.900l5 5M33.100 33.100l5 5M9.900 38.100l5-5M33.100 14.900l5-5"/><circle class="i-f" cx="24" cy="24" r="12"/><circle class="i-s" cx="24" cy="24" r="4.500"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 48 48"><path class="i-s" d="M16 21v-6a8 8 0 0 1 16 0v6"/><rect class="i-f" x="10" y="21" width="28" height="21" rx="4"/><circle class="i-d" cx="24" cy="31.500" r="2.400"/></symbol>
+  <symbol id="i-key" viewBox="0 0 48 48"><circle class="i-f" cx="14" cy="24" r="8"/><path class="i-s" d="M22 24h21M36 24v7M42 24v5"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M6 24h36M24 6c-8 5-8 31 0 36M24 6c8 5 8 31 0 36"/></symbol>
+  <symbol id="i-chip" viewBox="0 0 48 48"><path class="i-s" d="M18 5v7M24 5v7M30 5v7M18 36v7M24 36v7M30 36v7M5 18h7M5 24h7M5 30h7M36 18h7M36 24h7M36 30h7"/><rect class="i-f" x="12" y="12" width="24" height="24" rx="3"/><rect class="i-s" x="18.500" y="18.500" width="11" height="11" rx="1.500"/></symbol>
+  <symbol id="i-ram" viewBox="0 0 48 48"><path class="i-f" d="M4 13h40v18h-3.500v4h-33v-4H4z"/><path class="i-s" d="M11 18v8M18 18v8M25 18v8M32 18v8M38 18v8"/></symbol>
+  <symbol id="i-disk" viewBox="0 0 48 48"><rect class="i-f" x="8" y="6" width="32" height="36" rx="4"/><circle class="i-s" cx="24" cy="21" r="9"/><circle class="i-d" cx="24" cy="21" r="1.800"/><path class="i-s" d="M14 36h8"/></symbol>
+  <symbol id="i-gpu" viewBox="0 0 48 48"><path class="i-s" d="M10 34v6M16 34v6M22 34v6"/><rect class="i-f" x="4" y="12" width="40" height="22" rx="3"/><circle class="i-s" cx="16" cy="23" r="6.500"/><circle class="i-s" cx="32" cy="23" r="6.500"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M24 13v11l7 5"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 48 48"><rect class="i-f" x="5" y="10" width="38" height="28" rx="3"/><path class="i-s" d="M6 12l18 14 18-14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 48 48"><circle class="i-f" cx="21" cy="21" r="13"/><path class="i-s" d="M31 31l11 11"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 48 48"><path class="i-f" d="M24 6l20 35H4z"/><path class="i-s" d="M24 19v11"/><circle class="i-d" cx="24" cy="35" r="1.600"/></symbol>
+  <symbol id="i-check" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M15 24.500l6.500 6.500L34 18"/></symbol>
+  <symbol id="i-cross" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-s" d="M17 17l14 14M31 17L17 31"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M12 19l6 5-6 5M22 30h12"/></symbol>
+  <symbol id="i-browser" viewBox="0 0 48 48"><rect class="i-f" x="4" y="8" width="40" height="32" rx="4"/><path class="i-s" d="M4 17h40"/><circle class="i-d" cx="10" cy="12.500" r="1.300"/><circle class="i-d" cx="15" cy="12.500" r="1.300"/><circle class="i-d" cx="20" cy="12.500" r="1.300"/></symbol>
+  <symbol id="i-router" viewBox="0 0 48 48"><path class="i-s" d="M14 26V12M34 26V12"/><rect class="i-f" x="5" y="26" width="38" height="13" rx="3"/><path class="i-s" d="M21 32.500h14"/><circle class="i-d" cx="12.500" cy="32.500" r="1.600"/></symbol>
+  <symbol id="i-code" viewBox="0 0 48 48"><path class="i-s" d="M17 14L6 24l11 10M31 14l11 10-11 10M27 9l-6 30"/></symbol>
+  <symbol id="i-bug" viewBox="0 0 48 48"><path class="i-s" d="M17 16a7 7 0 0 1 14 0M14 24H5M14 32H6M34 24h9M34 32h8M16 38l-6 5M32 38l6 5M18 11l-4-5M30 11l4-5"/><ellipse class="i-f" cx="24" cy="28" rx="10" ry="13"/><path class="i-s" d="M24 20v20"/></symbol>
+  <symbol id="i-box" viewBox="0 0 48 48"><path class="i-f" d="M24 5l18 9v20l-18 9-18-9V14z"/><path class="i-s" d="M6 14l18 9 18-9M24 23v20"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 48 48"><path class="i-f" d="M24 5l16 6v12c0 10-7 17-16 20-9-3-16-10-16-20V11z"/><path class="i-s" d="M17 24l5 5 9-10"/></symbol>
+  <symbol id="i-bolt" viewBox="0 0 48 48"><path class="i-f" d="M27 4L9 27h13l-2 17 18-24H25z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 48 48"><rect class="i-f" x="12" y="24" width="7" height="14"/><rect class="i-f" x="22" y="14" width="7" height="24"/><rect class="i-f" x="32" y="19" width="7" height="19"/><path class="i-s" d="M6 6v36h36"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 48 48"><path class="i-s" d="M13 15v18M35 22c0 9-22 3-22 11"/><circle class="i-f" cx="13" cy="10" r="5"/><circle class="i-f" cx="13" cy="38" r="5"/><circle class="i-f" cx="35" cy="17" r="5"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 48 48"><path class="i-f" d="M3 24c5-9 12-14 21-14s16 5 21 14c-5 9-12 14-21 14S8 33 3 24z"/><circle class="i-s" cx="24" cy="24" r="6"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 48 48"><path class="i-s" d="M5 19c11-11 27-11 38 0M11 26c8-8 18-8 26 0M17.500 32.500c4-4 9-4 13 0"/><circle class="i-d" cx="24" cy="38.500" r="2.200"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 48 48"><path class="i-s" d="M5 24l19 10 19-10M5 32l19 10 19-10"/><path class="i-f" d="M24 6l19 10-19 10L5 16z"/></symbol>
+  <symbol id="i-book" viewBox="0 0 48 48"><path class="i-f" d="M24 12C19 8 12 7 5 8v28c7-1 14 0 19 4 5-4 12-5 19-4V8c-7-1-14 0-19 4z"/><path class="i-s" d="M24 12v28"/></symbol>
+  <symbol id="i-play" viewBox="0 0 48 48"><circle class="i-f" cx="24" cy="24" r="18"/><path class="i-d" d="M20 16l13 8-13 8z"/></symbol>
+  <symbol id="i-building" viewBox="0 0 48 48"><rect class="i-f" x="10" y="5" width="28" height="38" rx="2"/><path class="i-s" d="M17 13h4M27 13h4M17 21h4M27 21h4M17 29h4M27 29h4M21 43v-7h6v7"/></symbol>
+  <symbol id="i-idcard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="9" width="40" height="30" rx="4"/><circle class="i-s" cx="16" cy="21" r="4.500"/><path class="i-s" d="M9 33c1-4 4-5 7-5s6 1 7 5M28 19h10M28 26h10"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 48 48"><path class="i-f" d="M11 14h26l-2.500 28h-21z"/><path class="i-s" d="M6 14h36M18 14V8h12v6M20 21v14M28 21v14"/></symbol>
+  <symbol id="i-link" viewBox="0 0 48 48"><path class="i-s" d="M20 28a8 8 0 0 0 11.300 0l7-7a8 8 0 0 0-11.300-11.300l-3 3M28 20a8 8 0 0 0-11.300 0l-7 7A8 8 0 0 0 21 38.300l3-3"/></symbol>
+  <symbol id="i-plug" viewBox="0 0 48 48"><path class="i-s" d="M17 4v10M31 4v10M24 35v9"/><path class="i-f" d="M11 14h26v8a13 13 0 0 1-26 0z"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 48 48"><path class="i-f" d="M12 6h24v6c0 6-8 9-8 12s8 6 8 12v6H12v-6c0-6 8-9 8-12s-8-6-8-12z"/><path class="i-s" d="M9 6h30M9 42h30"/></symbol>
+  <symbol id="i-list" viewBox="0 0 48 48"><rect class="i-f" x="8" y="5" width="32" height="38" rx="3"/><path class="i-s" d="M14 15l2.500 2.500L21 13M26 15h9M14 25l2.500 2.500L21 23M26 25h9M14 35l2.500 2.500L21 33M26 35h9"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 48 48"><path class="i-f" d="M16 5h16l11 11v16L32 43H16L5 32V16z"/><path class="i-s" d="M15 24h18"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 48 48"><path class="i-s" d="M40 24a16 16 0 1 1-4.700-11.300M40 7v11H29"/></symbol>
+  <symbol id="i-down" viewBox="0 0 48 48"><path class="i-s" d="M24 6v26M13 22l11 11 11-11M8 42h32"/></symbol>
+  <symbol id="i-up" viewBox="0 0 48 48"><path class="i-s" d="M24 34V8M13 18L24 7l11 11M8 42h32"/></symbol>
+  <symbol id="i-funnel" viewBox="0 0 48 48"><path class="i-f" d="M5 8h38L29 25v14l-10 4V25z"/></symbol>
+  <symbol id="i-scale" viewBox="0 0 48 48"><path class="i-s" d="M24 7v34M12 41h24M8 13h32"/><path class="i-f" d="M8 13L3 26a5.500 5.500 0 0 0 10 0zM40 13l-5 13a5.500 5.500 0 0 0 10 0z"/></symbol>
+  <symbol id="i-spark" viewBox="0 0 48 48"><path class="i-f" d="M21 5l4 13 13 4-13 4-4 13-4-13-13-4 13-4z"/><path class="i-s" d="M38 31v8M34 35h8"/></symbol>
+  <symbol id="i-network" viewBox="0 0 48 48"><path class="i-s" d="M24 13v9M24 22L12 34M24 22l12 12"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="10" cy="37" r="5"/><circle class="i-f" cx="38" cy="37" r="5"/><circle class="i-d" cx="24" cy="22" r="2.500"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 48 48"><rect class="i-f" x="5" y="8" width="38" height="32" rx="3"/><path class="i-s" d="M5 18h38M5 29h38M18 8v32M31 8v32"/></symbol>
+  <symbol id="i-nic" viewBox="0 0 48 48"><rect class="i-f" x="5" y="14" width="38" height="20" rx="3"/><path class="i-s" d="M12 34v7M18 34v7M24 34v7M30 34v7M36 34v7M13 21h8v6h-8zM27 22h9M27 27h9"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 48 48"><rect class="i-f" x="4" y="12" width="40" height="24" rx="4"/><path class="i-s" d="M11 19h2M18 19h2M25 19h2M32 19h2M11 25h2M18 25h2M25 25h2M32 25h2M15 31h18"/></symbol>
+  <symbol id="i-queue" viewBox="0 0 48 48"><rect class="i-f" x="5" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="17" y="15" width="9" height="18" rx="2"/><rect class="i-f" x="29" y="15" width="9" height="18" rx="2"/><path class="i-s" d="M41 19l4 5-4 5"/></symbol>
+  <symbol id="i-tree" viewBox="0 0 48 48"><path class="i-s" d="M24 13v8M24 21H11v6M24 21h13v6"/><circle class="i-f" cx="24" cy="9" r="5"/><circle class="i-f" cx="11" cy="32" r="5"/><circle class="i-f" cx="37" cy="32" r="5"/></symbol>
+  <symbol id="i-container" viewBox="0 0 48 48"><rect class="i-f" x="5" y="11" width="38" height="26" rx="3"/><path class="i-s" d="M13 17v14M20 17v14M28 17v14M35 17v14"/></symbol>
+  <symbol id="i-sleep" viewBox="0 0 48 48"><path class="i-f" d="M38 29A16 16 0 0 1 19 10a16 16 0 1 0 19 19z"/><path class="i-s" d="M28 8h8l-8 9h8"/></symbol>
+  <symbol id="i-skull" viewBox="0 0 48 48"><path class="i-f" d="M24 5c-9 0-16 6.500-16 15 0 5 2.500 9 6 11.500V38h20v-6.500c3.500-2.500 6-6.500 6-11.500 0-8.500-7-15-16-15z"/><circle class="i-d" cx="17.500" cy="20" r="3.200"/><circle class="i-d" cx="30.500" cy="20" r="3.200"/><path class="i-s" d="M20 38v-5M24 38v-5M28 38v-5"/></symbol>
+  <symbol id="i-patch" viewBox="0 0 48 48"><path class="i-f" d="M10 5h20l8 8v30H10z"/><path class="i-s" d="M30 5v8h8M17 22h6M20 19v6M17 34h6"/><path class="i-s" d="M28 22h4M28 34h4"/></symbol>
+</defs>
+</svg>
+
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<aside class="side" id="side" aria-label="전체 목차">
+<a class="brand" href="../index.html"><b>리눅스 커널 깊이 읽기</b><span>Linux v7.3</span></a>
+<button class="side-search search-open" type="button"><svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true"><use href="#i-search"/></svg>검색<kbd>/</kbd></button>
+<nav><div class="side-part pc-gray"><i></i>0부 · 길잡이</div><ol><li data-ch="ch00"><a href="../chapters/ch00.html"><span class="n">00</span><span>커널이라는 프로그램</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-blue"><i></i>1부 · 태스크</div><ol><li data-ch="ch01"><a href="../chapters/ch01.html"><span class="n">01</span><span>fork: 한 번 부르고 두 번 돌아온다</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch02"><a href="../chapters/ch02.html"><span class="n">02</span><span>task_struct와 스레드</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch03"><a href="../chapters/ch03.html" aria-current="page"><span class="n">03</span><span>태스크의 상태와 대기</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-green"><i></i>2부 · 스케줄러</div><ol><li data-ch="ch04"><a href="../chapters/ch04.html"><span class="n">04</span><span>스케줄러의 뼈대</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch05"><a href="../chapters/ch05.html"><span class="n">05</span><span>CFS에서 EEVDF로</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch06"><a href="../chapters/ch06.html"><span class="n">06</span><span>커널 선점</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch07"><a href="../chapters/ch07.html"><span class="n">07</span><span>멀티코어 스케줄링</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-warm"><i></i>3부 · 시간과 인터럽트</div><ol><li data-ch="ch08"><a href="../chapters/ch08.html"><span class="n">08</span><span>시간과 타이머</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch09"><a href="../chapters/ch09.html"><span class="n">09</span><span>인터럽트 하드웨어</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch10"><a href="../chapters/ch10.html"><span class="n">10</span><span>커널의 IRQ 계층</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch11"><a href="../chapters/ch11.html"><span class="n">11</span><span>Top half와 Bottom half</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch12"><a href="../chapters/ch12.html"><span class="n">12</span><span>패킷 하나의 여정</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-purple"><i></i>4부 · 동시성</div><ol><li data-ch="ch13"><a href="../chapters/ch13.html"><span class="n">13</span><span>경쟁 조건과 실행 컨텍스트</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch14"><a href="../chapters/ch14.html"><span class="n">14</span><span>스핀락과 뮤텍스</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch15"><a href="../chapters/ch15.html"><span class="n">15</span><span>우선순위 역전과 상속</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch16"><a href="../chapters/ch16.html"><span class="n">16</span><span>RCU</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-red"><i></i>5부 · 메모리</div><ol><li data-ch="ch17"><a href="../chapters/ch17.html"><span class="n">17</span><span>가상 주소 공간</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch18"><a href="../chapters/ch18.html"><span class="n">18</span><span>물리 메모리와 회수</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-teal"><i></i>6부 · 시스템 콜과 I/O</div><ol><li data-ch="ch19"><a href="../chapters/ch19.html"><span class="n">19</span><span>시스템 콜</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch20"><a href="../chapters/ch20.html"><span class="n">20</span><span>VFS와 파일시스템</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch21"><a href="../chapters/ch21.html"><span class="n">21</span><span>블록 계층과 io_uring</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-yellow"><i></i>7부 · 격리와 확장</div><ol><li data-ch="ch22"><a href="../chapters/ch22.html"><span class="n">22</span><span>네임스페이스와 cgroup</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch23"><a href="../chapters/ch23.html"><span class="n">23</span><span>가상화와 KVM</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch24"><a href="../chapters/ch24.html"><span class="n">24</span><span>eBPF</span><span class="done" aria-label="읽음">✓</span></a></li></ol><div class="side-part pc-gray"><i></i>8부 · 개발 방법론</div><ol><li data-ch="ch25"><a href="../chapters/ch25.html"><span class="n">25</span><span>C로 쓴 객체지향</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch26"><a href="../chapters/ch26.html"><span class="n">26</span><span>커널은 어떻게 만들어지는가</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch27"><a href="../chapters/ch27.html"><span class="n">27</span><span>품질을 지키는 장치</span><span class="done" aria-label="읽음">✓</span></a></li><li data-ch="ch28"><a href="../chapters/ch28.html"><span class="n">28</span><span>직접 해 보기</span><span class="done" aria-label="읽음">✓</span></a></li></ol></nav>
+<div class="side-links"><a href="../index.html">전체 지도</a><a href="../chapters/timeline.html">버전 연표</a><a href="../chapters/refs.html">참고 자료</a><a href="../chapters/sources.html">소스 색인</a><a href="../chapters/glossary.html">용어 사전</a><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub ↗</a></div>
+</aside>
+<div class="shell">
+<header class="top">
+<button class="icon-btn menu-btn" id="menu-btn" type="button" aria-label="목차 열기">☰ 목차</button>
+<div class="crumb">1부 태스크 › <b>3장 태스크의 상태와 대기</b></div>
+<button class="icon-btn search-open" type="button">검색</button>
+<button class="icon-btn" id="theme-btn" type="button">테마</button>
+</header>
+<div class="progress-line" aria-hidden="true"><i></i></div>
+<main id="main" class="layout has-toc">
+<article>
+<header class="ch-head pc-blue">
+<div class="ch-kicker"><span class="ch-no">03</span><span class="part">1부 · 태스크</span></div>
+<h1>태스크의 상태와 대기</h1>
+<p class="ch-sub">잠들고, 깨어나고, 죽고, 거둬지기까지</p>
+<div class="ch-meta"><span class="chip ver">Linux v7.3 기준</span><span class="chip">약 55분</span></div>
+<div class="ch-files"><span class="chip-label">읽는 소스</span><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/sched.h" target="_blank" rel="noopener">include/linux/sched.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/fs/proc/array.c" target="_blank" rel="noopener">fs/proc/array.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c" target="_blank" rel="noopener">kernel/sched/core.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/wait.h" target="_blank" rel="noopener">include/linux/wait.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/wait.c" target="_blank" rel="noopener">kernel/sched/wait.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/sched/signal.h" target="_blank" rel="noopener">include/linux/sched/signal.h</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/hung_task.c" target="_blank" rel="noopener">kernel/hung_task.c</a><a class="chip mono" href="https://github.com/torvalds/linux/blob/v7.3/kernel/exit.c" target="_blank" rel="noopener">kernel/exit.c</a></div>
+</header><div class="lead">
+<p>태스크는 대부분의 시간을 기다리며 보냅니다. 키 입력을, 디스크를, 네트워크 패킷을, 다른 태스크가 쥔 락을 기다립니다. 기다리는 동안에는 CPU를 쓰면 안 되고, 기다리던 일이 일어나면 단 한 번도 놓치지 않고 깨어나야 합니다. 이 두 요구 사이에 틈이 있습니다. "잠들까 말까" 살피는 순간과 실제로 잠드는 순간 사이에 깨우는 신호가 지나가 버리면 태스크는 영영 깨어나지 못합니다. 이 장은 태스크의 상태가 어떤 값으로 표현되는지, 커널이 그 틈을 어떻게 메우는지, 그리고 태스크가 마지막으로 잠드는 종료의 과정을 따라갑니다.</p>
+</div>
+<div class="goals"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-search"></use></svg>이 장에서 답하는 질문</div>
+<ul>
+<li><code>__state</code>의 값들은 <code>ps</code>가 보여 주는 R, S, D, T, Z와 어떻게 대응하는가?</li>
+<li>잠드는 코드는 왜 상태를 먼저 바꾸고, 그다음에 조건을 확인하고, 그다음에 <code>schedule()</code>을 부르는가?</li>
+<li><code>wake_up()</code>은 대기 큐에서 누구를 몇이나 깨우는가?</li>
+<li><code>kill -9</code>로도 죽지 않는 프로세스는 왜 생기고, <code>TASK_KILLABLE</code>은 무엇을 고쳤는가?</li>
+<li>좀비는 무엇을 쥐고 있고, 누가 언제 거두는가?</li>
+<li>부모가 먼저 죽은 태스크는 누구의 자식이 되는가?</li>
+</ul>
+</div>
+<section class="level2" id="state-bits">
+<h2><span class="sec-n">3.1</span>상태는 비트 묶음이다<a aria-label="이 절의 링크" class="anchor" href="#state-bits">#</a></h2>
+<p>태스크의 상태는 <code>task_struct</code>의 두 필드에 나뉘어 있습니다. <code>__state</code>는 실행할 수 있는지를, <code>exit_state</code>는 종료가 어디까지 진행되었는지를 나타냅니다. 값은 <code>include/linux/sched.h</code>에 한 줄로 이어 정의되어 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/sched.h#L106" rel="noopener" target="_blank">include/linux/sched.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/sched.h" data-line="106" id="cb1"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb1-1"><span class="co">/* Used in tsk-&gt;__state: */</span></span>
+<span id="cb1-2"><span class="pp">#define TASK_RUNNING            </span><span class="bn">0x00000000</span></span>
+<span id="cb1-3"><span class="pp">#define TASK_INTERRUPTIBLE      </span><span class="bn">0x00000001</span></span>
+<span id="cb1-4"><span class="pp">#define TASK_UNINTERRUPTIBLE        </span><span class="bn">0x00000002</span></span>
+<span id="cb1-5"><span class="pp">#define __TASK_STOPPED          </span><span class="bn">0x00000004</span></span>
+<span id="cb1-6"><span class="pp">#define __TASK_TRACED           </span><span class="bn">0x00000008</span></span>
+<span id="cb1-7"><span class="co">/* Used in tsk-&gt;exit_state: */</span></span>
+<span id="cb1-8"><span class="pp">#define EXIT_DEAD           </span><span class="bn">0x00000010</span></span>
+<span id="cb1-9"><span class="pp">#define EXIT_ZOMBIE         </span><span class="bn">0x00000020</span></span>
+<span id="cb1-10"><span class="pp">#define EXIT_TRACE          </span><span class="op">(</span><span class="pp">EXIT_ZOMBIE </span><span class="op">|</span><span class="pp"> EXIT_DEAD</span><span class="op">)</span></span>
+<span id="cb1-11"><span class="co">/* Used in tsk-&gt;__state again: */</span></span>
+<span id="cb1-12"><span class="pp">#define TASK_PARKED         </span><span class="bn">0x00000040</span></span>
+<span id="cb1-13"><span class="pp">#define TASK_DEAD           </span><span class="bn">0x00000080</span></span>
+<span id="cb1-14"><span class="pp">#define TASK_WAKEKILL           </span><span class="bn">0x00000100</span></span>
+<span id="cb1-15"><span class="pp">#define TASK_WAKING         </span><span class="bn">0x00000200</span></span>
+<span id="cb1-16"><span class="pp">#define TASK_NOLOAD         </span><span class="bn">0x00000400</span></span>
+<span id="cb1-17"><span class="pp">#define TASK_NEW            </span><span class="bn">0x00000800</span></span>
+<span id="cb1-18"><span class="pp">#define TASK_RTLOCK_WAIT        </span><span class="bn">0x00001000</span></span>
+<span id="cb1-19"><span class="pp">#define TASK_FREEZABLE          </span><span class="bn">0x00002000</span></span>
+<span id="cb1-20"><span class="co">/* ... */</span></span>
+<span id="cb1-21"><span class="pp">#define TASK_FROZEN         </span><span class="bn">0x00008000</span></span>
+<span id="cb1-22"><span class="co">/* ... */</span></span>
+<span id="cb1-23"><span class="co">/* Convenience macros for the sake of set_current_state: */</span></span>
+<span id="cb1-24"><span class="pp">#define TASK_KILLABLE           </span><span class="op">(</span><span class="pp">TASK_WAKEKILL </span><span class="op">|</span><span class="pp"> TASK_UNINTERRUPTIBLE</span><span class="op">)</span></span>
+<span id="cb1-25"><span class="pp">#define TASK_STOPPED            </span><span class="op">(</span><span class="pp">TASK_WAKEKILL </span><span class="op">|</span><span class="pp"> __TASK_STOPPED</span><span class="op">)</span></span>
+<span id="cb1-26"><span class="pp">#define TASK_TRACED         __TASK_TRACED</span></span>
+<span id="cb1-27"></span>
+<span id="cb1-28"><span class="pp">#define TASK_IDLE           </span><span class="op">(</span><span class="pp">TASK_UNINTERRUPTIBLE </span><span class="op">|</span><span class="pp"> TASK_NOLOAD</span><span class="op">)</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li>값이 1, 2, 4, 8처럼 <strong>비트 하나씩</strong>입니다. 순서를 매긴 번호가 아니라 겹쳐 쓸 수 있는 플래그입니다.</li>
+<li><code>TASK_RUNNING</code>만 0입니다. "잠들 이유가 하나도 없다"는 뜻입니다. 나머지 비트는 저마다 실행하지 못하는 이유 하나를 가리킵니다.</li>
+<li>아래쪽의 <code>TASK_KILLABLE</code>과 <code>TASK_IDLE</code>은 비트 둘을 묶은 이름입니다. <code>TASK_WAKEKILL</code>, <code>TASK_NOLOAD</code>, <code>TASK_FREEZABLE</code>은 혼자 쓰이지 않고 다른 상태에 붙어 성질을 바꾸는 수식 비트입니다.</li>
+</ul>
+<figure class="fig" id="fig-state-bits"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 440" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>v7.3의 태스크 상태 비트: __state와 exit_state에 쓰이는 값, ps가 보여 주는 글자, 그리고 여러 비트를 묶은 TASK_KILLABLE, TASK_IDLE, TASK_STOPPED, TASK_NORMAL.</title>
+
+  <text class="t-xs" x="20" y="24">값</text>
+  <text class="t-xs" x="92" y="24">이름</text>
+  <text class="t-xs mid" x="290" y="24">ps</text>
+  <text class="t-xs" x="318" y="24">뜻</text>
+  <text class="t-code tc-muted" x="20" y="50">0x0000</text>
+  <rect class="box green" x="84" y="34" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="50">TASK_RUNNING</text>
+  <text class="t-mono t-b mid" x="290" y="50">R</text>
+  <text class="t-xs" x="318" y="50">실행 중이거나 실행 대기</text>
+  <text class="t-code tc-muted" x="20" y="74">0x0001</text>
+  <rect class="box blue" x="84" y="58" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="74">TASK_INTERRUPTIBLE</text>
+  <text class="t-mono t-b mid" x="290" y="74">S</text>
+  <text class="t-xs" x="318" y="74">시그널로도 깨어나는 잠</text>
+  <text class="t-code tc-muted" x="20" y="98">0x0002</text>
+  <rect class="box blue" x="84" y="82" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="98">TASK_UNINTERRUPTIBLE</text>
+  <text class="t-mono t-b mid" x="290" y="98">D</text>
+  <text class="t-xs" x="318" y="98">깨워 줄 때까지 자는 잠</text>
+  <text class="t-code tc-muted" x="20" y="122">0x0004</text>
+  <rect class="box blue" x="84" y="106" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="122">__TASK_STOPPED</text>
+  <text class="t-mono t-b mid" x="290" y="122">T</text>
+  <text class="t-xs" x="318" y="122">SIGSTOP으로 멈춤</text>
+  <text class="t-code tc-muted" x="20" y="146">0x0008</text>
+  <rect class="box blue" x="84" y="130" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="146">__TASK_TRACED</text>
+  <text class="t-mono t-b mid" x="290" y="146">t</text>
+  <text class="t-xs" x="318" y="146">디버거가 세워 둠</text>
+  <text class="t-code tc-muted" x="20" y="170">0x0010</text>
+  <rect class="box gray" x="84" y="154" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="170">EXIT_DEAD</text>
+  <text class="t-mono t-b mid" x="290" y="170">X</text>
+  <text class="t-xs" x="318" y="170">거두는 중 (exit_state)</text>
+  <text class="t-code tc-muted" x="20" y="194">0x0020</text>
+  <rect class="box gray" x="84" y="178" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="194">EXIT_ZOMBIE</text>
+  <text class="t-mono t-b mid" x="290" y="194">Z</text>
+  <text class="t-xs" x="318" y="194">좀비 (exit_state)</text>
+  <text class="t-code tc-muted" x="20" y="218">0x0040</text>
+  <rect class="box blue" x="84" y="202" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="218">TASK_PARKED</text>
+  <text class="t-mono t-b mid" x="290" y="218">P</text>
+  <text class="t-xs" x="318" y="218">커널 스레드를 세워 둠</text>
+  <text class="t-code tc-muted" x="20" y="242">0x0080</text>
+  <rect class="box gray" x="84" y="226" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="242">TASK_DEAD</text>
+  <text class="t-xs" x="318" y="242">마지막 스위치 직전</text>
+  <text class="t-code tc-muted" x="20" y="266">0x0100</text>
+  <rect class="box purple" x="84" y="250" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="266">TASK_WAKEKILL</text>
+  <text class="t-xs" x="318" y="266">수식: 치명적 시그널이면 깨움</text>
+  <text class="t-code tc-muted" x="20" y="290">0x0200</text>
+  <rect class="box" x="84" y="274" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="290">TASK_WAKING</text>
+  <text class="t-xs" x="318" y="290">깨우는 도중</text>
+  <text class="t-code tc-muted" x="20" y="314">0x0400</text>
+  <rect class="box purple" x="84" y="298" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="314">TASK_NOLOAD</text>
+  <text class="t-xs" x="318" y="314">수식: 부하 평균에서 뺌</text>
+  <text class="t-code tc-muted" x="20" y="338">0x0800</text>
+  <rect class="box" x="84" y="322" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="338">TASK_NEW</text>
+  <text class="t-xs" x="318" y="338">만드는 도중</text>
+  <text class="t-code tc-muted" x="20" y="362">0x1000</text>
+  <rect class="box blue" x="84" y="346" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="362">TASK_RTLOCK_WAIT</text>
+  <text class="t-mono t-b mid" x="290" y="362">D</text>
+  <text class="t-xs" x="318" y="362">RT 커널의 락 대기</text>
+  <text class="t-code tc-muted" x="20" y="386">0x2000</text>
+  <rect class="box purple" x="84" y="370" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="386">TASK_FREEZABLE</text>
+  <text class="t-xs" x="318" y="386">수식: 얼려도 되는 잠</text>
+  <text class="t-code tc-muted" x="20" y="410">0x8000</text>
+  <rect class="box blue" x="84" y="394" width="186" height="22" rx="4"/>
+  <text class="t-code" x="92" y="410">TASK_FROZEN</text>
+  <text class="t-mono t-b mid" x="290" y="410">D</text>
+  <text class="t-xs" x="318" y="410">얼어 있음</text>
+
+  <text class="t-b" x="520" y="24">여러 비트를 묶은 이름</text>
+  <rect class="box purple" x="520" y="34" width="220" height="88" rx="8"/>
+  <text class="t-code t-b" x="532" y="54">TASK_KILLABLE</text>
+  <text class="t-code" x="532" y="74">TASK_WAKEKILL |</text>
+  <text class="t-code" x="532" y="90">TASK_UNINTERRUPTIBLE</text>
+  <text class="t-xs" x="532" y="110">시그널은 치명적인 것만 깨운다</text>
+  <rect class="box purple" x="520" y="130" width="220" height="88" rx="8"/>
+  <text class="t-code t-b" x="532" y="150">TASK_IDLE</text>
+  <text class="t-code" x="532" y="170">TASK_UNINTERRUPTIBLE |</text>
+  <text class="t-code" x="532" y="186">TASK_NOLOAD</text>
+  <text class="t-xs" x="532" y="206">ps에서 I. 일감을 기다리는 커널 스레드</text>
+  <rect class="box purple" x="520" y="226" width="220" height="88" rx="8"/>
+  <text class="t-code t-b" x="532" y="246">TASK_STOPPED</text>
+  <text class="t-code" x="532" y="266">TASK_WAKEKILL |</text>
+  <text class="t-code" x="532" y="282">__TASK_STOPPED</text>
+  <text class="t-xs" x="532" y="302">멈췄지만 SIGKILL로는 깨어난다</text>
+  <rect class="box purple" x="520" y="322" width="220" height="88" rx="8"/>
+  <text class="t-code t-b" x="532" y="342">TASK_NORMAL</text>
+  <text class="t-code" x="532" y="362">TASK_INTERRUPTIBLE |</text>
+  <text class="t-code" x="532" y="378">TASK_UNINTERRUPTIBLE</text>
+  <text class="t-xs" x="532" y="398">wake_up()이 깨우는 대상</text>
+</svg></div><figcaption><b>그림 3-1</b>v7.3의 상태 비트 전체와 <code>ps</code>가 보여 주는 글자. 보라색은 다른 상태에 붙여 쓰는 수식 비트입니다.</figcaption></figure>
+<p><code>ps</code>와 <code>/proc/&lt;pid&gt;/status</code>가 보여 주는 한 글자는 이 비트에서 나옵니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/fs/proc/array.c#L127" rel="noopener" target="_blank">fs/proc/array.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="fs/proc/array.c" data-line="127" id="cb2"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb2-1"><span class="dt">static</span> <span class="dt">const</span> <span class="dt">char</span> <span class="op">*</span> <span class="dt">const</span> task_state_array<span class="op">[]</span> <span class="op">=</span> <span class="op">{</span></span>
+<span id="cb2-2"></span>
+<span id="cb2-3">    <span class="co">/* states in TASK_REPORT: */</span></span>
+<span id="cb2-4">    <span class="st">"R (running)"</span><span class="op">,</span>      <span class="co">/* 0x00 */</span></span>
+<span id="cb2-5">    <span class="st">"S (sleeping)"</span><span class="op">,</span>     <span class="co">/* 0x01 */</span></span>
+<span id="cb2-6">    <span class="st">"D (disk sleep)"</span><span class="op">,</span>   <span class="co">/* 0x02 */</span></span>
+<span id="cb2-7">    <span class="st">"T (stopped)"</span><span class="op">,</span>      <span class="co">/* 0x04 */</span></span>
+<span id="cb2-8">    <span class="st">"t (tracing stop)"</span><span class="op">,</span> <span class="co">/* 0x08 */</span></span>
+<span id="cb2-9">    <span class="st">"X (dead)"</span><span class="op">,</span>     <span class="co">/* 0x10 */</span></span>
+<span id="cb2-10">    <span class="st">"Z (zombie)"</span><span class="op">,</span>       <span class="co">/* 0x20 */</span></span>
+<span id="cb2-11">    <span class="st">"P (parked)"</span><span class="op">,</span>       <span class="co">/* 0x40 */</span></span>
+<span id="cb2-12"></span>
+<span id="cb2-13">    <span class="co">/* states beyond TASK_REPORT: */</span></span>
+<span id="cb2-14">    <span class="st">"I (idle)"</span><span class="op">,</span>     <span class="co">/* 0x80 */</span></span>
+<span id="cb2-15"><span class="op">};</span></span></code></pre></div></div>
+<p><code>__state</code>와 <code>exit_state</code>를 합쳐 가장 높은 비트 하나를 고른 뒤 이 표에서 찾습니다. 유저 공간에 내보내는 글자는 아홉 가지뿐이어서 몇몇은 뭉뚱그려집니다. <code>TASK_KILLABLE</code>은 D로, <code>TASK_IDLE</code>은 따로 I로, 얼어 있는 <code>TASK_FROZEN</code>은 D로 보입니다.</p>
+<div class="callout old"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-clock"></use></svg>예전 자료와 다른 점</div>
+<p>교과서의 프로세스 상태도는 생성, 준비, 실행, 대기, 종료의 다섯 칸입니다. 리눅스를 설명하는 글도 R, S, D, T, Z 다섯을 하나씩의 상태로 그리곤 합니다. v7.3의 실제 모습은 두 가지가 다릅니다. 첫째, "준비"와 "실행"을 가르는 상태값이 없습니다. 런큐에서 차례를 기다리는 태스크도, 지금 CPU를 쓰는 태스크도 <code>TASK_RUNNING</code>입니다. 둘을 가르는 것은 상태가 아니라 <code>on_rq</code>(런큐에 있는가)와 <code>on_cpu</code>(CPU에서 도는 중인가)라는 별도의 필드입니다. 둘째, 상태는 다섯 개의 칸이 아니라 열여섯 개 남짓의 비트이고 조합됩니다. 필드 이름도 바뀌었습니다. 예전 자료의 <code>task-&gt;state</code>는 v5.14에서 <code>__state</code>가 되었습니다. 밑줄 둘은 "직접 읽고 쓰지 말고 <code>READ_ONCE()</code>나 전용 매크로를 거치라"는 표시입니다.</p>
+</div>
+</section>
+<section class="level2" id="transitions">
+<h2><span class="sec-n">3.2</span>상태 사이를 오가는 길<a aria-label="이 절의 링크" class="anchor" href="#transitions">#</a></h2>
+<p>상태가 바뀌는 길을 한 장에 모으면 이렇습니다.</p>
+<figure class="fig" id="fig-state-diagram"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>v7.3의 태스크 상태도: TASK_NEW에서 wake_up_new_task()로 TASK_RUNNING이 되고, TASK_RUNNING 안에서 런큐 대기와 CPU 실행을 오간다. set_current_state()와 schedule()로 잠들고 try_to_wake_up()으로 깨어난다. SIGSTOP으로 멈추고 SIGCONT로 풀린다. do_exit()로 좀비가 되고 부모의 wait4()로 거둬진다.</title>
+
+  <!-- NEW -->
+  <rect class="box" x="20" y="44" width="120" height="44" rx="10"/>
+  <text class="t-code t-b mid" x="80" y="63">TASK_NEW</text>
+  <text class="t-xs mid" x="80" y="80">만드는 중</text>
+  <text class="t-code mid" x="84" y="108">wake_up_new_task()</text>
+
+  <!-- RUNNING -->
+  <rect class="panel green" x="190" y="16" width="360" height="100" rx="12"/>
+  <text class="t-code t-b" x="204" y="37">TASK_RUNNING</text>
+  <text class="t-xs" x="312" y="37">ps에서 R. 두 경우를 가리지 않는다</text>
+  <rect class="box" x="204" y="46" width="150" height="56" rx="8"/>
+  <text class="t-b mid" x="279" y="69">런큐에서 대기</text>
+  <text class="t-code mid" x="279" y="90">on_rq = 1</text>
+  <rect class="box green" x="386" y="46" width="150" height="56" rx="8"/>
+  <text class="t-b mid" x="461" y="69">CPU에서 실행</text>
+  <text class="t-code mid" x="461" y="90">on_cpu = 1</text>
+  <path class="ln" d="M140 66 H199" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M354 64 H381" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M386 86 H359" marker-end="url(#ah)"/>
+
+  <!-- 멈춤 -->
+  <rect class="box warm" x="620" y="30" width="120" height="60" rx="10"/>
+  <text class="t-code t-b mid" x="680" y="52">TASK_STOPPED</text>
+  <text class="t-xs mid" x="680" y="70">ps에서 T</text>
+  <path class="ln thin warm" d="M550 50 H615" marker-end="url(#ah-warm)"/>
+  <text class="t-code mid" x="585" y="42">SIGSTOP</text>
+  <path class="ln thin warm" d="M620 72 H555" marker-end="url(#ah-warm)"/>
+  <text class="t-code mid" x="585" y="90">SIGCONT</text>
+
+  <!-- 잠 -->
+  <rect class="panel blue" x="190" y="204" width="360" height="92" rx="12"/>
+  <text class="t-b" x="204" y="225">잠든 상태</text>
+  <text class="t-xs" x="278" y="225">런큐에서 빠진다</text>
+  <rect class="box" x="204" y="234" width="166" height="48" rx="8"/>
+  <text class="t-code t-b mid" x="287" y="254">INTERRUPTIBLE · S</text>
+  <text class="t-xs mid" x="287" y="272">시그널로도 깨어난다</text>
+  <rect class="box" x="380" y="234" width="156" height="48" rx="8"/>
+  <text class="t-code t-b mid" x="458" y="254">UNINTERRUPTIBLE · D</text>
+  <text class="t-xs mid" x="458" y="272">깨워 줄 때까지 잔다</text>
+
+  <path class="ln blue" d="M461 116 V198" marker-end="url(#ah-blue)"/>
+  <text class="t-code end" x="452" y="152">set_current_state()</text>
+  <text class="t-code end" x="452" y="170">→ schedule()</text>
+  <path class="ln blue" d="M279 204 V122" marker-end="url(#ah-blue)"/>
+  <text class="t-code end" x="270" y="166">try_to_wake_up()</text>
+
+  <!-- 종료 -->
+  <path class="ln" d="M520 116 V150 H680 V194" marker-end="url(#ah)"/>
+  <text class="t-code mid" x="600" y="143">do_exit()</text>
+  <rect class="box gray" x="620" y="198" width="120" height="48" rx="10"/>
+  <text class="t-code t-b mid" x="680" y="218">EXIT_ZOMBIE</text>
+  <text class="t-xs mid" x="680" y="236">Z · 부모를 기다림</text>
+  <path class="ln" d="M680 246 V288" marker-end="url(#ah)"/>
+  <text class="t-code end" x="672" y="272">wait4()</text>
+  <rect class="box gray" x="620" y="292" width="120" height="48" rx="10"/>
+  <text class="t-code t-b mid" x="680" y="312">EXIT_DEAD</text>
+  <text class="t-xs mid" x="680" y="330">X · 거두는 중</text>
+  <path class="ln" d="M680 340 V356" marker-end="url(#ah)"/>
+  <text class="t-code end" x="740" y="378">release_task()로 해제</text>
+
+  <!-- 주석 -->
+  <text class="t-s" x="20" y="330">위쪽 두 상자 사이: 스케줄러가 고르면 오른쪽으로, 선점되거나 양보하면 왼쪽으로.</text>
+  <text class="t-s" x="20" y="352">깨우는 도중에는 잠깐 TASK_WAKING을 거친다.</text>
+  <text class="t-s" x="20" y="374">종료하는 태스크는 __state가 TASK_DEAD이고, Z와 X는 exit_state에 적힌다.</text>
+</svg></div><figcaption><b>그림 3-2</b>상태 전이와 그것을 일으키는 함수. 태스크의 일생은 대부분 위쪽 초록 상자와 아래쪽 파란 상자 사이를 오가는 일입니다.</figcaption></figure>
+<p>길은 넷으로 나뉩니다.</p>
+<ul>
+<li><strong>만들어져서 런큐로.</strong> <code>copy_process()</code>가 만든 태스크는 <code>TASK_NEW</code>이고, <code>wake_up_new_task()</code>가 <code>TASK_RUNNING</code>으로 바꿔 런큐에 넣습니다(<a href="ch01.html">1장</a>).</li>
+<li><strong>잠들었다 깨어나기.</strong> 태스크가 스스로 상태를 바꾸고 <code>schedule()</code>을 불러 런큐에서 빠집니다. 다른 누군가가 <code>try_to_wake_up()</code>으로 되돌려 놓습니다. 이 장의 대부분이 이 길 이야기입니다.</li>
+<li><strong>멈췄다 풀리기.</strong> <code>SIGSTOP</code>이나 디버거가 태스크를 세우고, <code>SIGCONT</code>나 디버거가 다시 풉니다.</li>
+<li><strong>죽어서 거둬지기.</strong> <code>do_exit()</code>를 거쳐 좀비가 되고, 부모가 <code>wait4()</code>로 거둡니다.</li>
+</ul>
+<p><code>TASK_RUNNING</code> 안에서 "대기"와 "실행" 사이를 오가는 것은 상태 전이가 아닙니다. 스케줄러가 다음 태스크를 고르거나 현재 태스크를 선점하는 일이고, <code>__state</code>는 그대로입니다(<a href="ch04.html">4장</a>, <a href="ch06.html">6장</a>). 반대쪽에도 예외가 있습니다. v7.3의 fair 클래스는 잠든 태스크를 런큐에서 곧바로 빼지 않고 다음에 뽑힐 차례까지 남겨 두기도 합니다(<a href="ch05.html">5장</a>). 그래도 그 태스크가 실행되지는 않습니다.</p>
+</section>
+<section class="level2" id="sleeping">
+<h2><span class="sec-n">3.3</span>잠드는 순서<a aria-label="이 절의 링크" class="anchor" href="#sleeping">#</a></h2>
+<p>커널 코드가 "어떤 조건이 참이 될 때까지 기다린다"를 구현하는 표준 모양이 있습니다. <code>set_current_state()</code>의 주석에 그대로 적혀 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/sched.h#L203" rel="noopener" target="_blank">include/linux/sched.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/sched.h" data-line="203" id="cb3"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb3-1"><span class="co">/*</span></span>
+<span id="cb3-2"><span class="co"> * set_current_state() includes a barrier so that the write of current-&gt;__state</span></span>
+<span id="cb3-3"><span class="co"> * is correctly serialised wrt the caller's subsequent test of whether to</span></span>
+<span id="cb3-4"><span class="co"> * actually sleep:</span></span>
+<span id="cb3-5"><span class="co"> *</span></span>
+<span id="cb3-6"><span class="co"> *   for (;;) {</span></span>
+<span id="cb3-7"><span class="co"> *  set_current_state(TASK_UNINTERRUPTIBLE);</span></span>
+<span id="cb3-8"><span class="co"> *  if (CONDITION)</span></span>
+<span id="cb3-9"><span class="co"> *     break;</span></span>
+<span id="cb3-10"><span class="co"> *</span></span>
+<span id="cb3-11"><span class="co"> *  schedule();</span></span>
+<span id="cb3-12"><span class="co"> *   }</span></span>
+<span id="cb3-13"><span class="co"> *   __set_current_state(TASK_RUNNING);</span></span></code></pre></div></div>
+<p>순서는 셋입니다. ① 자기 상태를 "잠듦"으로 바꾼다. ② 조건을 확인한다. ③ 조건이 거짓이면 <code>schedule()</code>을 부른다. 직관과는 반대입니다. 조건부터 보고, 거짓이면 그때 상태를 바꾸고 자는 편이 자연스러워 보입니다. 그렇게 하면 안 되는 이유가 <strong>깨움 분실</strong>(lost wakeup)입니다.</p>
+<figure class="fig" id="fig-lost-wakeup"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>깨움 분실: 조건을 확인한 뒤에 상태를 바꾸면, 그 사이에 온 깨움이 헛되어 태스크가 영영 잠든다. 상태를 먼저 바꾸고 조건을 확인하면 그 사이에 온 깨움이 상태를 TASK_RUNNING으로 되돌려 놓으므로 schedule()을 불러도 잠들지 않는다.</title>
+
+  <rect class="panel" x="20" y="16" width="350" height="360" rx="14"/>
+  <text class="t-b" x="34" y="42">틀린 순서</text>
+  <text class="t-xs" x="120" y="42">조건을 보고 나서 상태를 바꾼다</text>
+  <text class="t-xs tc-blue t-b" x="34" y="70">A · 잠들려는 태스크</text>
+  <text class="t-xs tc-green t-b end" x="356" y="70">B · 깨우는 쪽</text>
+  <rect class="box blue" x="34" y="82" width="200" height="28" rx="6"/>
+  <text class="t-code" x="44" y="100">① 조건 확인: 거짓</text>
+  <rect class="box green" x="156" y="134" width="200" height="28" rx="6"/>
+  <text class="t-code" x="166" y="152">② 조건 = 참</text>
+  <rect class="box green" x="156" y="186" width="200" height="28" rx="6"/>
+  <text class="t-code" x="166" y="204">③ wake_up_process(A)</text>
+  <text class="t-xs" x="158" y="229">A가 RUNNING이라 할 일이 없다</text>
+  <rect class="box blue" x="34" y="238" width="200" height="28" rx="6"/>
+  <text class="t-code" x="44" y="256">④ 상태 = INTERRUPTIBLE</text>
+  <rect class="box red" x="34" y="290" width="200" height="28" rx="6"/>
+  <text class="t-code" x="44" y="308">⑤ schedule()</text>
+  <text class="t-xs" x="36" y="333">런큐에서 빠진다</text>
+  <text class="t-s tc-red t-b" x="34" y="360">깨움은 이미 지나갔다. A는 영영 잠든다</text>
+
+  <rect class="panel" x="390" y="16" width="350" height="360" rx="14"/>
+  <text class="t-b" x="404" y="42">옳은 순서</text>
+  <text class="t-xs" x="490" y="42">상태를 바꾸고 나서 조건을 본다</text>
+  <text class="t-xs tc-blue t-b" x="404" y="70">A · 잠들려는 태스크</text>
+  <text class="t-xs tc-green t-b end" x="726" y="70">B · 깨우는 쪽</text>
+  <rect class="box blue" x="404" y="82" width="200" height="28" rx="6"/>
+  <text class="t-code" x="414" y="100">① 상태 = INTERRUPTIBLE</text>
+  <rect class="box blue" x="404" y="134" width="200" height="28" rx="6"/>
+  <text class="t-code" x="414" y="152">② 조건 확인: 거짓</text>
+  <rect class="box green" x="526" y="186" width="200" height="28" rx="6"/>
+  <text class="t-code" x="536" y="204">③ 조건 = 참</text>
+  <rect class="box green" x="526" y="238" width="200" height="28" rx="6"/>
+  <text class="t-code" x="536" y="256">④ wake_up_process(A)</text>
+  <text class="t-xs" x="528" y="281">A의 상태를 RUNNING으로 되돌린다</text>
+  <rect class="box blue" x="404" y="290" width="200" height="28" rx="6"/>
+  <text class="t-code" x="414" y="308">⑤ schedule()</text>
+  <text class="t-xs" x="406" y="333">상태가 RUNNING이라 런큐에 남는다</text>
+  <text class="t-s tc-green t-b" x="404" y="360">A는 곧 돌아와 조건을 다시 보고 빠져나온다</text>
+</svg></div><figcaption><b>그림 3-3</b>조건 확인과 상태 변경의 순서가 바뀌면, 그 사이에 도착한 깨움은 아무 효과 없이 지나갑니다. 상태를 먼저 바꿔 두면 같은 시점의 깨움이 상태를 되돌려 놓습니다.</figcaption></figure>
+<p>깨우는 쪽이 하는 일은 "조건을 참으로 만들고, 그 태스크가 잠든 상태면 <code>TASK_RUNNING</code>으로 되돌린다"입니다. 왼쪽 그림에서는 깨우는 쪽이 왔을 때 A가 아직 <code>TASK_RUNNING</code>이어서 되돌릴 것이 없습니다. 그 뒤에 A가 잠들면 다시 깨워 줄 사람이 없습니다. 오른쪽에서는 A가 이미 "잠듦"이라고 적어 두었으므로 깨우는 쪽이 그것을 <code>TASK_RUNNING</code>으로 고칩니다. A가 그 뒤에 <code>schedule()</code>을 불러도 상태가 <code>TASK_RUNNING</code>이므로 런큐에서 빠지지 않습니다.</p>
+<p>상태를 바꾼 것만으로는 잠든 것이 아닙니다. 태스크를 실제로 런큐에서 빼는 것은 <code>schedule()</code>이고, 그때 <code>__state</code>를 봅니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L6748" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="6748" id="cb4"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb4-1"><span class="dt">static</span> <span class="dt">bool</span> try_to_block_task<span class="op">(</span><span class="kw">struct</span> rq <span class="op">*</span>rq<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span></span>
+<span id="cb4-2">                  <span class="dt">unsigned</span> <span class="dt">long</span> <span class="op">*</span>task_state_p<span class="op">,</span> <span class="dt">bool</span> should_block<span class="op">)</span></span>
+<span id="cb4-3"><span class="op">{</span></span>
+<span id="cb4-4">    <span class="dt">unsigned</span> <span class="dt">long</span> task_state <span class="op">=</span> <span class="op">*</span>task_state_p<span class="op">;</span></span>
+<span id="cb4-5"></span>
+<span id="cb4-6">    WARN_ON_ONCE<span class="op">(</span>p<span class="op">-&gt;</span>is_blocked<span class="op">);</span></span>
+<span id="cb4-7"></span>
+<span id="cb4-8">    <span class="cf">if</span> <span class="op">(</span>signal_pending_state<span class="op">(</span>task_state<span class="op">,</span> p<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb4-9">        WRITE_ONCE<span class="op">(</span>p<span class="op">-&gt;</span>__state<span class="op">,</span> TASK_RUNNING<span class="op">);</span></span>
+<span id="cb4-10">        <span class="op">*</span>task_state_p <span class="op">=</span> TASK_RUNNING<span class="op">;</span></span>
+<span id="cb4-11">        clear_task_blocked_on<span class="op">(</span>p<span class="op">,</span> NULL<span class="op">);</span></span>
+<span id="cb4-12"></span>
+<span id="cb4-13">        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb4-14">    <span class="op">}</span></span>
+<span id="cb4-15"></span>
+<span id="cb4-16">    p<span class="op">-&gt;</span>is_blocked <span class="op">=</span> <span class="dv">1</span><span class="op">;</span></span>
+<span id="cb4-17">    <span class="co">/* ... */</span></span>
+<span id="cb4-18">    block_task<span class="op">(</span>rq<span class="op">,</span> p<span class="op">,</span> task_state<span class="op">);</span></span>
+<span id="cb4-19">    <span class="cf">return</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb4-20"><span class="op">}</span></span></code></pre></div></div>
+<p><code>__schedule()</code>은 현재 태스크의 <code>__state</code>가 0이 아니고 선점으로 들어온 것이 아닐 때 이 함수를 부릅니다. <code>block_task()</code>가 런큐에서 빼는 일을 합니다. 그 앞의 <code>signal_pending_state()</code>는 뒤의 <a href="#signals">시그널 절</a>에서 다시 봅니다.</p>
+<p>"선점으로 들어온 것이 아닐 때"라는 조건이 중요합니다. ①과 ③ 사이에서 태스크가 선점당하면 스케줄러는 상태가 무엇이든 태스크를 런큐에 그대로 둡니다. 그러지 않으면 조건을 확인하기도 전에 잠들어 버리기 때문입니다. <a href="ch06.html">6장</a>의 <code>SM_PREEMPT</code>가 이 구분입니다.</p>
+<div class="callout note"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-book"></use></svg>참고 · 순서만으로는 모자란다: 메모리 배리어</div>
+<p><code>set_current_state()</code>는 단순한 대입이 아니라 <code>smp_store_mb()</code>입니다. 상태를 쓴 다음 메모리 배리어를 실행해, 그 쓰기가 뒤따르는 조건 읽기보다 먼저 다른 CPU에 보이도록 합니다. 깨우는 쪽도 대칭으로 조건을 쓴 뒤 배리어를 치고 상태를 읽습니다. 배리어가 없으면 CPU가 쓰기를 버퍼에 잠시 쥐고 있는 동안 양쪽이 서로의 옛 값을 읽어, 소스의 순서가 옳아도 깨움을 놓칠 수 있습니다. 메모리 순서는 <a href="ch13.html">13장</a>에서 다룹니다. 조건과 깨움이 같은 락으로 보호될 때는 배리어 없는 <code>__set_current_state()</code>를 써도 됩니다.</p>
+</div>
+</section>
+<section class="level2" id="wait-queue">
+<h2><span class="sec-n">3.4</span>대기 큐<a aria-label="이 절의 링크" class="anchor" href="#wait-queue">#</a></h2>
+<p>깨우려면 누가 기다리는지 알아야 합니다. 같은 사건을 기다리는 태스크들을 매달아 두는 리스트가 <strong>대기 큐</strong>(wait queue)입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/wait.h#L28" rel="noopener" target="_blank">include/linux/wait.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/wait.h" data-line="28" id="cb5"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb5-1"><span class="kw">struct</span> wait_queue_entry <span class="op">{</span></span>
+<span id="cb5-2">    <span class="dt">unsigned</span> <span class="dt">int</span>        flags<span class="op">;</span></span>
+<span id="cb5-3">    <span class="dt">void</span>            <span class="op">*</span>private<span class="op">;</span></span>
+<span id="cb5-4">    wait_queue_func_t   func<span class="op">;</span></span>
+<span id="cb5-5">    <span class="kw">struct</span> list_head    entry<span class="op">;</span></span>
+<span id="cb5-6"><span class="op">};</span></span>
+<span id="cb5-7"></span>
+<span id="cb5-8"><span class="kw">struct</span> wait_queue_head <span class="op">{</span></span>
+<span id="cb5-9">    spinlock_t      lock<span class="op">;</span></span>
+<span id="cb5-10">    <span class="kw">struct</span> list_head    head<span class="op">;</span></span>
+<span id="cb5-11"><span class="op">};</span></span></code></pre></div></div>
+<p>머리(<code>wait_queue_head</code>)는 기다릴 대상 쪽에 있습니다. 소켓, 파이프, 터미널 같은 구조체 안에 들어 있습니다. 항목(<code>wait_queue_entry</code>)은 기다리는 쪽이 자기 커널 스택에 만들어 매답니다. <code>private</code>은 보통 기다리는 태스크를 가리키고, <code>func</code>는 깨울 때 불릴 함수입니다.</p>
+<figure class="fig" id="fig-wait-queue"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 340" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>대기 큐의 구조: wait_queue_head의 리스트에 wait_queue_entry가 매달리고, 각 항목의 private이 잠든 태스크를 가리킨다. 비배타 대기자는 앞쪽에, 배타 대기자는 뒤쪽에 놓인다. wake_up()은 비배타 대기자 전부와 배타 대기자 하나를 깨운다.</title>
+
+  <rect class="box yellow" x="20" y="56" width="128" height="92" rx="10"/>
+  <text class="t-code t-b" x="28" y="78">wait_queue_head</text>
+  <rect class="box" x="30" y="88" width="108" height="22" rx="4"/>
+  <text class="t-code" x="38" y="104">lock</text>
+  <rect class="box" x="30" y="114" width="108" height="22" rx="4"/>
+  <text class="t-code" x="38" y="130">head</text>
+  <text class="t-xs tc-blue t-b mid" x="314" y="26">비배타 대기자: 리스트 앞쪽에 넣는다</text>
+  <path class="ln thin blue" d="M176 36 H452"/>
+  <text class="t-xs tc-purple t-b mid" x="602" y="26">배타 대기자: 뒤쪽에 넣는다</text>
+  <path class="ln thin purple" d="M464 36 H740"/>
+  <rect class="box blue" x="176" y="46" width="132" height="102" rx="10"/>
+  <text class="t-code t-b" x="184" y="66">wait_queue_entry</text>
+  <text class="t-code" x="184" y="86">flags: 0</text>
+  <text class="t-code" x="184" y="104">private, func</text>
+  <rect class="box" x="202" y="114" width="80" height="22" rx="4"/>
+  <text class="t-code mid" x="242" y="130">entry</text>
+  <path class="ln thin muted" d="M242 148 V184" marker-end="url(#ah-muted)"/>
+  <rect class="box green" x="176" y="190" width="132" height="50" rx="10"/>
+  <text class="t-b mid" x="242" y="211">태스크 A</text>
+  <text class="t-xs mid" x="242" y="230">깨어난다</text>
+  <rect class="box blue" x="320" y="46" width="132" height="102" rx="10"/>
+  <text class="t-code t-b" x="328" y="66">wait_queue_entry</text>
+  <text class="t-code" x="328" y="86">flags: 0</text>
+  <text class="t-code" x="328" y="104">private, func</text>
+  <rect class="box" x="346" y="114" width="80" height="22" rx="4"/>
+  <text class="t-code mid" x="386" y="130">entry</text>
+  <path class="ln thin muted" d="M386 148 V184" marker-end="url(#ah-muted)"/>
+  <rect class="box green" x="320" y="190" width="132" height="50" rx="10"/>
+  <text class="t-b mid" x="386" y="211">태스크 B</text>
+  <text class="t-xs mid" x="386" y="230">깨어난다</text>
+  <rect class="box purple" x="464" y="46" width="132" height="102" rx="10"/>
+  <text class="t-code t-b" x="472" y="66">wait_queue_entry</text>
+  <text class="t-code" x="472" y="86">flags: EXCLUSIVE</text>
+  <text class="t-code" x="472" y="104">private, func</text>
+  <rect class="box" x="490" y="114" width="80" height="22" rx="4"/>
+  <text class="t-code mid" x="530" y="130">entry</text>
+  <path class="ln thin muted" d="M530 148 V184" marker-end="url(#ah-muted)"/>
+  <rect class="box green" x="464" y="190" width="132" height="50" rx="10"/>
+  <text class="t-b mid" x="530" y="211">태스크 C</text>
+  <text class="t-xs mid" x="530" y="230">깨어난다</text>
+  <rect class="box purple" x="608" y="46" width="132" height="102" rx="10"/>
+  <text class="t-code t-b" x="616" y="66">wait_queue_entry</text>
+  <text class="t-code" x="616" y="86">flags: EXCLUSIVE</text>
+  <text class="t-code" x="616" y="104">private, func</text>
+  <rect class="box" x="634" y="114" width="80" height="22" rx="4"/>
+  <text class="t-code mid" x="674" y="130">entry</text>
+  <path class="ln thin muted" d="M674 148 V184" marker-end="url(#ah-muted)"/>
+  <rect class="box gray" x="608" y="190" width="132" height="50" rx="10"/>
+  <text class="t-b mid" x="674" y="211">태스크 D</text>
+  <text class="t-xs mid" x="674" y="230">계속 잔다</text>
+  <path class="ln thin" d="M138 125 H197" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M282 125 H341" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M426 125 H485" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M570 125 H629" marker-end="url(#ah)"/>
+  <text class="t-xs" x="20" y="200">private이 잠든</text>
+  <text class="t-xs" x="20" y="216">태스크를 가리킨다</text>
+
+  <rect class="box code" x="20" y="262" width="720" height="62" rx="8"/>
+  <text class="t-mono t-b" x="34" y="285">wake_up(&amp;wq)</text>
+  <text class="t-s" x="190" y="285">앞에서부터 func를 부른다. 배타 대기자를 하나 깨우면 거기서 멈춘다 (A, B, C)</text>
+  <text class="t-mono t-b" x="34" y="309">wake_up_all(&amp;wq)</text>
+  <text class="t-s" x="190" y="309">끝까지 간다 (A, B, C, D)</text>
+</svg></div><figcaption><b>그림 3-4</b>대기 큐의 구조. 항목은 리스트로 이어지고, 배타 대기자는 뒤쪽에 모입니다.</figcaption></figure>
+<p>앞 절의 잠드는 순서를 대기 큐와 엮은 것이 <code>wait_event()</code> 계열 매크로입니다. 속은 이 매크로 하나입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/wait.h#L302" rel="noopener" target="_blank">include/linux/wait.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/wait.h" data-line="302" id="cb6"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb6-1"><span class="pp">#define ___wait_event</span><span class="op">(</span><span class="pp">wq_head</span><span class="op">,</span><span class="pp"> condition</span><span class="op">,</span><span class="pp"> state</span><span class="op">,</span><span class="pp"> exclusive</span><span class="op">,</span><span class="pp"> ret</span><span class="op">,</span><span class="pp"> cmd</span><span class="op">)</span><span class="pp">       </span><span class="op">\</span></span>
+<span id="cb6-2"><span class="op">({</span><span class="pp">                                      </span><span class="op">\</span></span>
+<span id="cb6-3"><span class="pp">    __label__ __out</span><span class="op">;</span><span class="pp">                            </span><span class="op">\</span></span>
+<span id="cb6-4"><span class="pp">    </span><span class="kw">struct</span><span class="pp"> wait_queue_entry __wq_entry</span><span class="op">;</span><span class="pp">                 </span><span class="op">\</span></span>
+<span id="cb6-5"><span class="pp">    </span><span class="dt">long</span><span class="pp"> __ret </span><span class="op">=</span><span class="pp"> ret</span><span class="op">;</span><span class="pp">   </span><span class="co">/* explicit shadow */</span><span class="pp">               </span><span class="op">\</span></span>
+<span id="cb6-6"><span class="pp">                                        </span><span class="op">\</span></span>
+<span id="cb6-7"><span class="pp">    init_wait_entry</span><span class="op">(&amp;</span><span class="pp">__wq_entry</span><span class="op">,</span><span class="pp"> exclusive </span><span class="op">?</span><span class="pp"> WQ_FLAG_EXCLUSIVE </span><span class="op">:</span><span class="pp"> </span><span class="dv">0</span><span class="op">);</span><span class="pp">    </span><span class="op">\</span></span>
+<span id="cb6-8"><span class="pp">    </span><span class="cf">for</span><span class="pp"> </span><span class="op">(;;)</span><span class="pp"> </span><span class="op">{</span><span class="pp">                              </span><span class="op">\</span></span>
+<span id="cb6-9"><span class="pp">        </span><span class="dt">long</span><span class="pp"> __int </span><span class="op">=</span><span class="pp"> prepare_to_wait_event</span><span class="op">(&amp;</span><span class="pp">wq_head</span><span class="op">,</span><span class="pp"> </span><span class="op">&amp;</span><span class="pp">__wq_entry</span><span class="op">,</span><span class="pp"> state</span><span class="op">);\</span></span>
+<span id="cb6-10"><span class="pp">                                        </span><span class="op">\</span></span>
+<span id="cb6-11"><span class="pp">        </span><span class="cf">if</span><span class="pp"> </span><span class="op">(</span><span class="pp">condition</span><span class="op">)</span><span class="pp">                          </span><span class="op">\</span></span>
+<span id="cb6-12"><span class="pp">            </span><span class="cf">break</span><span class="op">;</span><span class="pp">                          </span><span class="op">\</span></span>
+<span id="cb6-13"><span class="pp">                                        </span><span class="op">\</span></span>
+<span id="cb6-14"><span class="pp">        </span><span class="cf">if</span><span class="pp"> </span><span class="op">(</span><span class="pp">___wait_is_interruptible</span><span class="op">(</span><span class="pp">state</span><span class="op">)</span><span class="pp"> </span><span class="op">&amp;&amp;</span><span class="pp"> __int</span><span class="op">)</span><span class="pp"> </span><span class="op">{</span><span class="pp">         </span><span class="op">\</span></span>
+<span id="cb6-15"><span class="pp">            __ret </span><span class="op">=</span><span class="pp"> __int</span><span class="op">;</span><span class="pp">                      </span><span class="op">\</span></span>
+<span id="cb6-16"><span class="pp">            </span><span class="cf">goto</span><span class="pp"> __out</span><span class="op">;</span><span class="pp">                     </span><span class="op">\</span></span>
+<span id="cb6-17"><span class="pp">        </span><span class="op">}</span><span class="pp">                               </span><span class="op">\</span></span>
+<span id="cb6-18"><span class="pp">                                        </span><span class="op">\</span></span>
+<span id="cb6-19"><span class="pp">        cmd</span><span class="op">;</span><span class="pp">                                </span><span class="op">\</span></span>
+<span id="cb6-20"><span class="pp">                                        </span><span class="op">\</span></span>
+<span id="cb6-21"><span class="pp">        </span><span class="cf">if</span><span class="pp"> </span><span class="op">(</span><span class="pp">condition</span><span class="op">)</span><span class="pp">                          </span><span class="op">\</span></span>
+<span id="cb6-22"><span class="pp">            </span><span class="cf">break</span><span class="op">;</span><span class="pp">                          </span><span class="op">\</span></span>
+<span id="cb6-23"><span class="pp">    </span><span class="op">}</span><span class="pp">                                   </span><span class="op">\</span></span>
+<span id="cb6-24"><span class="pp">    finish_wait</span><span class="op">(&amp;</span><span class="pp">wq_head</span><span class="op">,</span><span class="pp"> </span><span class="op">&amp;</span><span class="pp">__wq_entry</span><span class="op">);</span><span class="pp">                 </span><span class="op">\</span></span>
+<span id="cb6-25"><span class="pp">__out</span><span class="op">:</span><span class="pp">  __ret</span><span class="op">;</span><span class="pp">                                  </span><span class="op">\</span></span>
+<span id="cb6-26"><span class="op">})</span></span></code></pre></div></div>
+<p>앞에서 본 세 단계가 그대로 있습니다. <code>prepare_to_wait_event()</code>가 항목을 큐에 매달고 <code>set_current_state(state)</code>를 부릅니다(①). 이어 <code>condition</code>을 확인하고(②), 거짓이면 <code>cmd</code>, 곧 <code>schedule()</code>을 실행합니다(③). 깨어나면 루프의 처음으로 돌아가 조건을 다시 봅니다. 깨어났다고 조건이 참이라는 보장은 없기 때문입니다. 다른 태스크가 먼저 채 갔을 수도 있고, 다른 이유로 깨워졌을 수도 있습니다. <code>wait_event(wq, cond)</code>는 이 매크로를 <code>TASK_UNINTERRUPTIBLE</code>과 <code>schedule()</code>로 부른 것이고, <code>wait_event_interruptible()</code>은 <code>TASK_INTERRUPTIBLE</code>로 부른 것입니다.</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p>잠드는 순서는 한 줄만 어긋나도 "백만 번에 한 번 멈추는" 버그가 됩니다. 그런 규약을 호출하는 사람마다 손으로 쓰게 두면 누군가는 틀립니다. 커널은 규약 전체를 <code>wait_event(wq, 조건)</code> 한 줄로 감쌌습니다. 호출하는 쪽은 "무엇을 기다리는가"만 쓰고, "어떤 순서로 잠드는가"는 매크로가 맡습니다. 조건을 인자로 받아 루프 안에서 다시 평가한다는 점도 설계의 일부입니다. 틀리기 쉬운 순서가 있으면 문서로 경고하기 전에 그 순서를 한곳에 가두어, 틀릴 수 없는 인터페이스를 만드는 편이 낫습니다. 락을 쥐고 푸는 순서를 감싼 <code>guard()</code>도 같은 발상입니다(<a href="ch25.html">25장</a>).</p>
+</div>
+<section class="level3" id="누구를-깨우는가">
+<h3>누구를 깨우는가</h3>
+<p>깨우는 쪽은 <code>wake_up(&amp;wq)</code>을 부릅니다. 속은 리스트를 도는 반복문입니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/wait.c#L93" rel="noopener" target="_blank">kernel/sched/wait.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/wait.c" data-line="93" id="cb7"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb7-1"><span class="dt">static</span> <span class="dt">int</span> __wake_up_common<span class="op">(</span><span class="kw">struct</span> wait_queue_head <span class="op">*</span>wq_head<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span> mode<span class="op">,</span></span>
+<span id="cb7-2">            <span class="dt">int</span> nr_exclusive<span class="op">,</span> <span class="dt">int</span> wake_flags<span class="op">,</span> <span class="dt">void</span> <span class="op">*</span>key<span class="op">)</span></span>
+<span id="cb7-3"><span class="op">{</span></span>
+<span id="cb7-4">    wait_queue_entry_t <span class="op">*</span>curr<span class="op">,</span> <span class="op">*</span>next<span class="op">;</span></span>
+<span id="cb7-5"></span>
+<span id="cb7-6">    lockdep_assert_held<span class="op">(&amp;</span>wq_head<span class="op">-&gt;</span>lock<span class="op">);</span></span>
+<span id="cb7-7"></span>
+<span id="cb7-8">    curr <span class="op">=</span> list_first_entry<span class="op">(&amp;</span>wq_head<span class="op">-&gt;</span>head<span class="op">,</span> wait_queue_entry_t<span class="op">,</span> entry<span class="op">);</span></span>
+<span id="cb7-9"></span>
+<span id="cb7-10">    <span class="cf">if</span> <span class="op">(&amp;</span>curr<span class="op">-&gt;</span>entry <span class="op">==</span> <span class="op">&amp;</span>wq_head<span class="op">-&gt;</span>head<span class="op">)</span></span>
+<span id="cb7-11">        <span class="cf">return</span> nr_exclusive<span class="op">;</span></span>
+<span id="cb7-12"></span>
+<span id="cb7-13">    list_for_each_entry_safe_from<span class="op">(</span>curr<span class="op">,</span> next<span class="op">,</span> <span class="op">&amp;</span>wq_head<span class="op">-&gt;</span>head<span class="op">,</span> entry<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb7-14">        <span class="dt">unsigned</span> flags <span class="op">=</span> curr<span class="op">-&gt;</span>flags<span class="op">;</span></span>
+<span id="cb7-15">        <span class="dt">int</span> ret<span class="op">;</span></span>
+<span id="cb7-16"></span>
+<span id="cb7-17">        ret <span class="op">=</span> curr<span class="op">-&gt;</span>func<span class="op">(</span>curr<span class="op">,</span> mode<span class="op">,</span> wake_flags<span class="op">,</span> key<span class="op">);</span></span>
+<span id="cb7-18">        <span class="cf">if</span> <span class="op">(</span>ret <span class="op">&lt;</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb7-19">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb7-20">        <span class="cf">if</span> <span class="op">(</span>ret <span class="op">&amp;&amp;</span> <span class="op">(</span>flags <span class="op">&amp;</span> WQ_FLAG_EXCLUSIVE<span class="op">)</span> <span class="op">&amp;&amp;</span> <span class="op">!--</span>nr_exclusive<span class="op">)</span></span>
+<span id="cb7-21">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb7-22">    <span class="op">}</span></span>
+<span id="cb7-23"></span>
+<span id="cb7-24">    <span class="cf">return</span> nr_exclusive<span class="op">;</span></span>
+<span id="cb7-25"><span class="op">}</span></span></code></pre></div></div>
+<p>항목마다 <code>func</code>를 부르고, 배타 대기자를 <code>nr_exclusive</code>개 깨우면 멈춥니다. <code>wake_up()</code>은 이 값을 1로, <code>wake_up_all()</code>은 0(제한 없음)으로 넘깁니다. 배타 대기자는 큐의 뒤쪽에 넣으므로, <code>wake_up()</code> 한 번은 비배타 대기자 전부와 배타 대기자 하나를 깨웁니다.</p>
+<p><strong>배타 대기</strong>(exclusive wait)가 있는 까닭은 떼로 깨어나는 문제입니다. 워커 스레드 백 개가 같은 리스닝 소켓에서 <code>accept()</code>를 기다린다고 합시다. 연결 하나가 들어왔을 때 백 개를 다 깨우면, 하나만 연결을 얻고 아흔아홉은 조건을 다시 확인한 뒤 도로 잠듭니다. 아흔아홉 번의 컨텍스트 스위치가 낭비입니다. <code>accept()</code>는 배타로 기다리므로(<code>inet_csk_wait_for_connect()</code>) 연결 하나에 하나만 깨어납니다.</p>
+<p><code>func</code>가 함수 포인터라는 점도 쓸모가 있습니다. 기본값인 <code>default_wake_function()</code>은 태스크를 깨우지만, <code>epoll</code>은 여기에 자기 콜백을 걸어 "깨우는 대신 준비 목록에 넣기"를 합니다. 대기 큐가 "사건이 생기면 불러 주는 콜백 목록"으로도 쓰이는 것입니다.</p>
+<p>대기 큐보다 단순한 도구도 있습니다. <a href="ch01.html">1장</a>의 <code>vfork</code>에서 본 <strong>completion</strong>은 "한 번 끝난다"는 사건 전용입니다. 카운터 하나와 단순 대기 큐(<code>swait</code>) 하나로 되어 있고, <code>complete()</code>가 카운터를 올린 뒤 깨우므로 <code>wait_for_completion()</code>이 나중에 불려도 놓치지 않습니다.</p>
+</section>
+</section>
+<section class="level2" id="wakeup">
+<h2><span class="sec-n">3.5</span>깨우는 쪽<a aria-label="이 절의 링크" class="anchor" href="#wakeup">#</a></h2>
+<p><code>default_wake_function()</code>이 부르는 것이 <code>try_to_wake_up()</code>입니다. 잠든 태스크를 깨우는 길은 모두 이 함수로 모입니다. 주석은 하는 일을 한 줄로 적습니다. <code>@state &amp; @p-&gt;state</code>이면 <code>@p-&gt;state = TASK_RUNNING</code>.</p>
+<figure class="fig" id="fig-ttwu-path"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 348" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>깨우는 길: wake_up()이 대기 큐의 항목마다 func를 부르고, func는 try_to_wake_up()을 부른다. try_to_wake_up()은 pi_lock을 잡고, 상태를 확인하고, 아직 런큐에 있으면 상태만 고치고, 아니면 CPU를 골라 그 런큐에 태스크를 넣는다.</title>
+
+  <!-- 위: 대기 큐에서 ttwu까지 -->
+  <rect class="box yellow" x="20" y="16" width="120" height="44" rx="10"/>
+  <text class="t-code t-b mid" x="80" y="43">wake_up(&amp;wq)</text>
+  <path class="ln" d="M140 38 H160" marker-end="url(#ah)"/>
+  <rect class="box yellow" x="164" y="16" width="160" height="44" rx="10"/>
+  <text class="t-code t-b mid" x="244" y="36">__wake_up_common()</text>
+  <text class="t-xs mid" x="244" y="53">리스트를 돌며</text>
+  <path class="ln" d="M324 38 H344" marker-end="url(#ah)"/>
+  <rect class="box yellow" x="348" y="16" width="190" height="44" rx="10"/>
+  <text class="t-code t-b mid" x="443" y="36">entry의 func</text>
+  <text class="t-xs mid" x="443" y="53">보통 default_wake_function()</text>
+  <path class="ln" d="M538 38 H558" marker-end="url(#ah)"/>
+  <rect class="solid" x="562" y="16" width="178" height="44" rx="10"/>
+  <text class="t-code t-b t-on mid" x="651" y="43">try_to_wake_up()</text>
+  <path class="ln" d="M651 60 V82" marker-end="url(#ah)"/>
+
+  <!-- 아래: ttwu의 단계 -->
+  <rect class="panel" x="20" y="86" width="720" height="246" rx="14"/>
+
+  <rect class="box" x="34" y="100" width="300" height="38" rx="8"/>
+  <text class="t-b" x="46" y="124">① 태스크의 pi_lock을 잡는다</text>
+  <text class="t-s" x="348" y="124">같은 태스크를 여럿이 동시에 깨우는 일을 막는다</text>
+
+  <rect class="box" x="34" y="146" width="300" height="38" rx="8"/>
+  <text class="t-b" x="46" y="170">② 상태가 맞는지 본다</text>
+  <text class="t-s" x="348" y="170">__state와 state에 겹치는 비트가 없으면 그만둔다</text>
+
+  <rect class="box green" x="34" y="192" width="300" height="38" rx="8"/>
+  <text class="t-b" x="46" y="216">③ 아직 런큐에 있는가</text>
+  <text class="t-s" x="348" y="216">있으면 상태만 TASK_RUNNING으로 고치고 끝낸다</text>
+
+  <rect class="box blue" x="34" y="238" width="300" height="38" rx="8"/>
+  <text class="t-b" x="46" y="262">④ TASK_WAKING, CPU 고르기</text>
+  <text class="t-s" x="348" y="262">select_task_rq()가 깨울 CPU를 정한다 (7장)</text>
+
+  <rect class="box blue" x="34" y="284" width="300" height="38" rx="8"/>
+  <text class="t-b" x="46" y="308">⑤ 런큐에 넣고 TASK_RUNNING</text>
+  <text class="t-s" x="348" y="308">현재 태스크를 선점할지도 여기서 정한다 (6장)</text>
+</svg></div><figcaption><b>그림 3-5</b>대기 큐에서 <code>try_to_wake_up()</code>까지, 그리고 그 안의 다섯 단계.</figcaption></figure>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/sched/core.c#L4274" rel="noopener" target="_blank">kernel/sched/core.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/sched/core.c" data-line="4274" id="cb8"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb8-1"><span class="dt">int</span> try_to_wake_up<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">int</span> state<span class="op">,</span> <span class="dt">int</span> wake_flags<span class="op">)</span></span>
+<span id="cb8-2"><span class="op">{</span></span>
+<span id="cb8-3">    guard<span class="op">(</span>preempt<span class="op">)();</span></span>
+<span id="cb8-4">    <span class="dt">int</span> cpu<span class="op">,</span> success <span class="op">=</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb8-5">    <span class="co">/* ... */</span></span>
+<span id="cb8-6">    scoped_guard <span class="op">(</span>raw_spinlock_irqsave<span class="op">,</span> <span class="op">&amp;</span>p<span class="op">-&gt;</span>pi_lock<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb8-7">        <span class="co">/* ... */</span></span>
+<span id="cb8-8">        smp_mb__after_spinlock<span class="op">();</span></span>
+<span id="cb8-9"></span>
+<span id="cb8-10">        <span class="cf">if</span> <span class="op">(!</span>ttwu_state_match<span class="op">(</span>p<span class="op">,</span> state<span class="op">,</span> <span class="op">&amp;</span>success<span class="op">))</span></span>
+<span id="cb8-11">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb8-12"></span>
+<span id="cb8-13">        trace_sched_waking<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb8-14">        <span class="co">/* ... */</span></span>
+<span id="cb8-15">        smp_rmb<span class="op">();</span></span>
+<span id="cb8-16">        <span class="cf">if</span> <span class="op">(</span>READ_ONCE<span class="op">(</span>p<span class="op">-&gt;</span>on_rq<span class="op">)</span> <span class="op">&amp;&amp;</span> ttwu_runnable<span class="op">(</span>p<span class="op">,</span> wake_flags<span class="op">))</span></span>
+<span id="cb8-17">            <span class="cf">break</span><span class="op">;</span></span>
+<span id="cb8-18">        <span class="co">/* ... */</span></span>
+<span id="cb8-19">        WRITE_ONCE<span class="op">(</span>p<span class="op">-&gt;</span>__state<span class="op">,</span> TASK_WAKING<span class="op">);</span></span>
+<span id="cb8-20">        <span class="co">/* ... */</span></span>
+<span id="cb8-21">        cpu <span class="op">=</span> select_task_rq<span class="op">(</span>p<span class="op">,</span> p<span class="op">-&gt;</span>wake_cpu<span class="op">,</span> <span class="op">&amp;</span>wake_flags<span class="op">);</span></span>
+<span id="cb8-22">        <span class="co">/* ... */</span></span>
+<span id="cb8-23">        ttwu_queue<span class="op">(</span>p<span class="op">,</span> cpu<span class="op">,</span> wake_flags<span class="op">);</span></span>
+<span id="cb8-24">    <span class="op">}</span></span>
+<span id="cb8-25">    <span class="co">/* ... */</span></span>
+<span id="cb8-26"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 네 군데입니다.</p>
+<ul>
+<li>인자 <code>state</code>는 "어떤 잠을 깨울 것인가"의 마스크입니다. <code>wake_up()</code>은 <code>TASK_NORMAL</code>(S와 D)을 넘깁니다. 태스크의 <code>__state</code>와 겹치는 비트가 없으면 <code>ttwu_state_match()</code>가 거짓을 돌려주고 아무 일도 하지 않습니다. 이미 깨어 있는 태스크를 깨워도 해가 없는 이유입니다.</li>
+<li><code>p-&gt;on_rq</code>가 아직 1이면 태스크는 상태만 바꿨을 뿐 런큐에서 빠지지 않았습니다. 앞의 그림 3-3 오른쪽이 이 경우입니다. <code>ttwu_runnable()</code>이 상태만 <code>TASK_RUNNING</code>으로 되돌리고 끝냅니다.</li>
+<li>런큐에서 빠진 태스크라면 <code>select_task_rq()</code>로 깨울 CPU를 고릅니다. 잠들기 전의 CPU일 수도 있고 다른 CPU일 수도 있습니다(<a href="ch07.html">7장</a>).</li>
+<li><code>ttwu_queue()</code>가 그 CPU의 런큐에 넣고 <code>TASK_RUNNING</code>으로 바꿉니다.</li>
+</ul>
+<p>깨운다는 것은 <strong>런큐에 넣는다</strong>는 뜻이지 CPU를 준다는 뜻이 아닙니다. 깨어난 태스크가 언제 실제로 도는지는 스케줄러가 정합니다. 그리고 이 함수는 인터럽트 핸들러에서도 불립니다. 디스크가 읽기를 마쳤다는 인터럽트, 패킷이 도착했다는 인터럽트가 기다리던 태스크를 깨우는 것이 바로 이 길입니다. 그래서 <code>pi_lock</code>은 인터럽트를 끄고 잡는 스핀락입니다.</p>
+</section>
+<section class="level2" id="signals">
+<h2><span class="sec-n">3.6</span>시그널이 깨우는 잠, 깨우지 못하는 잠<a aria-label="이 절의 링크" class="anchor" href="#signals">#</a></h2>
+<p>잠에는 두 가지가 있습니다. <code>TASK_INTERRUPTIBLE</code>(S)은 기다리던 사건이 오거나 <strong>시그널이 오면</strong> 깨어납니다. <code>TASK_UNINTERRUPTIBLE</code>(D)은 기다리던 사건이 올 때까지 무슨 일이 있어도 잡니다.</p>
+<p>시그널을 보내는 쪽은 대상 태스크에 <code>TIF_SIGPENDING</code> 플래그를 세우고 <code>wake_up_state()</code>를 부릅니다. 넘기는 마스크는 <code>TASK_INTERRUPTIBLE</code>이고, 치명적 시그널이면 <code>TASK_WAKEKILL</code>이 더해집니다. D로 잠든 태스크는 이 마스크에 걸리지 않으므로 깨어나지 않습니다. 잠드는 쪽에서는 앞에서 본 <code>try_to_block_task()</code>와 <code>prepare_to_wait_event()</code>가 이 함수로 "이미 와 있는 시그널"을 확인합니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/include/linux/sched/signal.h#L409" rel="noopener" target="_blank">include/linux/sched/signal.h</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="include/linux/sched/signal.h" data-line="409" id="cb9"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb9-1"><span class="dt">static</span> <span class="kw">inline</span> <span class="dt">int</span> signal_pending_state<span class="op">(</span><span class="dt">unsigned</span> <span class="dt">int</span> state<span class="op">,</span> <span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">)</span></span>
+<span id="cb9-2"><span class="op">{</span></span>
+<span id="cb9-3">    <span class="cf">if</span> <span class="op">(!(</span>state <span class="op">&amp;</span> <span class="op">(</span>TASK_INTERRUPTIBLE <span class="op">|</span> TASK_WAKEKILL<span class="op">)))</span></span>
+<span id="cb9-4">        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb9-5">    <span class="cf">if</span> <span class="op">(!</span>signal_pending<span class="op">(</span>p<span class="op">))</span></span>
+<span id="cb9-6">        <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb9-7"></span>
+<span id="cb9-8">    <span class="cf">return</span> <span class="op">(</span>state <span class="op">&amp;</span> TASK_INTERRUPTIBLE<span class="op">)</span> <span class="op">||</span> __fatal_signal_pending<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb9-9"><span class="op">}</span></span></code></pre></div></div>
+<p>시그널에 깨어난 커널 코드는 하던 일을 접고 <code>-ERESTARTSYS</code>를 들고 유저 모드 쪽으로 나갑니다. 나가는 길에 시그널 핸들러가 실행되고, 그 뒤 시스템 콜을 다시 걸지 <code>EINTR</code>로 실패시킬지가 정해집니다. 다시 거는 방법은 <a href="ch01.html">1장</a>에서 본 요령입니다. <code>pt_regs</code>의 명령어 포인터를 2바이트 뒤로 물려(<code>regs-&gt;ip -= 2</code>) <code>syscall</code> 명령어를 한 번 더 실행하게 합니다.</p>
+<p>그렇다면 왜 D가 있을까요. 하던 일을 중간에 접을 수 없는 코드가 있기 때문입니다. 파일시스템이 디스크 블록 여러 개를 고치는 도중이라면, 시그널이 왔다고 반쯤 고친 채 돌아갈 수는 없습니다. 그런 곳은 D로 기다립니다. 대신 값을 치릅니다. 기다리던 사건이 끝내 오지 않으면, 예컨대 저장 장치가 응답을 멈추면, 그 태스크는 <code>kill -9</code>로도 죽지 않습니다. <code>SIGKILL</code>도 시그널이기 때문입니다.</p>
+<p><code>TASK_KILLABLE</code>이 이 문제를 줄였습니다. D에 <code>TASK_WAKEKILL</code> 비트를 더한 것으로, 보통 시그널은 무시하되 <strong>태스크를 죽일 시그널</strong>에는 깨어납니다. 위 함수의 마지막 줄이 그 판정입니다. 치명적 시그널을 받은 태스크는 유저 코드로 돌아가지 않고 곧 죽을 것이므로, 커널 코드는 "이어 갈 수 있게 되돌리기"가 아니라 "쥔 것을 놓고 빠져나오기"만 하면 됩니다. 되돌리기보다 훨씬 쉬운 일이라, 예전에는 D로만 기다릴 수 있던 많은 자리가 <code>TASK_KILLABLE</code>로 바뀌었습니다.</p>
+<div class="table-wrap"><table style="width:100%;">
+<colgroup>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+<col style="width: 16%"/>
+</colgroup>
+<thead>
+<tr>
+<th>잠의 종류</th>
+<th><code>ps</code></th>
+<th>보통 시그널</th>
+<th><code>SIGKILL</code></th>
+<th>부하 평균에 포함</th>
+<th>hung task 검사</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TASK_INTERRUPTIBLE</code></td>
+<td>S</td>
+<td>깨운다</td>
+<td>깨운다</td>
+<td>아니오</td>
+<td>안 함</td>
+</tr>
+<tr>
+<td><code>TASK_UNINTERRUPTIBLE</code></td>
+<td>D</td>
+<td>못 깨운다</td>
+<td>못 깨운다</td>
+<td>예</td>
+<td>한다</td>
+</tr>
+<tr>
+<td><code>TASK_KILLABLE</code></td>
+<td>D</td>
+<td>못 깨운다</td>
+<td>깨운다</td>
+<td>예</td>
+<td>안 함</td>
+</tr>
+<tr>
+<td><code>TASK_IDLE</code></td>
+<td>I</td>
+<td>못 깨운다</td>
+<td>못 깨운다</td>
+<td>아니오</td>
+<td>안 함</td>
+</tr>
+</tbody>
+</table></div>
+<p>표의 오른쪽 두 열이 D 상태의 부작용입니다.</p>
+<div class="callout myth"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-cross"></use></svg>흔한 오해</div>
+<p>"load average는 CPU 사용률이다." 리눅스의 부하 평균은 실행 가능한 태스크 수에 <strong>D 상태로 잠든 태스크 수를 더해</strong> 평균한 값입니다(<code>kernel/sched/loadavg.c</code>). CPU는 한가한데 디스크나 NFS가 막혀 태스크 수십 개가 D로 쌓이면 부하 평균은 수십이 됩니다. 부하 평균이 높을 때는 <code>ps</code>에서 R이 많은지 D가 많은지부터 봐야 합니다. 일감을 기다리며 쉬는 커널 스레드가 이 숫자를 부풀리지 않도록 만든 것이 <code>TASK_NOLOAD</code> 비트와 <code>TASK_IDLE</code>입니다.</p>
+</div>
+<p>D로 너무 오래 잠든 태스크는 커널이 알려 줍니다. <code>khungtaskd</code>라는 커널 스레드가 주기적으로 태스크를 훑습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/hung_task.c#L103" rel="noopener" target="_blank">kernel/hung_task.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/hung_task.c" data-line="103" id="cb10"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb10-1"><span class="dt">static</span> <span class="dt">bool</span> task_is_hung<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>t<span class="op">,</span> <span class="dt">unsigned</span> <span class="dt">long</span> timeout<span class="op">)</span></span>
+<span id="cb10-2"><span class="op">{</span></span>
+<span id="cb10-3">    <span class="dt">unsigned</span> <span class="dt">long</span> switch_count <span class="op">=</span> t<span class="op">-&gt;</span>nvcsw <span class="op">+</span> t<span class="op">-&gt;</span>nivcsw<span class="op">;</span></span>
+<span id="cb10-4">    <span class="dt">unsigned</span> <span class="dt">int</span> state <span class="op">=</span> READ_ONCE<span class="op">(</span>t<span class="op">-&gt;</span>__state<span class="op">);</span></span>
+<span id="cb10-5"></span>
+<span id="cb10-6">    <span class="co">/*</span></span>
+<span id="cb10-7"><span class="co">     * skip the TASK_KILLABLE tasks -- these can be killed</span></span>
+<span id="cb10-8"><span class="co">     * skip the TASK_IDLE tasks -- those are genuinely idle</span></span>
+<span id="cb10-9"><span class="co">     * skip the TASK_FROZEN task -- it reasonably stops scheduling by freezer</span></span>
+<span id="cb10-10"><span class="co">     */</span></span>
+<span id="cb10-11">    <span class="cf">if</span> <span class="op">(!(</span>state <span class="op">&amp;</span> TASK_UNINTERRUPTIBLE<span class="op">)</span> <span class="op">||</span></span>
+<span id="cb10-12">        <span class="op">(</span>state <span class="op">&amp;</span> <span class="op">(</span>TASK_WAKEKILL <span class="op">|</span> TASK_NOLOAD <span class="op">|</span> TASK_FROZEN<span class="op">)))</span></span>
+<span id="cb10-13">        <span class="cf">return</span> <span class="kw">false</span><span class="op">;</span></span>
+<span id="cb10-14">    <span class="co">/* ... */</span></span>
+<span id="cb10-15"><span class="op">}</span></span></code></pre></div></div>
+<p>수식 비트가 붙지 않은 순수한 D이고, 컨텍스트 스위치 횟수가 <code>hung_task_timeout_secs</code>(기본 120초) 동안 그대로이면 "task ... blocked for more than 120 seconds"라는 메시지와 함께 스택을 찍습니다. 이 메시지는 대개 디스크나 네트워크 저장소가 응답하지 않거나, 락을 쥔 태스크가 멈췄다는 신호입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>잠든 태스크가 <strong>어디서</strong> 자는지 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ ps -eo pid,stat,wchan:24,comm | awk 'NR==1 || $2 ~ /^[DZ]/'
+    PID STAT WCHAN                    COMMAND
+   4127 D    folio_wait_bit_common    dd
+  41533 Z    -                        zombie
+
+# cat /proc/4127/stack
+[&lt;0&gt;] folio_wait_bit_common+0x13d/0x350
+[&lt;0&gt;] filemap_read+0x...
+...
+
+$ cat /proc/loadavg
+3.05 2.11 1.40 2/1289 41612
+$ cat /proc/sys/kernel/hung_task_timeout_secs
+120</code></pre></div>
+<p>출력은 예시입니다. <code>WCHAN</code> 열은 태스크가 잠든 커널 함수이고, <code>/proc/&lt;pid&gt;/stack</code>은 거기까지의 호출 경로입니다(root 권한 필요). <code>/proc/loadavg</code>의 네 번째 칸 <code>2/1289</code>는 지금 실행 가능한 태스크 수와 전체 태스크 수입니다.</p>
+<p>상태별로 얼마나 자주 CPU를 내놓는지는 <code>sched_switch</code> 추적점의 <code>prev_state</code>로 셉니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code># bpftrace -e 'tracepoint:sched:sched_switch { @[args.prev_state] = count(); }'
+^C
+@[2]: 311
+@[128]: 5120
+@[256]: 9034
+@[0]: 12077
+@[1]: 48213</code></pre></div>
+<p>키는 <code>ps</code> 글자와 같은 비트입니다. 1은 S, 2는 D, 128은 I이고, 0은 <code>TASK_RUNNING</code>인 채 스스로 양보한 경우, 256은 선점당한 경우입니다.</p>
+</div>
+</section>
+<section class="level2" id="stopped">
+<h2><span class="sec-n">3.7</span>멈춤, 주차, 얼림<a aria-label="이 절의 링크" class="anchor" href="#stopped">#</a></h2>
+<p>잠과 닮았지만 "조건을 기다리는" 것이 아닌 상태들이 있습니다. 누가 풀어 줄 때까지 서 있는 상태입니다.</p>
+<ul>
+<li><strong>멈춤(T).</strong> <code>SIGSTOP</code>이나 셸의 Ctrl-Z를 받은 태스크는 <code>TASK_STOPPED</code>가 됩니다. <code>SIGCONT</code>를 보내는 쪽이 <code>wake_up_state(t, __TASK_STOPPED)</code>로 풉니다. <code>TASK_STOPPED</code>에는 <code>TASK_WAKEKILL</code>이 들어 있어서, 멈춘 프로세스도 <code>SIGKILL</code>로는 죽습니다.</li>
+<li><strong>추적 멈춤(t).</strong> <code>gdb</code>나 <code>strace</code> 같은 추적 도구가 <code>ptrace</code>로 붙은 태스크는 중단점이나 시스템 콜 경계에서 <code>TASK_TRACED</code>로 섭니다. 추적 도구가 계속하라고 할 때까지입니다.</li>
+<li><strong>주차(P).</strong> CPU별 커널 스레드는 자기 CPU가 꺼질 때 종료하는 대신 <code>TASK_PARKED</code>로 서 있다가, CPU가 다시 켜지면 이어서 돕니다.</li>
+<li><strong>얼림.</strong> 시스템을 절전 상태로 보낼 때 프리저가 태스크들을 <code>TASK_FROZEN</code>으로 만듭니다. 잠들 때 <code>TASK_FREEZABLE</code>을 붙여 둔 태스크는 깨울 필요 없이 그 자리에서 얼릴 수 있습니다.</li>
+</ul>
+<p>이 상태들은 조건 루프를 돌지 않으므로 <code>set_current_state()</code> 대신 <code>set_special_state()</code>로 들어갑니다. 이 매크로는 <code>pi_lock</code>을 쥐고 상태를 씁니다. 앞에서 본 것처럼 깨우는 쪽은 뒤늦게 <code>TASK_RUNNING</code>을 덮어쓸 수 있는데, 조건 루프가 없는 코드는 그 덮어쓰기를 "한 바퀴 더 돌면 그만"으로 넘길 수 없기 때문입니다.</p>
+</section>
+<section class="level2" id="exit">
+<h2><span class="sec-n">3.8</span>종료와 좀비<a aria-label="이 절의 링크" class="anchor" href="#exit">#</a></h2>
+<p>태스크는 <code>exit()</code>를 부르거나 치명적 시그널을 받아 끝납니다. 어느 쪽이든 <code>do_exit()</code>(<code>kernel/exit.c</code>)로 옵니다. 만들 때의 <code>copy_process()</code>를 거꾸로 돌린 것과 비슷합니다.</p>
+<figure class="fig" id="fig-exit-timeline"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 388" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>태스크가 죽어서 사라지기까지: do_exit()가 주소 공간과 파일을 놓고, exit_notify()가 태스크를 좀비로 만들어 부모에게 SIGCHLD를 보낸다. 마지막 스위치에서 커널 스택을 놓고, 부모가 wait4()를 부르면 release_task()가 PID를 놓으며, task_struct 메모리는 RCU 유예 기간이 지난 뒤에 풀린다.</title>
+
+  <!-- 시점 안내선 -->
+  <path class="ln thin muted dash" d="M210 30 V292"/>
+  <path class="ln thin muted dash" d="M350 30 V292"/>
+  <path class="ln thin muted dash" d="M410 30 V292"/>
+  <path class="ln thin muted dash" d="M560 30 V292"/>
+  <path class="ln thin muted dash" d="M670 30 V292"/>
+  <text class="t-xs t-ink t-b mid" x="210" y="22">①</text>
+  <text class="t-xs t-ink t-b mid" x="350" y="22">②</text>
+  <text class="t-xs t-ink t-b mid" x="410" y="22">③</text>
+  <text class="t-xs t-ink t-b mid" x="560" y="22">④</text>
+  <text class="t-xs t-ink t-b mid" x="670" y="22">⑤</text>
+
+  <!-- 죽는 태스크 -->
+  <text class="t-s t-ink t-b" x="20" y="60">죽는 태스크</text>
+  <rect class="box green" x="120" y="40" width="90" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="165" y="60">유저 코드</text>
+  <rect class="box yellow" x="210" y="40" width="200" height="30" rx="6"/>
+  <text class="t-code mid" x="310" y="60">do_exit()</text>
+  <rect class="box gray" x="410" y="40" width="150" height="30" rx="6"/>
+  <rect x="410" y="40" width="150" height="30" rx="6" fill="url(#hatch)"/>
+  <text class="t-xs" x="416" y="88">좀비. 다시는 실행되지 않는다</text>
+
+  <!-- 부모 -->
+  <text class="t-s t-ink t-b" x="20" y="130">부모</text>
+  <rect class="box blue" x="120" y="110" width="440" height="30" rx="6"/>
+  <text class="t-s t-ink mid" x="240" y="130">다른 일을 하는 중</text>
+  <rect class="box yellow" x="560" y="110" width="70" height="30" rx="6"/>
+  <text class="t-code mid" x="595" y="130">wait4()</text>
+  <rect class="box blue" x="630" y="110" width="110" height="30" rx="6"/>
+  <path class="ln thin warm" d="M350 70 V106" marker-end="url(#ah-warm)"/>
+  <text class="t-code tc-warm end" x="342" y="94">SIGCHLD</text>
+
+  <!-- 자원의 수명 -->
+  <text class="t-s t-ink t-b" x="20" y="178">mm, 파일</text>
+  <rect class="solid purple" x="120" y="166" width="170" height="16" rx="4"/>
+  <text class="t-s t-ink t-b" x="20" y="210">커널 스택</text>
+  <rect class="solid purple" x="120" y="198" width="290" height="16" rx="4"/>
+  <text class="t-s t-ink t-b" x="20" y="242">PID, 종료 코드</text>
+  <rect class="solid purple" x="120" y="230" width="440" height="16" rx="4"/>
+  <text class="t-s t-ink t-b" x="20" y="274">task_struct</text>
+  <rect class="solid purple" x="120" y="262" width="550" height="16" rx="4"/>
+
+  <!-- 시점 설명 -->
+  <text class="t-xs" x="20" y="316">① exit()를 부르거나 치명적 시그널을 받는다. do_exit() 안에서 mm, 파일, fs를 차례로 놓는다.</text>
+  <text class="t-xs" x="20" y="334">② exit_notify(): exit_state를 EXIT_ZOMBIE로 바꾸고 부모에게 SIGCHLD를 보낸다.</text>
+  <text class="t-xs" x="20" y="352">③ 마지막 schedule(). 스위치를 넘겨받은 다음 태스크가 죽은 태스크의 커널 스택을 놓는다.</text>
+  <text class="t-xs" x="20" y="370">④ 부모의 wait4()가 release_task()를 불러 PID를 놓는다.   ⑤ RCU 유예 기간 뒤 task_struct 메모리가 풀린다.</text>
+</svg></div><figcaption><b>그림 3-6</b>태스크가 쥔 것들은 한꺼번에 사라지지 않고 네 단계에 걸쳐 놓입니다. 보라색 막대가 각 자원이 살아 있는 구간입니다.</figcaption></figure>
+<p><code>do_exit()</code>의 순서는 이렇습니다.</p>
+<ol type="1">
+<li><code>exit_signals()</code>로 <code>PF_EXITING</code>을 세웁니다. 이 태스크는 더는 시그널을 받지 않습니다.</li>
+<li><code>exit_mm()</code>, <code>exit_files()</code>, <code>exit_fs()</code> 등으로 자원을 놓습니다. 참조 카운트를 내리고, 마지막 사용자였다면 해제합니다. 주소 공간이 여기서 사라집니다.</li>
+<li><code>exit_notify()</code>로 가족에게 알립니다.</li>
+<li><code>do_task_dead()</code>가 <code>__state</code>를 <code>TASK_DEAD</code>로 바꾸고 마지막 <code>schedule()</code>을 부릅니다. 이 호출은 돌아오지 않습니다.</li>
+</ol>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/exit.c#L748" rel="noopener" target="_blank">kernel/exit.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/exit.c" data-line="748" id="cb13"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb13-1"><span class="dt">static</span> <span class="dt">void</span> exit_notify<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>tsk<span class="op">,</span> <span class="dt">int</span> group_dead<span class="op">)</span></span>
+<span id="cb13-2"><span class="op">{</span></span>
+<span id="cb13-3">    <span class="dt">bool</span> autoreap<span class="op">;</span></span>
+<span id="cb13-4">    <span class="kw">struct</span> task_struct <span class="op">*</span>p<span class="op">,</span> <span class="op">*</span>n<span class="op">;</span></span>
+<span id="cb13-5">    LIST_HEAD<span class="op">(</span>dead<span class="op">);</span></span>
+<span id="cb13-6"></span>
+<span id="cb13-7">    write_lock_irq<span class="op">(&amp;</span>tasklist_lock<span class="op">);</span></span>
+<span id="cb13-8">    forget_original_parent<span class="op">(</span>tsk<span class="op">,</span> <span class="op">&amp;</span>dead<span class="op">);</span></span>
+<span id="cb13-9">    <span class="co">/* ... */</span></span>
+<span id="cb13-10">    tsk<span class="op">-&gt;</span>exit_state <span class="op">=</span> EXIT_ZOMBIE<span class="op">;</span></span>
+<span id="cb13-11"></span>
+<span id="cb13-12">    <span class="cf">if</span> <span class="op">(</span>unlikely<span class="op">(</span>tsk<span class="op">-&gt;</span>ptrace<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb13-13">        <span class="co">/* ... */</span></span>
+<span id="cb13-14">    <span class="op">}</span> <span class="cf">else</span> <span class="cf">if</span> <span class="op">(</span>thread_group_leader<span class="op">(</span>tsk<span class="op">))</span> <span class="op">{</span></span>
+<span id="cb13-15">        autoreap <span class="op">=</span> thread_group_empty<span class="op">(</span>tsk<span class="op">)</span> <span class="op">&amp;&amp;</span></span>
+<span id="cb13-16">               do_notify_parent<span class="op">(</span>tsk<span class="op">,</span> tsk<span class="op">-&gt;</span>exit_signal<span class="op">);</span></span>
+<span id="cb13-17">    <span class="op">}</span> <span class="cf">else</span> <span class="op">{</span></span>
+<span id="cb13-18">        autoreap <span class="op">=</span> <span class="kw">true</span><span class="op">;</span></span>
+<span id="cb13-19">        <span class="co">/* untraced sub-thread */</span></span>
+<span id="cb13-20">        do_notify_pidfd<span class="op">(</span>tsk<span class="op">);</span></span>
+<span id="cb13-21">    <span class="op">}</span></span>
+<span id="cb13-22"></span>
+<span id="cb13-23">    <span class="cf">if</span> <span class="op">(</span>autoreap<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb13-24">        tsk<span class="op">-&gt;</span>exit_state <span class="op">=</span> EXIT_DEAD<span class="op">;</span></span>
+<span id="cb13-25">        list_add<span class="op">(&amp;</span>tsk<span class="op">-&gt;</span>ptrace_entry<span class="op">,</span> <span class="op">&amp;</span>dead<span class="op">);</span></span>
+<span id="cb13-26">    <span class="op">}</span></span>
+<span id="cb13-27">    <span class="co">/* ... */</span></span>
+<span id="cb13-28">    write_unlock_irq<span class="op">(&amp;</span>tasklist_lock<span class="op">);</span></span>
+<span id="cb13-29"></span>
+<span id="cb13-30">    list_for_each_entry_safe<span class="op">(</span>p<span class="op">,</span> n<span class="op">,</span> <span class="op">&amp;</span>dead<span class="op">,</span> ptrace_entry<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb13-31">        list_del_init<span class="op">(&amp;</span>p<span class="op">-&gt;</span>ptrace_entry<span class="op">);</span></span>
+<span id="cb13-32">        release_task<span class="op">(</span>p<span class="op">);</span></span>
+<span id="cb13-33">    <span class="op">}</span></span>
+<span id="cb13-34"><span class="op">}</span></span></code></pre></div></div>
+<p>읽을 곳은 세 군데입니다.</p>
+<ul>
+<li><code>forget_original_parent()</code>가 먼저입니다. 죽는 태스크의 자식들에게 새 부모를 찾아 줍니다. 아래에서 봅니다.</li>
+<li><code>exit_state = EXIT_ZOMBIE</code>. 이 순간부터 태스크는 <strong>좀비</strong>(zombie)입니다. <code>do_notify_parent()</code>가 부모에게 <code>exit_signal</code>(보통 <code>SIGCHLD</code>)을 보내고 부모의 <code>wait</code> 대기 큐를 깨웁니다.</li>
+<li><code>autoreap</code>이 참이면 좀비 단계를 건너뛰고 곧바로 <code>release_task()</code>로 갑니다. 스레드 그룹의 리더가 아닌 스레드가 그렇고, 부모가 <code>SIGCHLD</code>를 무시하도록 해 둔 경우와 <a href="ch01.html">1장</a>의 <code>CLONE_AUTOREAP</code>로 만든 자식이 그렇습니다.</li>
+</ul>
+<p>좀비가 남는 이유는 부모에게 전할 것이 있기 때문입니다. 종료 코드와 그동안 쓴 자원의 통계입니다. 부모가 <code>wait4()</code>나 <code>waitid()</code>로 물어 올 때까지 누군가 그것을 들고 있어야 하고, PID도 그때까지는 다른 태스크에 다시 배정되면 안 됩니다. 좀비는 <code>task_struct</code>와 PID, 그리고 거기 딸린 작은 구조체 몇 개만 쥐고 있습니다. 주소 공간도 파일도 없고, 커널 스택도 마지막 컨텍스트 스위치 직후에 놓습니다. 그러니 좀비 하나는 메모리를 거의 쓰지 않습니다. 문제가 되는 것은 PID와 태스크 수 한도입니다.</p>
+<p>부모가 <code>wait4()</code>를 부르면 <code>wait_task_zombie()</code>가 <code>exit_state</code>를 <code>EXIT_ZOMBIE</code>에서 <code>EXIT_DEAD</code>로 바꾸고(여러 스레드가 동시에 거두지 못하도록 <code>cmpxchg</code>로), 종료 코드를 읽어 내고, <code>release_task()</code>를 부릅니다. <code>release_task()</code>는 PID를 반납하고 태스크를 모든 리스트에서 뗍니다. <code>task_struct</code> 메모리는 그 뒤에도 조금 더 남습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/exit.c#L238" rel="noopener" target="_blank">kernel/exit.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/exit.c" data-line="238" id="cb14"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb14-1"><span class="dt">void</span> put_task_struct_rcu_user<span class="op">(</span><span class="kw">struct</span> task_struct <span class="op">*</span>task<span class="op">)</span></span>
+<span id="cb14-2"><span class="op">{</span></span>
+<span id="cb14-3">    <span class="cf">if</span> <span class="op">(</span>refcount_dec_and_test<span class="op">(&amp;</span>task<span class="op">-&gt;</span>rcu_users<span class="op">))</span></span>
+<span id="cb14-4">        call_rcu<span class="op">(&amp;</span>task<span class="op">-&gt;</span>rcu<span class="op">,</span> delayed_put_task_struct<span class="op">);</span></span>
+<span id="cb14-5"><span class="op">}</span></span></code></pre></div></div>
+<p><code>rcu_users</code>는 2로 시작합니다. 하나는 <code>release_task()</code>가, 하나는 죽은 태스크에서 스위치되어 나온 직후의 스케줄러(<code>finish_task_switch()</code>)가 내립니다. 둘 다 내려간 뒤에도 곧바로 해제하지 않고 <code>call_rcu()</code>에 맡깁니다. 커널 곳곳에 락 없이 <code>task_struct</code>를 읽는 코드가 있기 때문입니다. <code>getppid()</code>가 <code>real_parent</code>를 따라갈 때, <code>kill()</code>이 PID로 태스크를 찾을 때가 그렇습니다. 그런 읽기가 모두 끝났음이 보장되는 시점, 곧 RCU 유예 기간이 지난 뒤에야 메모리를 풉니다(<a href="ch16.html">16장</a>).</p>
+<div class="callout design"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-layers"></use></svg>설계 노트</div>
+<p><code>task_struct</code> 하나를 없애는 데 단계가 넷입니다. 자원은 <code>do_exit()</code>에서, 스택은 마지막 스위치에서, 이름(PID)은 <code>release_task()</code>에서, 메모리는 RCU 콜백에서 풀립니다. 번거로워 보이지만 각 단계는 "이것을 아직 쓰는 쪽이 누구인가"에 대한 답입니다. 스택은 죽는 태스크 자신이 마지막 순간까지 쓰므로 스스로 풀 수 없고, 종료 코드는 부모가 읽어야 하며, 구조체 메모리는 락 없이 읽는 쪽이 남아 있을 수 있습니다. 여럿이 함께 쓰는 객체의 해제는 한 번의 <code>free()</code>가 아니라, 사용자 부류마다 하나씩 참조를 거둬 가는 과정으로 설계해야 합니다. 그 설계가 틀리면 해제 후 사용(use-after-free)이 됩니다.</p>
+</div>
+<section class="level3" id="부모가-먼저-죽으면">
+<h3>부모가 먼저 죽으면</h3>
+<p>부모가 자식보다 먼저 끝나면 자식은 고아가 됩니다. 고아에게도 종료를 거둬 줄 부모가 있어야 하므로, <code>forget_original_parent()</code>가 새 부모를 정합니다. 찾는 순서는 주석에 적혀 있습니다.</p>
+<div class="code-box is-src"><div class="code-head"><a class="code-file" href="https://github.com/torvalds/linux/blob/v7.3/kernel/exit.c#L640" rel="noopener" target="_blank">kernel/exit.c</a><span class="code-ver">v7.3</span></div><div class="sourceCode" data-file="kernel/exit.c" data-line="640" id="cb15"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb15-1"><span class="co">/*</span></span>
+<span id="cb15-2"><span class="co"> * When we die, we re-parent all our children, and try to:</span></span>
+<span id="cb15-3"><span class="co"> * 1. give them to another thread in our thread group, if such a member exists</span></span>
+<span id="cb15-4"><span class="co"> * 2. give it to the first ancestor process which prctl'd itself as a</span></span>
+<span id="cb15-5"><span class="co"> *    child_subreaper for its children (like a service manager)</span></span>
+<span id="cb15-6"><span class="co"> * 3. give it to the init process (PID 1) in our pid namespace</span></span>
+<span id="cb15-7"><span class="co"> */</span></span></code></pre></div></div>
+<figure class="fig" id="fig-reparent"><div class="fig-body" tabindex="0" title="눌러서 크게 보기"><svg viewBox="0 0 760 336" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>부모를 잃은 태스크의 새 부모를 찾는 순서: 첫째 죽은 부모와 같은 스레드 그룹의 살아 있는 스레드, 둘째 조상 가운데 가장 가까운 서브리퍼, 셋째 PID 네임스페이스의 init.</title>
+
+  <!-- 원래의 부모 사슬 -->
+  <path class="ln thin muted" d="M190 60 V96"/>
+  <path class="ln thin muted" d="M190 140 V176"/>
+  <path class="ln thin muted dash" d="M190 220 V262"/>
+
+  <rect class="box gray" x="90" y="16" width="200" height="44" rx="10"/>
+  <text class="t-b mid" x="190" y="36">init</text>
+  <text class="t-xs mid" x="190" y="53">PID 1 · child_reaper</text>
+
+  <rect class="box purple" x="90" y="96" width="200" height="44" rx="10"/>
+  <text class="t-b mid" x="190" y="116">서비스 관리자</text>
+  <text class="t-xs mid" x="190" y="133">서브리퍼로 등록함</text>
+
+  <rect class="ghost dash" x="80" y="168" width="390" height="60" rx="12"/>
+  <rect class="box red" x="90" y="176" width="200" height="44" rx="10"/>
+  <text class="t-b mid" x="190" y="196">부모 스레드</text>
+  <text class="t-xs tc-red mid" x="190" y="213">종료하는 중</text>
+  <rect class="box green" x="310" y="176" width="150" height="44" rx="10"/>
+  <text class="t-b mid" x="385" y="196">다른 스레드</text>
+  <text class="t-xs mid" x="385" y="213">같은 그룹, 살아 있음</text>
+
+  <rect class="box blue" x="90" y="266" width="200" height="44" rx="10"/>
+  <text class="t-b mid" x="190" y="286">자식</text>
+  <text class="t-xs mid" x="190" y="303">부모를 잃는다</text>
+
+  <!-- 새 부모 후보 -->
+  <path class="ln green" d="M290 288 H385 V226" marker-end="url(#ah-green)"/>
+  <text class="t-b tc-green" x="394" y="262">①</text>
+  <path class="ln purple" d="M90 280 H52 V118 H84" marker-end="url(#ah-purple)"/>
+  <text class="t-b tc-purple" x="34" y="204">②</text>
+  <path class="ln" d="M90 296 H24 V38 H84" marker-end="url(#ah)"/>
+  <text class="t-b" x="8" y="124">③</text>
+
+  <!-- 설명 -->
+  <text class="t-b" x="500" y="36">새 부모를 찾는 순서</text>
+  <text class="t-s tc-green t-b" x="500" y="72">① 같은 스레드 그룹</text>
+  <text class="t-xs" x="500" y="92">부모의 스레드 그룹에 살아 있는</text>
+  <text class="t-xs" x="500" y="108">스레드가 있으면 그 스레드</text>
+  <text class="t-s tc-purple t-b" x="500" y="144">② 가장 가까운 서브리퍼</text>
+  <text class="t-xs" x="500" y="164">조상 가운데 prctl()로</text>
+  <text class="t-xs" x="500" y="180">PR_SET_CHILD_SUBREAPER를 건 것</text>
+  <text class="t-s t-ink t-b" x="500" y="216">③ init</text>
+  <text class="t-xs" x="500" y="236">그 PID 네임스페이스의 PID 1</text>
+  <text class="t-xs" x="500" y="252">컨테이너라면 컨테이너의 init</text>
+  <text class="t-code" x="500" y="296">find_new_reaper()</text>
+</svg></div><figcaption><b>그림 3-7</b>고아의 새 부모 후보 셋. 위에서부터 차례로 찾습니다.</figcaption></figure>
+<p>2번의 <strong>서브리퍼</strong>(subreaper)는 <code>prctl(PR_SET_CHILD_SUBREAPER)</code>로 "내 자손 가운데 고아가 생기면 내가 맡겠다"고 등록한 프로세스입니다. 서비스 관리자가 자기가 띄운 서비스의 손자, 증손자까지 놓치지 않으려고 씁니다. 3번의 init은 그 PID 네임스페이스의 PID 1입니다. 컨테이너 안이라면 컨테이너의 첫 프로세스입니다. 이 프로세스가 <code>wait()</code>를 부르지 않는 프로그램이면 컨테이너 안에 좀비가 쌓입니다. 컨테이너에 작은 init 프로그램을 넣으라고들 하는 이유입니다.</p>
+<div class="callout lab"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-terminal"></use></svg>직접 확인하기</div>
+<p>좀비를 직접 만들어 봅니다.</p>
+<div class="code-box"><div class="code-head"><span class="code-file">zombie.c</span><span class="code-ver">C</span></div><div class="sourceCode" id="cb16" name="zombie.c"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb16-1"><span class="pp">#include </span><span class="im">&lt;stdio.h&gt;</span></span>
+<span id="cb16-2"><span class="pp">#include </span><span class="im">&lt;stdlib.h&gt;</span></span>
+<span id="cb16-3"><span class="pp">#include </span><span class="im">&lt;unistd.h&gt;</span></span>
+<span id="cb16-4"></span>
+<span id="cb16-5"><span class="dt">int</span> main<span class="op">(</span><span class="dt">void</span><span class="op">)</span></span>
+<span id="cb16-6"><span class="op">{</span></span>
+<span id="cb16-7">    pid_t pid <span class="op">=</span> fork<span class="op">();</span></span>
+<span id="cb16-8"></span>
+<span id="cb16-9">    <span class="cf">if</span> <span class="op">(</span>pid <span class="op">==</span> <span class="dv">0</span><span class="op">)</span></span>
+<span id="cb16-10">        exit<span class="op">(</span><span class="dv">42</span><span class="op">);</span>   <span class="co">/* 자식: 곧바로 끝난다 */</span></span>
+<span id="cb16-11"></span>
+<span id="cb16-12">    printf<span class="op">(</span><span class="st">"자식 </span><span class="sc">%d</span><span class="st">를 거두지 않고 30초 기다립니다</span><span class="sc">\n</span><span class="st">"</span><span class="op">,</span> pid<span class="op">);</span></span>
+<span id="cb16-13">    sleep<span class="op">(</span><span class="dv">30</span><span class="op">);</span>      <span class="co">/* 부모: wait()를 부르지 않는다 */</span></span>
+<span id="cb16-14">    <span class="cf">return</span> <span class="dv">0</span><span class="op">;</span></span>
+<span id="cb16-15"><span class="op">}</span></span></code></pre></div></div>
+<div class="code-box"><div class="code-head"><span class="code-lang">터미널</span></div><pre class="console"><code>$ gcc -o zombie zombie.c
+$ ./zombie &amp;
+자식 41533을 거두지 않고 30초 기다립니다
+$ ps -o pid,ppid,stat,rss,comm --ppid $!
+    PID    PPID STAT   RSS COMMAND
+  41533   41532 Z        0 zombie &lt;defunct&gt;
+$ grep -E 'State|VmRSS' /proc/41533/status
+State:  Z (zombie)</code></pre></div>
+<p><code>RSS</code>가 0이고 <code>VmRSS</code> 줄이 없습니다. 주소 공간이 이미 없기 때문입니다. 좀비에게 <code>kill -9</code>를 보내도 사라지지 않습니다. 이미 죽은 태스크라 시그널을 받을 주체가 없습니다. 없애려면 부모가 <code>wait()</code>를 부르거나 부모가 끝나야 합니다. 30초 뒤 부모가 끝나면 좀비는 init이나 서브리퍼에게 넘어가 곧 거둬집니다.</p>
+</div>
+<div class="history"><div class="co-h"><svg aria-hidden="true" viewbox="0 0 48 48"><use href="#i-branch"></use></svg>변천사</div>
+<dl>
+<dt>2.6.25 · 2008</dt>
+<dd>
+<code>TASK_KILLABLE</code>. 치명적 시그널에만 깨어나는 잠이 생겨, 죽일 수 없는 D 상태 프로세스가 줄기 시작합니다.
+</dd>
+<dt>3.4 · 2012</dt>
+<dd>
+<code>PR_SET_CHILD_SUBREAPER</code>. init이 아닌 프로세스도 자손 고아를 거둘 수 있게 됩니다.
+</dd>
+<dt>5.14 · 2021</dt>
+<dd>
+<code>task_struct</code>의 <code>state</code>가 <code>__state</code>로 이름을 바꿉니다. 직접 접근을 찾아내 <code>READ_ONCE()</code>와 <code>WRITE_ONCE()</code>로 바꾸기 위해서였습니다.
+</dd>
+<dt>7.1 · 2026</dt>
+<dd>
+<code>CLONE_AUTOREAP</code>. 부모가 <code>wait</code>하지 않아도 좀비로 남지 않는 자식을 만들 수 있게 됩니다.
+</dd>
+</dl>
+</div>
+</section>
+</section>
+<section class="level2" id="summary">
+<h2>정리<a aria-label="이 절의 링크" class="anchor" href="#summary">#</a></h2>
+<ul>
+<li>태스크의 상태는 <code>__state</code>와 <code>exit_state</code> 두 필드의 비트입니다. <code>TASK_RUNNING</code>은 0이고, 나머지 비트는 실행하지 못하는 이유를 하나씩 나타내며 조합됩니다.</li>
+<li>"실행 중"과 "실행 대기"는 상태값이 아니라 <code>on_cpu</code>와 <code>on_rq</code>로 구분됩니다.</li>
+<li>잠드는 순서는 상태를 바꾸고, 조건을 확인하고, <code>schedule()</code>을 부르는 것입니다. 순서가 바뀌면 깨움을 놓칩니다. <code>wait_event()</code> 계열 매크로가 이 순서를 감쌉니다.</li>
+<li>대기 큐는 기다리는 태스크의 항목을 잇는 리스트입니다. <code>wake_up()</code>은 비배타 대기자 전부와 배타 대기자 하나를 깨웁니다.</li>
+<li>깨운다는 것은 <code>try_to_wake_up()</code>이 상태를 <code>TASK_RUNNING</code>으로 되돌리고 런큐에 넣는 일입니다.</li>
+<li>S는 시그널에 깨어나고 D는 깨어나지 않습니다. <code>TASK_KILLABLE</code>은 치명적 시그널에만 깨어납니다. D 상태의 태스크는 부하 평균에 포함됩니다.</li>
+<li>종료한 태스크는 부모가 <code>wait</code>로 거둘 때까지 <code>task_struct</code>와 PID만 쥔 좀비로 남습니다. <code>task_struct</code> 메모리는 RCU 유예 기간 뒤에 풀립니다.</li>
+<li>고아는 같은 스레드 그룹의 스레드, 가장 가까운 서브리퍼, PID 네임스페이스의 init 순서로 새 부모를 얻습니다.</li>
+</ul>
+</section>
+<section class="level2" id="quiz">
+<h2>확인 문제<a aria-label="이 절의 링크" class="anchor" href="#quiz">#</a></h2>
+<div class="quiz"><div class="q"><div class="q-body">
+<p>다음 코드는 <code>flag</code>가 참이 될 때까지 기다리려는 것입니다. 무엇이 잘못되었고, 어떤 순서로 실행될 때 문제가 드러납니까?</p>
+<div class="code-box"><div class="code-head"><span class="code-lang">C</span></div><div class="sourceCode" id="cb18"><pre class="sourceCode c"><code class="sourceCode c"><span id="cb18-1"><span class="cf">while</span> <span class="op">(!</span>flag<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb18-2">    set_current_state<span class="op">(</span>TASK_INTERRUPTIBLE<span class="op">);</span></span>
+<span id="cb18-3">    schedule<span class="op">();</span></span>
+<span id="cb18-4"><span class="op">}</span></span></code></pre></div></div>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>조건 확인(<code>!flag</code>)이 상태 변경보다 앞에 있습니다. 태스크가 <code>!flag</code>를 참으로 본 직후, <code>set_current_state()</code>를 부르기 전에 다른 CPU가 <code>flag = true</code>로 바꾸고 <code>wake_up_process()</code>를 부르면, 그때 이 태스크는 아직 <code>TASK_RUNNING</code>이므로 깨움은 아무 일도 하지 않습니다. 이어서 태스크가 상태를 <code>TASK_INTERRUPTIBLE</code>로 바꾸고 <code>schedule()</code>을 부르면 런큐에서 빠지고, 다시 깨워 줄 쪽이 없습니다. 고치려면 <code>set_current_state()</code>를 루프의 맨 앞에 두고 그 뒤에 <code>flag</code>를 확인해야 합니다. <code>wait_event_interruptible(wq, flag)</code>를 쓰면 이 순서가 보장됩니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p><code>ps</code>에서 어떤 프로세스가 D 상태로 몇 분째 머물러 있고 <code>kill -9</code>에도 반응하지 않습니다. 이 프로세스의 <code>__state</code>는 무엇이고, <code>SIGKILL</code>이 듣지 않는 이유는 무엇입니까? 같은 D로 보이는데 <code>kill -9</code>가 듣는 프로세스는 무엇이 다릅니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p><code>__state</code>는 <code>TASK_UNINTERRUPTIBLE</code>(0x2)입니다. <code>SIGKILL</code>을 보내면 커널은 <code>TIF_SIGPENDING</code>을 세우고 <code>wake_up_state()</code>를 부르는데, 넘기는 마스크는 <code>TASK_INTERRUPTIBLE</code>에 <code>TASK_WAKEKILL</code>을 더한 것입니다. <code>TASK_UNINTERRUPTIBLE</code>과는 겹치는 비트가 없으므로 <code>try_to_wake_up()</code>의 상태 확인에서 걸러집니다. 시그널은 대기 상태로 남아 있다가 태스크가 다른 이유로 깨어나 유저 모드로 나가려 할 때 처리됩니다. <code>kill -9</code>가 듣는 D는 <code>TASK_KILLABLE</code>입니다. <code>TASK_WAKEKILL</code> 비트가 있어 마스크와 겹치고, <code>signal_pending_state()</code>도 치명적 시그널이면 참을 돌려줍니다. <code>ps</code>가 둘을 모두 D로 보여 주는 것은 <code>TASK_WAKEKILL</code>이 보고용 비트(<code>TASK_REPORT</code>)에 들어 있지 않기 때문입니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>워커 스레드 32개가 한 대기 큐에서 <code>wait_event_interruptible_exclusive()</code>로 일감을 기다립니다. 일감 하나가 들어와 <code>wake_up()</code>이 한 번 불렸습니다. 몇 개의 스레드가 깨어납니까? 깨어난 스레드가 일감을 꺼내려다 실패할 수도 있습니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>하나입니다. 32개 모두 배타 대기자이므로 <code>__wake_up_common()</code>은 첫 항목의 <code>func</code>를 불러 깨우고 <code>nr_exclusive</code>가 0이 되어 멈춥니다. 다만 깨어난 스레드가 일감을 얻는다는 보장은 없습니다. 깨움은 런큐에 넣는 것일 뿐이라, 그 스레드가 실제로 돌기 전에 마침 깨어 있던 다른 스레드가 일감을 먼저 가져갈 수 있습니다. 그래서 <code>wait_event</code> 매크로는 깨어난 뒤 조건을 다시 확인하고, 거짓이면 다시 잠듭니다. "깨어났다"와 "조건이 참이다"는 별개입니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>좀비 프로세스 천 개가 쌓인 서버가 있습니다. 메모리는 거의 줄지 않았는데 새 프로세스가 <code>fork: Resource temporarily unavailable</code>로 실패하기 시작했습니다. 좀비가 쥐고 있는 것과 쥐고 있지 않은 것으로 이 현상을 설명해 보세요.</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>좀비는 <code>do_exit()</code>에서 주소 공간, 파일, 네임스페이스 참조를 이미 놓았고 커널 스택도 마지막 스위치 뒤에 놓았습니다. 남은 것은 <code>task_struct</code>와 <code>struct pid</code>, 그리고 종료 코드와 통계뿐입니다. 그래서 좀비 하나가 쓰는 메모리는 <code>task_struct</code> 하나 남짓입니다. 그러나 좀비도 태스크 하나로 셉니다. <code>release_task()</code>가 불리기 전까지 사용자별 <code>RLIMIT_NPROC</code> 계수, cgroup의 <code>pids.current</code>, PID 번호가 그대로 잡혀 있습니다. <code>fork()</code>가 돌려준 <code>EAGAIN</code>은 <a href="ch01.html">1장</a>에서 본 이 한도들 가운데 하나에 걸린 것입니다. 해결은 좀비를 죽이는 것이 아니라(이미 죽었습니다) 부모가 <code>wait()</code>를 부르게 하거나 부모를 끝내 고아로 만들어 init이 거두게 하는 것입니다.</p>
+</div></details></div><div class="q"><div class="q-body">
+<p>스레드 넷으로 된 프로세스에서 메인 스레드가 아닌 스레드 하나가 <code>pthread_exit()</code>로 끝났습니다. 이 스레드는 좀비가 됩니까? 반대로 메인 스레드만 <code>pthread_exit()</code>로 끝나고 나머지 셋이 계속 돌면 <code>ps</code>에는 어떻게 보입니까?</p>
+
+</div><details class="a"><summary>답 보기</summary><div>
+<p>리더가 아닌 스레드는 좀비로 남지 않습니다. <code>exit_notify()</code>에서 <code>thread_group_leader()</code>가 거짓이므로 <code>autoreap</code>이 참이 되고, <code>exit_state</code>가 곧바로 <code>EXIT_DEAD</code>가 되어 <code>release_task()</code>로 넘어갑니다. 스레드의 종료를 기다리는 <code>pthread_join()</code>은 커널의 <code>wait</code>가 아니라 <code>CLONE_CHILD_CLEARTID</code>와 futex로 구현되기 때문에 좀비가 필요 없습니다. 메인 스레드(그룹 리더)만 끝난 경우는 다릅니다. 리더는 <code>EXIT_ZOMBIE</code>가 되지만 <code>thread_group_empty()</code>가 거짓이라 부모에게 알리지 않고, 나머지 스레드가 모두 끝날 때까지 좀비로 남습니다. 리더의 <code>task_struct</code>가 스레드 그룹의 PID(<code>tgid</code>)를 대표하기 때문입니다. <code>ps</code>에는 그 프로세스가 <code>Zl</code>처럼 좀비이면서 다중 스레드인 상태로 보이고, 나머지 스레드는 <code>ps -L</code>에서 정상적으로 돕니다.</p>
+</div></details></div></div>
+
+
+
+
+</section>
+<section class="level2" id="terms">
+<h2>용어<a aria-label="이 절의 링크" class="anchor" href="#terms">#</a></h2>
+<dl class="terms">
+<dt>__state</dt>
+<dd>
+태스크가 실행 가능한지, 어떤 이유로 잠들었는지를 나타내는 <code>task_struct</code>의 비트 필드.
+</dd>
+<dt>TASK_RUNNING</dt>
+<dd>
+실행 중이거나 런큐에서 실행을 기다리는 상태. 값은 0.
+</dd>
+<dt>깨움 분실<small>lost wakeup</small></dt>
+<dd>
+조건 확인과 잠들기 사이에 깨움이 지나가, 태스크가 깨워 줄 이 없이 잠드는 경쟁 조건.
+</dd>
+<dt>대기 큐<small>wait queue</small></dt>
+<dd>
+같은 사건을 기다리는 태스크의 항목을 이은 리스트. <code>wait_queue_head</code>와 <code>wait_queue_entry</code>로 이루어진다.
+</dd>
+<dt>배타 대기<small>exclusive wait</small></dt>
+<dd>
+<code>wake_up()</code> 한 번에 하나만 깨어나도록 표시한 대기. 떼로 깨어나는 낭비를 막는다.
+</dd>
+<dt>try_to_wake_up</dt>
+<dd>
+태스크의 상태를 <code>TASK_RUNNING</code>으로 되돌리고 런큐에 넣는 함수. 모든 깨움이 여기로 모인다.
+</dd>
+<dt>TASK_KILLABLE</dt>
+<dd>
+보통 시그널에는 깨어나지 않고 치명적 시그널에만 깨어나는 잠. <code>TASK_WAKEKILL | TASK_UNINTERRUPTIBLE</code>.
+</dd>
+<dt>TASK_IDLE</dt>
+<dd>
+부하 평균에 넣지 않는 시그널 불가 잠. 일감을 기다리는 커널 스레드가 쓴다.
+</dd>
+<dt>completion</dt>
+<dd>
+"한 번 끝난다"는 사건을 기다리는 도구. 카운터와 단순 대기 큐로 이루어진다.
+</dd>
+<dt>좀비<small>zombie</small></dt>
+<dd>
+종료했지만 부모가 아직 거두지 않은 태스크. <code>task_struct</code>와 PID만 남아 있다.
+</dd>
+<dt>서브리퍼<small>subreaper</small></dt>
+<dd>
+자손 가운데 생긴 고아를 init 대신 떠맡겠다고 등록한 프로세스.
+</dd>
+<dt>부하 평균<small>load average</small></dt>
+<dd>
+실행 가능한 태스크 수와 D 상태 태스크 수를 더해 지수 평균한 값.
+</dd>
+</dl>
+</section>
+<section class="level2" id="more">
+<h2>더 읽을거리<a aria-label="이 절의 링크" class="anchor" href="#more">#</a></h2>
+<ul>
+<li><a href="https://docs.kernel.org/scheduler/completion.html" rel="noopener" target="_blank"><code>Documentation/scheduler/completion.rst</code></a>: completion의 쓰임과 대기 큐와의 차이.</li>
+<li><a href="https://docs.kernel.org/power/freezing-of-tasks.html" rel="noopener" target="_blank"><code>Documentation/power/freezing-of-tasks.rst</code></a>: 프리저가 태스크를 얼리는 방식과 <code>TASK_FREEZABLE</code>.</li>
+<li><a href="https://docs.kernel.org/admin-guide/sysctl/kernel.html" rel="noopener" target="_blank"><code>Documentation/admin-guide/sysctl/kernel.rst</code></a>: <code>hung_task_timeout_secs</code>를 비롯한 hung task 검사 설정.</li>
+<li><a href="https://man7.org/linux/man-pages/man2/wait.2.html" rel="noopener" target="_blank"><code>wait(2)</code></a>: <code>wait4</code>, <code>waitid</code>와 좀비, <code>SIGCHLD</code>를 무시할 때의 동작.</li>
+<li><a href="https://man7.org/linux/man-pages/man7/signal.7.html" rel="noopener" target="_blank"><code>signal(7)</code></a>: 시그널에 끊긴 시스템 콜이 다시 걸리는 규칙.</li>
+<li>LWN, <a href="https://lwn.net/Articles/288056/" rel="noopener" target="_blank">TASK_KILLABLE</a>: 죽일 수 있는 잠이 들어온 배경.</li>
+</ul>
+</section>
+<footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch02.html"><small>← 2장</small><b>task_struct와 스레드</b></a><a class="next" href="ch04.html"><small>4장 →</small><b>스케줄러의 뼈대</b></a></nav></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+</article>
+<nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#state-bits">상태는 비트 묶음이다</a><a href="#transitions">상태 사이를 오가는 길</a><a href="#sleeping">잠드는 순서</a><a href="#wait-queue">대기 큐</a><a href="#wakeup">깨우는 쪽</a><a href="#signals">시그널이 깨우는 잠, 깨우지 못하는 잠</a><a href="#stopped">멈춤, 주차, 얼림</a><a href="#exit">종료와 좀비</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
+</main>
+</div>
+<script src="../assets/site.js"></script>
+</body>
+</html>

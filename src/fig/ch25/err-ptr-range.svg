@@ -1,0 +1,31 @@
+<svg viewBox="0 0 760 250" xmlns="http://www.w3.org/2000/svg">
+  <title>포인터에 오류 코드 싣기: 64비트 주소 공간의 맨 끝 4095개 값은 유효한 객체의 주소가 될 수 없으므로 오류 코드로 쓰고, IS_ERR는 포인터가 그 범위에 드는지만 본다.</title>
+
+  <text class="t-s t-ink t-b" x="20" y="28">포인터 하나가 가질 수 있는 값</text>
+
+  <rect class="box gray" x="20" y="44" width="60" height="44"/>
+  <text class="t-code mid" x="50" y="71">NULL</text>
+  <rect class="box blue" x="80" y="44" width="480" height="44"/>
+  <text class="t-s t-ink mid" x="320" y="71">유효한 주소가 있을 수 있는 범위</text>
+  <rect class="box red" x="560" y="44" width="180" height="44"/>
+  <text class="t-s t-ink t-b mid" x="650" y="64">오류 코드</text>
+  <text class="t-xs mid" x="650" y="81">맨 끝 4095개</text>
+
+  <text class="t-code tc-muted" x="20" y="108">0</text>
+  <text class="t-code tc-muted mid" x="560" y="108">0xffff…f001</text>
+  <text class="t-code tc-muted end" x="740" y="108">0xffff…ffff</text>
+
+  <rect class="box code" x="20" y="128" width="350" height="76" rx="8"/>
+  <text class="t-xs" x="34" y="148">돌려주는 쪽</text>
+  <text class="t-code" x="34" y="170">return ERR_PTR(-ENOMEM);</text>
+  <text class="t-xs" x="34" y="190">-12를 포인터로 바꾸면 0xffff…fff4</text>
+
+  <rect class="box code" x="390" y="128" width="350" height="76" rx="8"/>
+  <text class="t-xs" x="404" y="148">받는 쪽</text>
+  <text class="t-code" x="404" y="170">if (IS_ERR(p)) return PTR_ERR(p);</text>
+  <text class="t-xs" x="404" y="190">p ≥ (unsigned long)-4095 인지만 본다</text>
+
+  <path class="ln red" d="M195 128 V118 H630 V92" marker-end="url(#ah-red)"/>
+
+  <text class="t-s mid" x="380" y="232">반환값 하나로 "객체", "없음(NULL)", "실패와 그 이유"를 구분한다</text>
+</svg>

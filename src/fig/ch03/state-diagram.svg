@@ -1,0 +1,68 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>v7.3의 태스크 상태도: TASK_NEW에서 wake_up_new_task()로 TASK_RUNNING이 되고, TASK_RUNNING 안에서 런큐 대기와 CPU 실행을 오간다. set_current_state()와 schedule()로 잠들고 try_to_wake_up()으로 깨어난다. SIGSTOP으로 멈추고 SIGCONT로 풀린다. do_exit()로 좀비가 되고 부모의 wait4()로 거둬진다.</title>
+
+  <!-- NEW -->
+  <rect class="box" x="20" y="44" width="120" height="44" rx="10"/>
+  <text class="t-code t-b mid" x="80" y="63">TASK_NEW</text>
+  <text class="t-xs mid" x="80" y="80">만드는 중</text>
+  <text class="t-code mid" x="84" y="108">wake_up_new_task()</text>
+
+  <!-- RUNNING -->
+  <rect class="panel green" x="190" y="16" width="360" height="100" rx="12"/>
+  <text class="t-code t-b" x="204" y="37">TASK_RUNNING</text>
+  <text class="t-xs" x="312" y="37">ps에서 R. 두 경우를 가리지 않는다</text>
+  <rect class="box" x="204" y="46" width="150" height="56" rx="8"/>
+  <text class="t-b mid" x="279" y="69">런큐에서 대기</text>
+  <text class="t-code mid" x="279" y="90">on_rq = 1</text>
+  <rect class="box green" x="386" y="46" width="150" height="56" rx="8"/>
+  <text class="t-b mid" x="461" y="69">CPU에서 실행</text>
+  <text class="t-code mid" x="461" y="90">on_cpu = 1</text>
+  <path class="ln" d="M140 66 H199" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M354 64 H381" marker-end="url(#ah)"/>
+  <path class="ln thin" d="M386 86 H359" marker-end="url(#ah)"/>
+
+  <!-- 멈춤 -->
+  <rect class="box warm" x="620" y="30" width="120" height="60" rx="10"/>
+  <text class="t-code t-b mid" x="680" y="52">TASK_STOPPED</text>
+  <text class="t-xs mid" x="680" y="70">ps에서 T</text>
+  <path class="ln thin warm" d="M550 50 H615" marker-end="url(#ah-warm)"/>
+  <text class="t-code mid" x="585" y="42">SIGSTOP</text>
+  <path class="ln thin warm" d="M620 72 H555" marker-end="url(#ah-warm)"/>
+  <text class="t-code mid" x="585" y="90">SIGCONT</text>
+
+  <!-- 잠 -->
+  <rect class="panel blue" x="190" y="204" width="360" height="92" rx="12"/>
+  <text class="t-b" x="204" y="225">잠든 상태</text>
+  <text class="t-xs" x="278" y="225">런큐에서 빠진다</text>
+  <rect class="box" x="204" y="234" width="166" height="48" rx="8"/>
+  <text class="t-code t-b mid" x="287" y="254">INTERRUPTIBLE · S</text>
+  <text class="t-xs mid" x="287" y="272">시그널로도 깨어난다</text>
+  <rect class="box" x="380" y="234" width="156" height="48" rx="8"/>
+  <text class="t-code t-b mid" x="458" y="254">UNINTERRUPTIBLE · D</text>
+  <text class="t-xs mid" x="458" y="272">깨워 줄 때까지 잔다</text>
+
+  <path class="ln blue" d="M461 116 V198" marker-end="url(#ah-blue)"/>
+  <text class="t-code end" x="452" y="152">set_current_state()</text>
+  <text class="t-code end" x="452" y="170">→ schedule()</text>
+  <path class="ln blue" d="M279 204 V122" marker-end="url(#ah-blue)"/>
+  <text class="t-code end" x="270" y="166">try_to_wake_up()</text>
+
+  <!-- 종료 -->
+  <path class="ln" d="M520 116 V150 H680 V194" marker-end="url(#ah)"/>
+  <text class="t-code mid" x="600" y="143">do_exit()</text>
+  <rect class="box gray" x="620" y="198" width="120" height="48" rx="10"/>
+  <text class="t-code t-b mid" x="680" y="218">EXIT_ZOMBIE</text>
+  <text class="t-xs mid" x="680" y="236">Z · 부모를 기다림</text>
+  <path class="ln" d="M680 246 V288" marker-end="url(#ah)"/>
+  <text class="t-code end" x="672" y="272">wait4()</text>
+  <rect class="box gray" x="620" y="292" width="120" height="48" rx="10"/>
+  <text class="t-code t-b mid" x="680" y="312">EXIT_DEAD</text>
+  <text class="t-xs mid" x="680" y="330">X · 거두는 중</text>
+  <path class="ln" d="M680 340 V356" marker-end="url(#ah)"/>
+  <text class="t-code end" x="740" y="378">release_task()로 해제</text>
+
+  <!-- 주석 -->
+  <text class="t-s" x="20" y="330">위쪽 두 상자 사이: 스케줄러가 고르면 오른쪽으로, 선점되거나 양보하면 왼쪽으로.</text>
+  <text class="t-s" x="20" y="352">깨우는 도중에는 잠깐 TASK_WAKING을 거친다.</text>
+  <text class="t-s" x="20" y="374">종료하는 태스크는 __state가 TASK_DEAD이고, Z와 X는 exit_state에 적힌다.</text>
+</svg>

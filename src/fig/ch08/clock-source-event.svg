@@ -1,0 +1,66 @@
+<svg viewBox="0 0 760 392" xmlns="http://www.w3.org/2000/svg">
+  <title>시간 하드웨어의 두 역할: 카운터를 읽는 clocksource는 timekeeper를 거쳐 시각을 알려 주고, 인터럽트를 예약하는 clock_event_device는 틱과 타이머를 깨운다</title>
+
+  <!-- 왼쪽: 시각 읽기 -->
+  <use href="#i-clock" x="20" y="10" width="32" height="32" class="ic blue"/>
+  <text class="t-l" x="62" y="24">지금 몇 시인가</text>
+  <text class="t-s" x="62" y="42">카운터를 읽어 시각을 계산한다</text>
+
+  <rect class="box blue" x="20" y="58" width="340" height="54" rx="10"/>
+  <text class="t-mono t-b" x="34" y="81">ktime_get() · clock_gettime()</text>
+  <text class="t-s" x="34" y="101">커널 코드와 유저 프로그램이 묻는다</text>
+
+  <rect class="box blue" x="20" y="138" width="340" height="54" rx="10"/>
+  <text class="t-mono t-b" x="34" y="161">struct timekeeper</text>
+  <text class="t-s" x="34" y="181">기준 시각 + 지난 사이클 × mult &gt;&gt; shift</text>
+
+  <rect class="box blue" x="20" y="218" width="340" height="54" rx="10"/>
+  <text class="t-mono t-b" x="34" y="241">struct clocksource</text>
+  <text class="t-code" x="34" y="261">.read()  .mult  .shift  .rating</text>
+
+  <rect class="box gray" x="20" y="298" width="340" height="54" rx="10"/>
+  <text class="t-b" x="34" y="321">카운터</text>
+  <text class="t-s" x="34" y="341">TSC · HPET · ACPI PM · arm arch timer</text>
+
+  <path class="ln blue" d="M190 298 V277" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M190 218 V197" marker-end="url(#ah-blue)"/>
+  <path class="ln blue" d="M190 138 V117" marker-end="url(#ah-blue)"/>
+  <text class="t-xs tc-blue" x="200" y="290">사이클 값</text>
+  <text class="t-xs tc-blue" x="200" y="210">read()</text>
+  <text class="t-xs tc-blue" x="200" y="130">나노초</text>
+
+  <!-- 오른쪽: 이벤트 예약 -->
+  <use href="#i-hourglass" x="400" y="10" width="32" height="32" class="ic warm"/>
+  <text class="t-l" x="442" y="24">언제 깨울까</text>
+  <text class="t-s" x="442" y="42">정한 시각에 인터럽트가 오게 예약한다</text>
+
+  <rect class="box warm" x="400" y="58" width="340" height="54" rx="10"/>
+  <text class="t-b" x="414" y="81">틱 · 타이머 휠 · hrtimer</text>
+  <text class="t-s" x="414" y="101">스케줄러, 타임아웃, nanosleep()</text>
+
+  <rect class="box warm" x="400" y="138" width="340" height="54" rx="10"/>
+  <text class="t-mono t-b" x="414" y="161">tick_device · hrtimer_cpu_base</text>
+  <text class="t-s" x="414" y="181">CPU마다 가장 이른 만료 시각을 고른다</text>
+
+  <rect class="box warm" x="400" y="218" width="340" height="54" rx="10"/>
+  <text class="t-mono t-b" x="414" y="241">struct clock_event_device</text>
+  <text class="t-code" x="414" y="261">.set_next_event()  .event_handler()</text>
+
+  <rect class="box gray" x="400" y="298" width="340" height="54" rx="10"/>
+  <text class="t-b" x="414" y="321">타이머 인터럽트 장치</text>
+  <text class="t-s" x="414" y="341">LAPIC 타이머 · HPET · arm arch timer</text>
+
+  <path class="ln warm" d="M500 112 V133" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M500 192 V213" marker-end="url(#ah-warm)"/>
+  <path class="ln warm" d="M500 272 V293" marker-end="url(#ah-warm)"/>
+  <text class="t-xs tc-warm end" x="490" y="290">예약</text>
+
+  <path class="ln red" d="M640 298 V277" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M640 218 V197" marker-end="url(#ah-red)"/>
+  <path class="ln red" d="M640 138 V117" marker-end="url(#ah-red)"/>
+  <text class="t-xs tc-red" x="650" y="290">인터럽트</text>
+  <text class="t-xs tc-red" x="650" y="210">event_handler()</text>
+  <text class="t-xs tc-red" x="650" y="130">콜백</text>
+
+  <text class="t-s mid" x="380" y="378">같은 칩(HPET, arm arch timer)이 두 역할을 다 해도 커널에는 따로 등록된다</text>
+</svg>

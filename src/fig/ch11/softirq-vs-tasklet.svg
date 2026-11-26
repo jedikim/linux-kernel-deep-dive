@@ -1,0 +1,47 @@
+<svg viewBox="0 0 760 326" xmlns="http://www.w3.org/2000/svg">
+  <title>두 CPU에서 본 직렬화 범위의 차이: 옛 BH는 시스템 전체에서 하나만, 태스크릿은 같은 태스크릿끼리만 직렬화, softirq는 같은 핸들러가 여러 CPU에서 동시에 돈다</title>
+
+  <!-- 옛 BH -->
+  <text class="t-b" x="20" y="30">옛 BH (2.2까지)</text>
+  <text class="t-xs" x="150" y="30">종류가 달라도 시스템 전체에서 한 번에 하나만 돈다</text>
+  <text class="t-s" x="36" y="60">CPU 0</text>
+  <rect class="box gray" x="110" y="42" width="190" height="26" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="60">BH ①</text>
+  <text class="t-s" x="36" y="92">CPU 1</text>
+  <rect class="box red" x="170" y="74" width="130" height="26" rx="6"/>
+  <rect x="170" y="74" width="130" height="26" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box gray" x="300" y="74" width="160" height="26" rx="6"/>
+  <text class="t-s t-ink mid" x="380" y="92">BH ②</text>
+  <text class="t-xs tc-red" x="470" y="92">← CPU 0의 BH가 끝나야 시작한다</text>
+
+  <path class="ln thin muted dash" d="M20 110 H740"/>
+
+  <!-- 태스크릿 -->
+  <text class="t-b" x="20" y="134">태스크릿</text>
+  <text class="t-xs" x="150" y="134">같은 태스크릿은 한 번에 한 CPU에서만, 다른 태스크릿과는 동시에</text>
+  <text class="t-s" x="36" y="164">CPU 0</text>
+  <rect class="box purple" x="110" y="146" width="190" height="26" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="164">태스크릿 T</text>
+  <text class="t-xs" x="310" y="164">U는 T와 겹쳐서 돌 수 있다</text>
+  <text class="t-s" x="36" y="196">CPU 1</text>
+  <rect class="box purple" x="150" y="178" width="110" height="26" rx="6"/>
+  <text class="t-s t-ink mid" x="205" y="196">태스크릿 U</text>
+  <rect class="box red" x="260" y="178" width="40" height="26" rx="6"/>
+  <rect x="260" y="178" width="40" height="26" rx="6" fill="url(#hatch-red)"/>
+  <rect class="box purple" x="300" y="178" width="140" height="26" rx="6"/>
+  <text class="t-s t-ink mid" x="370" y="196">태스크릿 T</text>
+  <text class="t-xs tc-red" x="450" y="196">← T는 CPU 0에서 끝난 뒤에야 다시 돈다</text>
+
+  <path class="ln thin muted dash" d="M20 214 H740"/>
+
+  <!-- softirq -->
+  <text class="t-b" x="20" y="238">softirq</text>
+  <text class="t-xs" x="150" y="238">같은 핸들러가 여러 CPU에서 동시에 돈다</text>
+  <text class="t-s" x="36" y="268">CPU 0</text>
+  <rect class="box purple" x="110" y="250" width="220" height="26" rx="6"/>
+  <text class="t-code mid" x="220" y="267">net_rx_action()</text>
+  <text class="t-s" x="36" y="300">CPU 1</text>
+  <rect class="box purple" x="170" y="282" width="220" height="26" rx="6"/>
+  <text class="t-code mid" x="280" y="299">net_rx_action()</text>
+  <text class="t-xs" x="400" y="300">← 기다리지 않는다. 공유 데이터는 핸들러가 지킨다</text>
+</svg>
