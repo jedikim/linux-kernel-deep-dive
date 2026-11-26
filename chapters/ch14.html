@@ -9,6 +9,7 @@
 <meta property="og:title" content="스핀락과 뮤텍스 — 리눅스 커널 깊이 읽기">
 <meta property="og:description" content="기다리는 두 가지 방법과 그 내부">
 <meta property="og:type" content="article">
+<link rel="license" href="https://creativecommons.org/publicdomain/zero/1.0/deed.ko">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
@@ -1212,7 +1213,7 @@ CPU별 데이터를 보호하는 구간에 이름을 붙인 락. 일반 커널�
 </ul>
 </section>
 <footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch13.html"><small>← 13장</small><b>경쟁 조건과 실행 컨텍스트</b></a><a class="next" href="ch15.html"><small>15장 →</small><b>우선순위 역전과 상속</b></a></nav></footer>
-<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p><p class="foot-lic">글과 그림 <a href="https://creativecommons.org/publicdomain/zero/1.0/deed.ko" target="_blank" rel="noopener license">CC0 1.0</a> · 인용한 커널 소스 <a href="https://github.com/torvalds/linux/blob/v7.3/COPYING" target="_blank" rel="noopener">GPL-2.0</a></p></footer>
 </article>
 <nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#spin-or-sleep">돌 것인가 잠들 것인가</a><a href="#layers">스핀락의 층</a><a href="#qspinlock">qspinlock: 줄을 서는 스핀락</a><a href="#rw-seq">읽는 쪽이 많을 때: rwlock과 seqlock</a><a href="#mutex">뮤텍스</a><a href="#others">그 밖의 잠드는 락</a><a href="#rt">local_lock과 PREEMPT_RT의 치환</a><a href="#guard">범위로 잡는 락과 컴파일러의 검사</a><a href="#measure">경합을 재는 법</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
 </main>

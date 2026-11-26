@@ -9,6 +9,7 @@
 <meta property="og:title" content="블록 계층과 io_uring — 리눅스 커널 깊이 읽기">
 <meta property="og:description" content="bio에서 blk-mq까지, 그리고 시스템 콜을 줄이는 I/O">
 <meta property="og:type" content="article">
+<link rel="license" href="https://creativecommons.org/publicdomain/zero/1.0/deed.ko">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
@@ -1211,7 +1212,7 @@ io_uring에서 커널이 결과(CQE)를 넣고 유저가 꺼내는 링.
 </ul>
 </section>
 <footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch20.html"><small>← 20장</small><b>VFS와 파일시스템</b></a><a class="next" href="ch22.html"><small>22장 →</small><b>네임스페이스와 cgroup</b></a></nav></footer>
-<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p><p class="foot-lic">글과 그림 <a href="https://creativecommons.org/publicdomain/zero/1.0/deed.ko" target="_blank" rel="noopener license">CC0 1.0</a> · 인용한 커널 소스 <a href="https://github.com/torvalds/linux/blob/v7.3/COPYING" target="_blank" rel="noopener">GPL-2.0</a></p></footer>
 </article>
 <nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#bio">블록 계층의 자리와 bio</a><a href="#blk-mq">blk-mq: 소프트웨어 큐와 하드웨어 큐</a><a href="#iosched">I/O 스케줄러</a><a href="#completion">완료: 인터럽트에서 bio_endio()까지</a><a href="#stacking">쌓기와 요즘 장치</a><a href="#api-history">I/O API의 변천</a><a href="#rings">io_uring의 두 링</a><a href="#execution">요청이 실행되는 세 길</a><a href="#savings">경계를 넘는 비용 줄이기</a><a href="#security">공격 표면과 제한</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
 </main>

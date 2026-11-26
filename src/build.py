@@ -341,8 +341,11 @@ def sidebar(active, root):
 
 def site_footer():
     links = ''.join(f'<a href="{esc(u)}" target="_blank" rel="noopener">{esc(n)}</a>' for n, u in BOOK['links'])
+    lic = BOOK['license']
     return (f'<footer class="site-foot"><p><b>{esc(BOOK["author"])}</b></p>'
-            f'<p class="foot-links"><a href="{esc(BOOK["repo"])}" target="_blank" rel="noopener">GitHub</a>{links}</p></footer>')
+            f'<p class="foot-links"><a href="{esc(BOOK["repo"])}" target="_blank" rel="noopener">GitHub</a>{links}</p>'
+            f'<p class="foot-lic">글과 그림 <a href="{esc(lic["url"])}" target="_blank" rel="noopener license">{esc(lic["name"])}</a>'
+            f' · 인용한 커널 소스 <a href="{esc(BOOK["source"])}COPYING" target="_blank" rel="noopener">GPL-2.0</a></p></footer>')
 
 
 def page(title, body, page_id, root, crumb, toc=None, desc=''):
@@ -361,6 +364,7 @@ def page(title, body, page_id, root, crumb, toc=None, desc=''):
 <meta property="og:title" content="{esc(title)}">
 <meta property="og:description" content="{esc(desc)}">
 <meta property="og:type" content="article">
+<link rel="license" href="{esc(BOOK["license"]["url"])}">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>try{{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}}catch(e){{}}</script>
 {FONTS}

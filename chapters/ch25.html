@@ -9,6 +9,7 @@
 <meta property="og:title" content="C로 쓴 객체지향 — 리눅스 커널 깊이 읽기">
 <meta property="og:description" content="커널 코드에 반복해서 나오는 설계 패턴">
 <meta property="og:type" content="article">
+<link rel="license" href="https://creativecommons.org/publicdomain/zero/1.0/deed.ko">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23a85d00'/%3E%3Cpath d='M10 7v18M22 7l-11 9.5L22 25' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <script>try{var t=JSON.parse(localStorage.getItem('lkd-theme')||'""');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
@@ -1013,7 +1014,7 @@ Kconfig 옵션이 켜졌는지를 컴파일 시점 상수 1이나 0으로 바꾸
 </ul>
 </section>
 <footer class="ch-foot"><button class="read-btn" id="read-btn" type="button" aria-pressed="false">읽음으로 표시</button><nav class="pager" aria-label="이전·다음 장"><a class="prev" href="ch24.html"><small>← 24장</small><b>eBPF</b></a><a class="next" href="ch26.html"><small>26장 →</small><b>커널은 어떻게 만들어지는가</b></a></nav></footer>
-<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p></footer>
+<footer class="site-foot"><p><b>Jedi Kim</b></p><p class="foot-links"><a href="https://github.com/jedikim/linux-kernel-deep-dive" target="_blank" rel="noopener">GitHub</a><a href="https://www.linkedin.com/in/jedikim/" target="_blank" rel="noopener">LinkedIn</a><a href="https://jedikim.com" target="_blank" rel="noopener">jedikim.com</a></p><p class="foot-lic">글과 그림 <a href="https://creativecommons.org/publicdomain/zero/1.0/deed.ko" target="_blank" rel="noopener license">CC0 1.0</a> · 인용한 커널 소스 <a href="https://github.com/torvalds/linux/blob/v7.3/COPYING" target="_blank" rel="noopener">GPL-2.0</a></p></footer>
 </article>
 <nav class="toc" aria-label="이 장의 순서"><h2>이 장의 순서</h2><a href="#ops">ops 테이블: 인터페이스와 구현</a><a href="#container-of">내장과 container_of</a><a href="#lists">침습형 리스트</a><a href="#refcount">수명: 참조 카운트</a><a href="#errors">오류 처리: errno, ERR_PTR, goto</a><a href="#cleanup">범위 기반 정리: guard()와 자동 해제</a><a href="#config">설정: Kconfig에서 죽은 코드 제거까지</a><a href="#fastpath">빠른 경로를 위해 코드를 고쳐 쓰기</a><a href="#macros">매크로: 제네릭과 코드 생성</a><a href="#registration">등록, initcall, 링커 섹션</a><a href="#annotations">도구가 읽는 주석</a><a href="#style">코딩 스타일, 그리고 Rust</a><a href="#summary">정리</a><a href="#quiz">확인 문제</a><a href="#terms">용어</a><a href="#more">더 읽을거리</a></nav>
 </main>

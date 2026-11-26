@@ -18,8 +18,6 @@
 
 Jedi Kim — [LinkedIn](https://www.linkedin.com/in/jedikim/) · [jedikim.com](https://jedikim.com)
 
-본문에 인용한 리눅스 커널 소스는 [GPL-2.0](https://github.com/torvalds/linux/blob/v7.3/COPYING)을 따릅니다.
-
 ## 빌드
 
 ```bash
@@ -27,3 +25,7 @@ python3 src/build.py
 ```
 
 원고는 `src/content/`, 그림은 `src/fig/`에 있습니다. `pandoc`과 Python 3(`beautifulsoup4`)가 필요합니다.
+
+## 저작권
+
+[CC0 1.0](LICENSE). 글과 그림은 누구나 자유롭게 복사하고, 고치고, 배포할 수 있습니다. 본문에 인용한 리눅스 커널 소스는 [GPL-2.0](https://github.com/torvalds/linux/blob/v7.3/COPYING)을 따르고, SPDX 표시가 붙은 예제 코드는 그 표시를 따릅니다.

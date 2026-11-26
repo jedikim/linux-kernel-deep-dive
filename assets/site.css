@@ -296,6 +296,7 @@ svg a text{pointer-events:none}
 .site-foot p{margin:4px 0}
 .site-foot b{color:var(--ink-2);font-weight:650}
 .site-foot a{color:var(--ink-2);margin:0 8px}
+.site-foot .foot-lic a{margin:0 2px}
 
 /* ── 표지 ── */
 .hero{padding:14px 0 4px}

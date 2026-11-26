@@ -10,6 +10,10 @@
     ["LinkedIn", "https://www.linkedin.com/in/jedikim/"],
     ["jedikim.com", "https://jedikim.com"]
   ],
+  "license": {
+    "name": "CC0 1.0",
+    "url": "https://creativecommons.org/publicdomain/zero/1.0/deed.ko"
+  },
   "pages": [
     {"id": "refs", "title": "참고 자료", "sym": "§"}
   ],
